@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo } from "react";
 import {
   Background,
   BackgroundVariant,
+  ConnectionLineType,
   Controls,
   MiniMap,
+  Panel,
   ReactFlow,
   useEdgesState,
   useNodesState,
@@ -18,20 +20,30 @@ import {
   type CalculationObjectNodeType,
 } from "./CalculationObjectNode";
 import { parseHandleId } from "../lib/display";
+import type { WorkspaceEdit } from "../lib/projectEdits";
+import type { QuantitySpec } from "../lib/quantities";
 import type { MappingEdge, ProjectDocument } from "../types/contract";
 
 const nodeTypes = { calculationObject: CalculationObjectNode };
 
+const defaultEdgeOptions = {
+  type: "smoothstep" as const,
+  animated: false,
+  className: "mapping-edge",
+};
+
 interface FlowCanvasProps {
   project: ProjectDocument;
+  quantities: QuantitySpec[];
   onProjectChange: (project: ProjectDocument) => void;
   onGraphEvaluate: (project: ProjectDocument, dirtyObjectIds?: string[]) => void;
-  onInputChange: (objectId: string, variableId: string, raw: string) => void;
+  onEdit: (edit: WorkspaceEdit) => void;
 }
 
 function toFlowNodes(
   project: ProjectDocument,
-  onInputChange: FlowCanvasProps["onInputChange"],
+  quantities: QuantitySpec[],
+  onEdit: (edit: WorkspaceEdit) => void,
 ): CalculationObjectNodeType[] {
   return project.objects.map((object) => ({
     id: object.id,
@@ -40,7 +52,8 @@ function toFlowNodes(
     data: {
       object,
       mappedInputIds: mappedInputsForObject(object.id, project.edges),
-      onInputChange,
+      quantities,
+      onEdit,
     },
     draggable: true,
   }));
@@ -53,22 +66,22 @@ function toFlowEdges(edges: MappingEdge[]): Edge[] {
     target: edge.targetObjectId,
     sourceHandle: `out:${edge.sourceVariableId}`,
     targetHandle: `in:${edge.targetVariableId}`,
-    animated: true,
+    type: "smoothstep",
     className: "mapping-edge",
     label: `${edge.sourceVariableId} → ${edge.targetVariableId}`,
   }));
 }
 
-export function FlowCanvas({ project, onProjectChange, onGraphEvaluate, onInputChange }: FlowCanvasProps) {
-  const initialNodes = useMemo(() => toFlowNodes(project, onInputChange), [project, onInputChange]);
+export function FlowCanvas({ project, quantities, onProjectChange, onGraphEvaluate, onEdit }: FlowCanvasProps) {
+  const initialNodes = useMemo(() => toFlowNodes(project, quantities, onEdit), [onEdit, project, quantities]);
   const initialEdges = useMemo(() => toFlowEdges(project.edges), [project.edges]);
   const [nodes, setNodes, onNodesChange] = useNodesState<CalculationObjectNodeType>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   useEffect(() => {
-    setNodes(toFlowNodes(project, onInputChange));
+    setNodes(toFlowNodes(project, quantities, onEdit));
     setEdges(toFlowEdges(project.edges));
-  }, [onInputChange, project, setEdges, setNodes]);
+  }, [onEdit, project, quantities, setEdges, setNodes]);
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -115,6 +128,8 @@ export function FlowCanvas({ project, onProjectChange, onGraphEvaluate, onInputC
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
       isValidConnection={isValidConnection}
+      defaultEdgeOptions={defaultEdgeOptions}
+      connectionLineType={ConnectionLineType.SmoothStep}
       onNodeDragStop={(_event, node) => {
         onProjectChange({
           ...project,
@@ -124,7 +139,7 @@ export function FlowCanvas({ project, onProjectChange, onGraphEvaluate, onInputC
         });
       }}
       fitView
-      fitViewOptions={{ padding: 0.2 }}
+      fitViewOptions={{ padding: 0.18 }}
       deleteKeyCode={["Backspace", "Delete"]}
       onEdgesDelete={(deleted) => {
         const removed = new Set(deleted.map((edge) => edge.id));
@@ -142,6 +157,11 @@ export function FlowCanvas({ project, onProjectChange, onGraphEvaluate, onInputC
       <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} color="#243044" />
       <Controls />
       <MiniMap pannable zoomable nodeColor="#16324a" maskColor="rgba(6, 10, 16, 0.72)" />
+      <Panel position="top-left" className="canvas-panel">
+        <button type="button" className="ghost-btn" onClick={() => onEdit({ type: "addObject" })}>
+          + 객체 추가
+        </button>
+      </Panel>
     </ReactFlow>
   );
 }

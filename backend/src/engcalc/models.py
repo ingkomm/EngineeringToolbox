@@ -21,6 +21,7 @@ class InputVariable(BaseModel):
 
     id: str
     value: float | None = None
+    quantity: str | None = None
     unit: str | None = None
     status: VariableStatus = "idle"
     error: str | None = None
@@ -30,8 +31,9 @@ class FormulaVariable(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str
-    formula: str
+    formula: str = ""
     value: float | None = None
+    quantity: str | None = None
     unit: str | None = None
     status: VariableStatus = "idle"
     error: str | None = None
@@ -43,6 +45,7 @@ class OutputBinding(BaseModel):
     id: str
     sourceVariableId: str
     value: float | None = None
+    quantity: str | None = None
     unit: str | None = None
     status: VariableStatus = "idle"
     error: str | None = None

@@ -11,9 +11,9 @@ from engcalc.models import (
     EvaluateResponse,
     FormulaVariable,
     InputVariable,
-    OutputBinding,
     ProjectDocument,
 )
+from engcalc.quantities import is_known_quantity, si_unit_for
 
 VARIABLE_ID_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -98,6 +98,17 @@ def _validate_structure(project: ProjectDocument) -> list[EvalError]:
                     )
                 )
             seen.add(variable)
+
+        for item in [*obj.inputs, *obj.calculations, *obj.outputs]:
+            if item.quantity and not is_known_quantity(item.quantity):
+                errors.append(
+                    EvalError(
+                        objectId=obj.id,
+                        variableId=item.id,
+                        code="UNKNOWN_QUANTITY",
+                        message=f"Unknown quantity {item.quantity}",
+                    )
+                )
 
         local_ids = {item.id for item in obj.inputs} | {item.id for item in obj.calculations}
         output_ids = [output.id for output in obj.outputs]
@@ -253,6 +264,10 @@ def _evaluate_object(
     inputs_by_id = {item.id: item for item in obj.inputs}
     calculations_by_id = {item.id: item for item in obj.calculations}
 
+    for item in [*obj.inputs, *obj.calculations]:
+        if item.quantity:
+            item.unit = si_unit_for(item.quantity)
+
     mapped_targets = {edge.targetVariableId for edge in inbound}
     for edge in inbound:
         target = inputs_by_id.get(edge.targetVariableId)
@@ -274,38 +289,63 @@ def _evaluate_object(
             (item for item in source_obj.outputs if item.id == edge.sourceVariableId),
             None,
         )
-        if source_output is None or source_output.value is None:
+        if source_output is None:
+            _mark_input_error(target, "UNKNOWN_OUTPUT_PORT", "Mapped source port is missing")
+            errors.append(
+                EvalError(
+                    objectId=obj.id,
+                    variableId=target.id,
+                    code="UNKNOWN_OUTPUT_PORT",
+                    message="Mapped source port is missing",
+                )
+            )
+            continue
+        if (
+            target.quantity
+            and source_output.quantity
+            and target.quantity != source_output.quantity
+        ):
             _mark_input_error(
                 target,
-                "UNRESOLVED_MAPPING",
-                f"Mapped source {edge.sourceObjectId}.{edge.sourceVariableId} has no value",
+                "QUANTITY_MISMATCH",
+                f"{source_output.quantity} cannot map onto {target.quantity}",
             )
             errors.append(
                 EvalError(
                     objectId=obj.id,
                     variableId=target.id,
-                    code="UNRESOLVED_MAPPING",
-                    message=f"Mapped source {edge.sourceObjectId}.{edge.sourceVariableId} has no value",
+                    code="QUANTITY_MISMATCH",
+                    message=f"{edge.sourceObjectId}.{edge.sourceVariableId} ({source_output.quantity}) "
+                    f"cannot map onto {target.id} ({target.quantity})",
                 )
             )
+            continue
+        if source_output.value is None:
+            target.value = None
+            target.status = "idle" if source_output.status != "error" else "error"
+            target.error = None if target.status == "idle" else "Mapped source has no value"
+            if target.status == "error":
+                errors.append(
+                    EvalError(
+                        objectId=obj.id,
+                        variableId=target.id,
+                        code="UNRESOLVED_MAPPING",
+                        message=f"Mapped source {edge.sourceObjectId}.{edge.sourceVariableId} has no value",
+                    )
+                )
             continue
         target.value = source_output.value
         target.status = "mapped"
         target.error = None
+        if source_output.quantity and not target.quantity:
+            target.quantity = source_output.quantity
+            target.unit = source_output.unit
 
     for item in obj.inputs:
         if item.id not in mapped_targets:
             if item.value is None:
-                item.status = "error"
-                item.error = "Input has no value"
-                errors.append(
-                    EvalError(
-                        objectId=obj.id,
-                        variableId=item.id,
-                        code="MISSING_INPUT",
-                        message=f"Input {item.id} has no value",
-                    )
-                )
+                item.status = "idle"
+                item.error = None
             else:
                 item.status = "ok"
                 item.error = None
@@ -333,6 +373,11 @@ def _evaluate_object(
         return errors
 
     for item in calc_order:
+        if not item.formula.strip():
+            item.value = None
+            item.status = "idle"
+            item.error = None
+            continue
         try:
             names = referenced_names(item.formula)
             unknown = [name for name in names if name not in env and name not in calculations_by_id]
@@ -364,15 +409,19 @@ def _evaluate_object(
                 )
             )
 
-    local_values: dict[str, tuple[float | None, str | None]] = {}
+    local_meta: dict[str, tuple[float | None, str | None, str | None, str]] = {}
     for item in obj.inputs:
-        local_values[item.id] = (item.value, item.unit)
+        local_meta[item.id] = (item.value, item.unit, item.quantity, item.status)
     for item in obj.calculations:
-        local_values[item.id] = (item.value, item.unit)
+        local_meta[item.id] = (item.value, item.unit, item.quantity, item.status)
 
     for output in obj.outputs:
-        source_value, source_unit = local_values.get(output.sourceVariableId, (None, None))
-        if output.sourceVariableId not in local_values:
+        if not output.sourceVariableId:
+            output.value = None
+            output.status = "idle"
+            output.error = None
+            continue
+        if output.sourceVariableId not in local_meta:
             output.value = None
             output.status = "error"
             output.error = f"Unknown source variable {output.sourceVariableId}"
@@ -385,21 +434,24 @@ def _evaluate_object(
                 )
             )
             continue
+        source_value, source_unit, source_quantity, source_status = local_meta[output.sourceVariableId]
+        output.quantity = source_quantity
+        output.unit = source_unit
         if source_value is None:
             output.value = None
-            output.status = "error"
-            output.error = f"Source {output.sourceVariableId} has no value"
-            errors.append(
-                EvalError(
-                    objectId=obj.id,
-                    variableId=output.id,
-                    code="UNRESOLVED_OUTPUT",
-                    message=output.error,
+            output.status = "error" if source_status == "error" else "idle"
+            output.error = None if output.status == "idle" else f"Source {output.sourceVariableId} has no value"
+            if output.status == "error":
+                errors.append(
+                    EvalError(
+                        objectId=obj.id,
+                        variableId=output.id,
+                        code="UNRESOLVED_OUTPUT",
+                        message=output.error or "",
+                    )
                 )
-            )
             continue
         output.value = source_value
-        output.unit = output.unit or source_unit
         output.status = "ok"
         output.error = None
 

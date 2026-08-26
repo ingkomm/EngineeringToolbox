@@ -34,6 +34,7 @@
       "properties": {
         "id": { "$ref": "#/$defs/variableId" },
         "value": { "type": ["number", "null"] },
+        "quantity": { "type": ["string", "null"] },
         "unit": { "type": ["string", "null"] },
         "status": { "$ref": "#/$defs/variableStatus" },
         "error": { "type": ["string", "null"] }
@@ -45,8 +46,9 @@
       "required": ["id", "formula"],
       "properties": {
         "id": { "$ref": "#/$defs/variableId" },
-        "formula": { "type": "string", "minLength": 1 },
+        "formula": { "type": "string" },
         "value": { "type": ["number", "null"] },
+        "quantity": { "type": ["string", "null"] },
         "unit": { "type": ["string", "null"] },
         "status": { "$ref": "#/$defs/variableStatus" },
         "error": { "type": ["string", "null"] }
@@ -60,6 +62,7 @@
         "id": { "$ref": "#/$defs/variableId" },
         "sourceVariableId": { "$ref": "#/$defs/variableId" },
         "value": { "type": ["number", "null"] },
+        "quantity": { "type": ["string", "null"] },
         "unit": { "type": ["string", "null"] },
         "status": { "$ref": "#/$defs/variableStatus" },
         "error": { "type": ["string", "null"] }

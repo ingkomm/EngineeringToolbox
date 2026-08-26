@@ -127,3 +127,67 @@ def test_engine_is_pure_json_roundtrip() -> None:
     result = evaluate_project(project)
     payload = json.loads(result.model_dump_json())
     assert payload["project"]["objects"][0]["calculations"][1]["value"] == 360.0
+    assert payload["project"]["objects"][0]["inputs"][0]["unit"] == "kg/s"
+
+
+def test_draft_object_is_idle_not_error() -> None:
+    project = ProjectDocument(
+        id="draft",
+        name="draft",
+        objects=[
+            CalculationObject(
+                id="obj-1",
+                name="Object 1",
+                position=Position(x=0, y=0),
+                inputs=[InputVariable(id="FLOW", value=None, quantity="mass_flow")],
+                calculations=[FormulaVariable(id="POWER", formula="", quantity="power")],
+                outputs=[OutputBinding(id="POWER", sourceVariableId="POWER")],
+            )
+        ],
+        edges=[],
+    )
+    result = evaluate_project(project)
+    assert result.errors == []
+    obj = result.project.objects[0]
+    assert obj.inputs[0].status == "idle"
+    assert obj.inputs[0].unit == "kg/s"
+    assert obj.calculations[0].status == "idle"
+    assert obj.outputs[0].status == "idle"
+
+
+def test_quantity_mismatch_on_mapping() -> None:
+    project = ProjectDocument(
+        id="mismatch",
+        name="mismatch",
+        objects=[
+            CalculationObject(
+                id="src",
+                name="Src",
+                position=Position(x=0, y=0),
+                inputs=[InputVariable(id="P", value=10, quantity="pressure")],
+                calculations=[],
+                outputs=[OutputBinding(id="P", sourceVariableId="P")],
+            ),
+            CalculationObject(
+                id="dst",
+                name="Dst",
+                position=Position(x=1, y=0),
+                inputs=[InputVariable(id="T", value=None, quantity="temperature")],
+                calculations=[],
+                outputs=[],
+            ),
+        ],
+        edges=[
+            Edge(
+                id="e1",
+                sourceObjectId="src",
+                sourceVariableId="P",
+                targetObjectId="dst",
+                targetVariableId="T",
+            )
+        ],
+    )
+    result = evaluate_project(project)
+    assert any(err.code == "QUANTITY_MISMATCH" for err in result.errors)
+    dest = next(obj for obj in result.project.objects if obj.id == "dst")
+    assert dest.inputs[0].value is None

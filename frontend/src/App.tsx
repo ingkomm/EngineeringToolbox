@@ -1,18 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 
-import { checkHealth, evaluateProject } from "./api/client";
+import { checkHealth, evaluateProject, fetchQuantities } from "./api/client";
 import { FlowCanvas } from "./canvas/FlowCanvas";
-import { prototypeProject } from "./example/prototypeProject";
+import { blankProject } from "./example/blankProject";
+import { FALLBACK_QUANTITIES, type QuantitySpec } from "./lib/quantities";
+import { applyWorkspaceEdit, type WorkspaceEdit } from "./lib/projectEdits";
 import type { EvalError, ProjectDocument } from "./types/contract";
 
 export function App() {
-  const [project, setProject] = useState<ProjectDocument>(prototypeProject);
+  const [project, setProject] = useState<ProjectDocument>(blankProject);
+  const [quantities, setQuantities] = useState<QuantitySpec[]>(FALLBACK_QUANTITIES);
   const [errors, setErrors] = useState<EvalError[]>([]);
   const [evaluated, setEvaluated] = useState<string[]>([]);
   const [backendUp, setBackendUp] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("Python 계산 엔진에 연결하는 중");
+  const [message, setMessage] = useState("변수와 수식을 직접 정의하세요");
   const debounceRef = useRef<number | null>(null);
   const projectRef = useRef(project);
   const requestSeq = useRef(0);
@@ -30,8 +33,10 @@ export function App() {
       setBackendUp(true);
       setMessage(
         result.errors.length
-          ? `평가 완료 · 오류 ${result.errors.length}건`
-          : `평가 완료 · ${result.evaluatedObjectIds.join(", ") || "none"}`,
+          ? `계산 오류 ${result.errors.length}건`
+          : result.evaluatedObjectIds.length
+            ? `계산 완료 · ${result.evaluatedObjectIds.join(", ")}`
+            : "계산할 수식이 없습니다",
       );
     } catch (error) {
       if (seq !== requestSeq.current) return;
@@ -42,42 +47,40 @@ export function App() {
     }
   }, []);
 
+  const scheduleEvaluate = useCallback(
+    (next: ProjectDocument, dirtyObjectIds?: string[]) => {
+      if (debounceRef.current) window.clearTimeout(debounceRef.current);
+      debounceRef.current = window.setTimeout(() => {
+        void runEvaluate(next, dirtyObjectIds);
+      }, 320);
+    },
+    [runEvaluate],
+  );
+
   useEffect(() => {
     void (async () => {
       const ok = await checkHealth();
       setBackendUp(ok);
-      if (ok) {
-        await runEvaluate(prototypeProject);
-      } else {
+      setQuantities(await fetchQuantities());
+      if (!ok) {
         setMessage("Python API가 실행 중이 아닙니다. backend를 먼저 시작하세요.");
       }
     })();
-  }, [runEvaluate]);
+  }, []);
 
-  const onInputChange = useCallback(
-    (objectId: string, variableId: string, raw: string) => {
-      const current = projectRef.current;
-      const next: ProjectDocument = {
-        ...current,
-        objects: current.objects.map((object) => {
-          if (object.id !== objectId) return object;
-          return {
-            ...object,
-            inputs: object.inputs.map((item) => {
-              if (item.id !== variableId) return item;
-              const value = raw === "" ? null : Number(raw);
-              return { ...item, value: value !== null && Number.isNaN(value) ? item.value : value };
-            }),
-          };
-        }),
-      };
-      setProject(next);
-      if (debounceRef.current) window.clearTimeout(debounceRef.current);
-      debounceRef.current = window.setTimeout(() => {
-        void runEvaluate(next, [objectId]);
-      }, 280);
+  const onEdit = useCallback(
+    (edit: WorkspaceEdit) => {
+      const result = applyWorkspaceEdit(projectRef.current, edit, quantities);
+      setProject(result.project);
+      setErrors([]);
+      if (result.shouldEvaluate) {
+        scheduleEvaluate(result.project, result.dirtyObjectIds);
+      } else {
+        setMessage("변수와 수식을 직접 정의하세요");
+        setEvaluated([]);
+      }
     },
-    [runEvaluate],
+    [quantities, scheduleEvaluate],
   );
 
   const mappingJson = useMemo(
@@ -87,8 +90,12 @@ export function App() {
           objects: project.objects.map((object) => ({
             id: object.id,
             name: object.name,
-            inputs: object.inputs.map((item) => item.id),
-            calculations: object.calculations.map((item) => ({ id: item.id, formula: item.formula })),
+            inputs: object.inputs.map((item) => ({ id: item.id, quantity: item.quantity ?? null, unit: item.unit ?? null })),
+            calculations: object.calculations.map((item) => ({
+              id: item.id,
+              formula: item.formula,
+              quantity: item.quantity ?? null,
+            })),
             outputs: object.outputs.map((item) => ({ id: item.id, sourceVariableId: item.sourceVariableId })),
           })),
           edges: project.edges,
@@ -103,7 +110,7 @@ export function App() {
     <div className="app-shell">
       <header className="topbar">
         <div>
-          <p className="topbar__kicker">Engineering Toolbox · Prototype 1</p>
+          <p className="topbar__kicker">Engineering Toolbox</p>
           <h1>Calculation Object Canvas</h1>
         </div>
         <div className="topbar__meta">
@@ -111,13 +118,16 @@ export function App() {
             {backendUp ? "Python API" : "API offline"}
           </span>
           <span className="pill">{busy ? "계산 중" : message}</span>
+          <button className="ghost-btn" type="button" onClick={() => onEdit({ type: "newWorkspace" })}>
+            새 워크시트
+          </button>
           <button
             className="ghost-btn"
             type="button"
             onClick={() => void runEvaluate(project)}
             disabled={busy || backendUp === false}
           >
-            전체 재계산
+            계산
           </button>
         </div>
       </header>
@@ -127,23 +137,44 @@ export function App() {
           <ReactFlowProvider>
             <FlowCanvas
               project={project}
+              quantities={quantities}
               onProjectChange={setProject}
               onGraphEvaluate={(next, dirty) => void runEvaluate(next, dirty)}
-              onInputChange={onInputChange}
+              onEdit={onEdit}
             />
           </ReactFlowProvider>
         </section>
         <aside className="side-pane">
           <section>
-            <h2>Mapping JSON</h2>
+            <h2>워크시트</h2>
             <p className="side-pane__hint">
-              Node/Edge는 계산식이 아니라 데이터 매핑입니다. 수식 평가는 Python만 수행합니다.
+              빈 객체에서 Input/Calculation을 직접 작성합니다. 연결은 데이터 매핑이고, 수식 평가는 Python만 수행합니다.
+              결과는 수식과 값이 있을 때만 계산됩니다.
             </p>
+            <button className="ghost-btn" type="button" onClick={() => onEdit({ type: "loadExample" })}>
+              참고 예제 열기
+            </button>
+          </section>
+          <section>
+            <h2>SI 표준 물성</h2>
+            <ul className="qty-list">
+              {quantities.map((item) => (
+                <li key={item.id}>
+                  <strong>{item.nameKo}</strong>
+                  <span>
+                    {item.siUnit}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+          <section>
+            <h2>Mapping JSON</h2>
             <pre>{mappingJson}</pre>
           </section>
           <section>
-            <h2>마지막 평가</h2>
-            <p>재계산된 Object: {evaluated.length ? evaluated.join(", ") : "—"}</p>
+            <h2>마지막 계산</h2>
+            <p>대상: {evaluated.length ? evaluated.join(", ") : "—"}</p>
             {errors.length === 0 ? (
               <p className="ok-text">오류 없음</p>
             ) : (

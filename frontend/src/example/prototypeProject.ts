@@ -1,6 +1,6 @@
 import type { ProjectDocument } from "../types/contract";
 
-/** Seed document for the first prototype. Values are evaluated by Python, not here. */
+/** Optional reference worksheet. Not loaded as the default workspace. */
 export const prototypeProject: ProjectDocument = {
   id: "prototype-1",
   name: "FLOW-POWER Prototype",
@@ -10,13 +10,13 @@ export const prototypeProject: ProjectDocument = {
       name: "Object A",
       position: { x: 72, y: 96 },
       inputs: [
-        { id: "FLOW", value: 120 },
-        { id: "PIN", value: 12 },
-        { id: "POUT", value: 15 },
+        { id: "FLOW", value: 120, quantity: "mass_flow" },
+        { id: "PIN", value: 12, quantity: "pressure" },
+        { id: "POUT", value: 15, quantity: "pressure" },
       ],
       calculations: [
-        { id: "DP", formula: "POUT - PIN" },
-        { id: "POWER", formula: "FLOW * DP" },
+        { id: "DP", formula: "POUT - PIN", quantity: "pressure" },
+        { id: "POWER", formula: "FLOW * DP", quantity: "power" },
       ],
       outputs: [{ id: "POWER", sourceVariableId: "POWER" }],
     },
@@ -24,8 +24,8 @@ export const prototypeProject: ProjectDocument = {
       id: "obj-b",
       name: "Object B",
       position: { x: 560, y: 96 },
-      inputs: [{ id: "INPUT_POWER", value: null }],
-      calculations: [{ id: "RESULT", formula: "INPUT_POWER * 2" }],
+      inputs: [{ id: "INPUT_POWER", value: null, quantity: "power" }],
+      calculations: [{ id: "RESULT", formula: "INPUT_POWER * 2", quantity: "power" }],
       outputs: [{ id: "RESULT", sourceVariableId: "RESULT" }],
     },
   ],

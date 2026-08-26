@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from engcalc.engine import evaluate_project
 from engcalc.models import EvaluateRequest, EvaluateResponse
+from engcalc.quantities import QUANTITIES
 
 app = FastAPI(title="Engineering Toolbox Calculation API", version="0.1.0")
 app.add_middleware(
@@ -19,6 +20,11 @@ app.add_middleware(
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/v1/quantities")
+def list_quantities() -> dict[str, object]:
+    return {"quantities": list(QUANTITIES)}
 
 
 @app.post("/api/v1/evaluate", response_model=EvaluateResponse)

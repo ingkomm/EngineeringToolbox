@@ -104,7 +104,7 @@ body,
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(0, 1fr) 300px;
   min-height: 0;
 }
 
@@ -158,8 +158,33 @@ body,
   background: radial-gradient(circle at top, #152033, var(--bg));
 }
 
+.qty-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.qty-list li {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.qty-list strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.canvas-panel {
+  display: flex;
+  gap: 8px;
+}
+
 .calc-node {
-  width: 360px;
+  width: 520px;
   background: var(--bg-node);
   border: 1px solid var(--line-strong);
   border-radius: 14px;
@@ -168,37 +193,40 @@ body,
 }
 
 .calc-node__header {
-  height: 46px;
-  padding: 6px 12px 0;
+  min-height: 46px;
+  padding: 8px 10px 8px 12px;
   border-bottom: 1px solid var(--line);
   display: grid;
   grid-template-columns: 1fr auto;
-  grid-template-rows: auto auto;
+  gap: 8px;
+  align-items: center;
 }
 
 .calc-node__kicker {
-  grid-column: 1;
+  grid-column: 1 / -1;
   font-size: 10px;
   color: var(--accent);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.calc-node__header h2 {
-  margin: 0;
+.calc-node__name {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text);
   font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
 }
 
-.calc-node__id {
-  grid-row: 1 / span 2;
-  align-self: center;
-  color: var(--muted);
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+.calc-node__name:focus {
+  outline: none;
 }
 
 .calc-table {
   padding: 8px 12px 0;
+  overflow: visible;
 }
 
 .calc-table--calc {
@@ -212,62 +240,90 @@ body,
 }
 
 .calc-table__title {
-  height: 22px;
+  min-height: 22px;
   font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
   display: flex;
   align-items: center;
+  justify-content: space-between;
+}
+
+.calc-empty {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: var(--muted);
 }
 
 .calc-row {
-  height: 32px;
-  display: grid;
-  grid-template-columns: 92px 1fr 72px;
+  min-height: 36px;
   gap: 6px;
   align-items: center;
   position: relative;
+  display: grid;
+  margin-bottom: 4px;
 }
 
-.calc-table--input .calc-row {
-  grid-template-columns: 92px 1fr;
+.calc-row--input {
+  grid-template-columns: 84px 72px minmax(0, 1fr) 22px;
 }
 
-.calc-row__id {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 12px;
-  font-weight: 600;
-  color: #d5e4f7;
+.calc-row--calc {
+  grid-template-columns: 84px minmax(0, 1fr) 58px 118px 22px;
 }
 
-.calc-row__formula {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
-  color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.calc-row--output {
+  grid-template-columns: minmax(0, 1fr) 58px 44px 22px;
 }
 
-.calc-row__value,
-.calc-row__input {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 12px;
-  text-align: right;
-}
-
-.calc-row__input {
+.calc-row__id-input,
+.calc-row__input,
+.calc-row__formula-input,
+.calc-row__qty,
+.calc-row__select {
   width: 100%;
-  height: 24px;
+  height: 26px;
   border: 1px solid var(--line);
   background: var(--input);
   color: var(--text);
   border-radius: 6px;
-  padding: 0 8px;
+  padding: 0 6px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
 }
 
-.calc-row__input:focus {
+.calc-row__id-input {
+  font-weight: 600;
+}
+
+.calc-row__input {
+  text-align: right;
+}
+
+.calc-row__qty,
+.calc-row__select {
+  font-size: 10px;
+}
+
+.calc-row__value,
+.calc-row__unit {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  text-align: right;
+  color: #d5e4f7;
+}
+
+.calc-row__unit {
+  color: var(--muted);
+}
+
+.calc-row__id-input:focus,
+.calc-row__input:focus,
+.calc-row__formula-input:focus,
+.calc-row__qty:focus,
+.calc-row__select:focus,
+.calc-node__name:focus {
   outline: 1px solid var(--accent-2);
 }
 
@@ -275,32 +331,65 @@ body,
   color: var(--warn);
   border: 1px dashed #8a6a22;
   border-radius: 6px;
-  height: 24px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding: 0 8px;
+  padding: 0 6px;
 }
 
-.calc-row[data-status="error"] .calc-row__id,
-.calc-row[data-status="error"] .calc-row__value {
+.calc-row[data-status="error"] .calc-row__value,
+.calc-row[data-status="error"] .calc-row__id-input {
   color: var(--danger);
+}
+
+.icon-btn,
+.link-btn {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.link-btn {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+}
+
+.link-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.icon-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.icon-btn:hover,
+.link-btn:hover {
+  color: var(--text);
 }
 
 .calc-handle {
   width: 10px;
   height: 10px;
   border: 2px solid #071018;
+  top: 50% !important;
 }
 
 .calc-handle--in {
   background: var(--warn);
-  left: -5px;
+  left: -12px !important;
 }
 
 .calc-handle--out {
   background: var(--accent);
-  right: -5px;
+  right: -12px !important;
 }
 
 .react-flow__edge-text {

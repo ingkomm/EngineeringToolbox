@@ -1,4 +1,5 @@
 import type { EvaluateResponse, ProjectDocument } from "../types/contract";
+import { FALLBACK_QUANTITIES, type QuantitySpec } from "../lib/quantities";
 
 export async function evaluateProject(
   project: ProjectDocument,
@@ -17,6 +18,17 @@ export async function evaluateProject(
     throw new Error(`Evaluate failed (${response.status}): ${text}`);
   }
   return (await response.json()) as EvaluateResponse;
+}
+
+export async function fetchQuantities(): Promise<QuantitySpec[]> {
+  try {
+    const response = await fetch("/api/v1/quantities");
+    if (!response.ok) return FALLBACK_QUANTITIES;
+    const body = (await response.json()) as { quantities?: QuantitySpec[] };
+    return body.quantities && body.quantities.length > 0 ? body.quantities : FALLBACK_QUANTITIES;
+  } catch {
+    return FALLBACK_QUANTITIES;
+  }
 }
 
 export async function checkHealth(): Promise<boolean> {

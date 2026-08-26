@@ -35,7 +35,24 @@ Variable ID는 셀 주소(`A1`, `B2`)가 아니라 의미 기반 식별자다.
 
 - 허용 패턴: `^[A-Za-z_][A-Za-z0-9_]*$`
 - 예: `FLOW`, `PIN`, `POUT`, `DP`, `POWER`, `INPUT_POWER`, `RESULT`
-- Object 내부에서 ID는 유일하다 (input / calculation / output 테이블을 합친 namespace).
+- Object 내부에서 ID는 유일하다 (input / calculation namespace). Output port는 로컬 변수를 재노출한다.
+- Input과 Calculation 행은 사용자가 임의로 추가/삭제/편집한다. 기본 워크시트는 비어 있다.
+
+각 변수는 SI 표준 물성(`quantity`)과 그에 따른 SI 단위(`unit`)를 가질 수 있다. 카탈로그는 Python이 소유한다 (`GET /api/v1/quantities`).
+
+| quantity | 한글 | SI unit |
+|---|---|---|
+| pressure | 압력 | Pa |
+| temperature | 온도 | K |
+| enthalpy | 엔탈피 | J/kg |
+| mass_flow | 질량유량 | kg/s |
+| volume_flow | 체적유량 | m3/s |
+| length | 길이 | m |
+| mass | 질량 | kg |
+| power | 동력 | W |
+| … | … | … |
+
+Edge mapping 시 source/target quantity가 둘 다 지정되어 있고 다르면 `QUANTITY_MISMATCH`. 단위 변환은 이 단계에서 하지 않는다.
 
 | Table | 역할 | 값의 출처 | Port |
 |---|---|---|---|
@@ -186,7 +203,9 @@ Error item:
 
 Source 값이 변하지 않은 Object는 재평가하지 않는다. 이 설계가 이후 Thermoflex Heat Balance Revision에서 "변경된 데이터와 영향받는 모듈만 갱신"의 기반이 된다.
 
-## 7. Prototype Example (유일한 구현 범위)
+## 7. Optional example (참고용, 기본 워크시트 아님)
+
+기본 Canvas는 빈 Calculation Object다. 아래 예제는 참고용으로만 로드한다.
 
 Object A:
 

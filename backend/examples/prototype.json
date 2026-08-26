@@ -7,13 +7,13 @@
       "name": "Object A",
       "position": { "x": 72, "y": 96 },
       "inputs": [
-        { "id": "FLOW", "value": 120 },
-        { "id": "PIN", "value": 12 },
-        { "id": "POUT", "value": 15 }
+        { "id": "FLOW", "value": 120, "quantity": "mass_flow" },
+        { "id": "PIN", "value": 12, "quantity": "pressure" },
+        { "id": "POUT", "value": 15, "quantity": "pressure" }
       ],
       "calculations": [
-        { "id": "DP", "formula": "POUT - PIN" },
-        { "id": "POWER", "formula": "FLOW * DP" }
+        { "id": "DP", "formula": "POUT - PIN", "quantity": "pressure" },
+        { "id": "POWER", "formula": "FLOW * DP", "quantity": "power" }
       ],
       "outputs": [
         { "id": "POWER", "sourceVariableId": "POWER" }
@@ -24,10 +24,10 @@
       "name": "Object B",
       "position": { "x": 560, "y": 96 },
       "inputs": [
-        { "id": "INPUT_POWER", "value": null }
+        { "id": "INPUT_POWER", "value": null, "quantity": "power" }
       ],
       "calculations": [
-        { "id": "RESULT", "formula": "INPUT_POWER * 2" }
+        { "id": "RESULT", "formula": "INPUT_POWER * 2", "quantity": "power" }
       ],
       "outputs": [
         { "id": "RESULT", "sourceVariableId": "RESULT" }

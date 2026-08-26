@@ -6,10 +6,12 @@ from engcalc.models import ProjectDocument
 client = TestClient(app)
 
 
-def test_health() -> None:
-    response = client.get("/health")
+def test_quantities_catalog() -> None:
+    response = client.get("/api/v1/quantities")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    ids = {item["id"] for item in response.json()["quantities"]}
+    assert {"pressure", "temperature", "enthalpy", "mass_flow", "length"} <= ids
+
 
 
 def test_evaluate_endpoint_prototype() -> None:

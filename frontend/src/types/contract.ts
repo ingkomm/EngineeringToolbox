@@ -8,6 +8,7 @@ export type VariableStatus = "idle" | "ok" | "mapped" | "error";
 export interface InputVariable {
   id: string;
   value: number | null;
+  quantity?: string | null;
   unit?: string | null;
   status?: VariableStatus;
   error?: string | null;
@@ -17,6 +18,7 @@ export interface FormulaVariable {
   id: string;
   formula: string;
   value?: number | null;
+  quantity?: string | null;
   unit?: string | null;
   status?: VariableStatus;
   error?: string | null;
@@ -26,6 +28,7 @@ export interface OutputBinding {
   id: string;
   sourceVariableId: string;
   value?: number | null;
+  quantity?: string | null;
   unit?: string | null;
   status?: VariableStatus;
   error?: string | null;
