@@ -10,9 +10,11 @@ import {
   FORMULA_FUNCTIONS,
   type FormulaCandidate,
 } from "../lib/formulaComplete";
+import { formulaLinksForObject } from "../lib/formulaRefs";
 import { OBJECT_ID_RE, VARIABLE_ID_RE, type WorkspaceEdit } from "../lib/projectEdits";
 import { displayName } from "../lib/variables";
 import type { QuantitySpec } from "../lib/quantities";
+import { InternalFormulaLinks } from "./InternalFormulaLinks";
 import { RowHandle } from "./RowHandle";
 import { PortSearch } from "./PortSearch";
 
@@ -35,10 +37,24 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
   const { object, project, mappedInputIds, quantities, onEdit } = data;
   const mapped = new Set(mappedInputIds);
   const updateNodeInternals = useUpdateNodeInternals();
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [hoveredCalcId, setHoveredCalcId] = useState<string | null>(null);
+  const [focusedCalcId, setFocusedCalcId] = useState<string | null>(null);
+  const [draftByCalc, setDraftByCalc] = useState<Record<string, string>>({});
   const handleSignature = [
     ...object.inputs.map((item) => item.id),
     ...object.outputs.map((item) => item.id),
   ].join("|");
+  const activeCalcId = focusedCalcId ?? hoveredCalcId;
+  const inputIds = useMemo(() => object.inputs.map((item) => item.id), [object.inputs]);
+  const formulaLinks = useMemo(
+    () => formulaLinksForObject(object.calculations, inputIds, focusedCalcId ? draftByCalc : undefined),
+    [draftByCalc, focusedCalcId, inputIds, object.calculations],
+  );
+  const hotInputs = useMemo(() => {
+    if (!activeCalcId) return null;
+    return new Set(formulaLinks.filter((link) => link.calcId === activeCalcId).map((link) => link.inputId));
+  }, [activeCalcId, formulaLinks]);
 
   useLayoutEffect(() => {
     updateNodeInternals(id);
@@ -79,6 +95,13 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
         </button>
       </header>
 
+      <div className="calc-node__body" ref={bodyRef}>
+        <InternalFormulaLinks
+          objectId={id}
+          bodyRef={bodyRef}
+          links={formulaLinks}
+          activeCalcId={activeCalcId}
+        />
       <section className="calc-table calc-table--input">
         <div className="calc-table__title">
           <span>Input</span>
@@ -99,7 +122,13 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
           );
           return (
             <div
-              className="calc-row calc-row--input"
+              className={[
+                "calc-row calc-row--input",
+                hotInputs?.has(item.id) ? "calc-row--formula-hot" : "",
+                hotInputs && !hotInputs.has(item.id) ? "calc-row--formula-dim" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
               key={item.id}
               data-status={item.status ?? "idle"}
               data-testid={`object-${id}-input-row-${item.id}`}
@@ -193,6 +222,11 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
               >
                 ×
               </button>
+              <span
+                className="calc-nub calc-nub--out"
+                data-formula-nub={`input:${item.id}`}
+                data-testid={`object-${id}-input-${item.id}-nub`}
+              />
             </div>
           );
         })}
@@ -215,11 +249,24 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
         ) : null}
         {object.calculations.map((item, index) => (
           <div
-            className="calc-row calc-row--calc"
+            className={[
+              "calc-row calc-row--calc",
+              activeCalcId === item.id ? "calc-row--formula-hot" : "",
+              activeCalcId && activeCalcId !== item.id ? "calc-row--formula-dim" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
             key={item.id}
             data-status={item.status ?? "idle"}
             data-testid={`object-${id}-calc-row-${item.id}`}
+            onMouseEnter={() => setHoveredCalcId(item.id)}
+            onMouseLeave={() => setHoveredCalcId((current) => (current === item.id ? null : current))}
           >
+            <span
+              className="calc-nub calc-nub--in"
+              data-formula-nub={`calc:${item.id}`}
+              data-testid={`object-${id}-calc-${item.id}-nub`}
+            />
             <IdField
               value={item.id}
               testId={`object-${id}-calc-${item.id}-id`}
@@ -235,6 +282,20 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
               testId={`object-${id}-calc-${item.id}-formula`}
               candidates={candidatesFor(item.id)}
               onCommit={(formula) => onEdit({ type: "updateCalculation", objectId: id, index, patch: { formula } })}
+              onFocusChange={(focused) => {
+                setFocusedCalcId(focused ? item.id : null);
+                if (!focused) {
+                  setDraftByCalc((current) => {
+                    if (!(item.id in current)) return current;
+                    const next = { ...current };
+                    delete next[item.id];
+                    return next;
+                  });
+                }
+              }}
+              onDraftChange={(formula) =>
+                setDraftByCalc((current) => (current[item.id] === formula ? current : { ...current, [item.id]: formula }))
+              }
               ariaLabel={`${item.id} formula`}
             />
             <span
@@ -267,6 +328,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
           </div>
         ))}
       </section>
+      </div>
 
       <section className="calc-table calc-table--output">
         <div className="calc-table__title">
@@ -393,12 +455,16 @@ function ValueField({
 function FormulaField({
   value,
   onCommit,
+  onFocusChange,
+  onDraftChange,
   ariaLabel,
   testId,
   candidates,
 }: {
   value: string;
   onCommit: (formula: string) => void;
+  onFocusChange?: (focused: boolean) => void;
+  onDraftChange?: (formula: string) => void;
   ariaLabel: string;
   testId: string;
   candidates: FormulaCandidate[];
@@ -432,6 +498,7 @@ function FormulaField({
     if (!token) return;
     const next = applyCandidate(draft, token, id);
     setDraft(next.text);
+    onDraftChange?.(next.text);
     setCursor(next.cursor);
     requestAnimationFrame(() => {
       const el = inputRef.current;
@@ -454,6 +521,8 @@ function FormulaField({
         data-testid={testId}
         onFocus={(event) => {
           setFocused(true);
+          onFocusChange?.(true);
+          onDraftChange?.(event.currentTarget.value);
           setCursor(event.currentTarget.selectionStart ?? event.currentTarget.value.length);
         }}
         onKeyDown={(event) => {
@@ -486,6 +555,7 @@ function FormulaField({
         }}
         onChange={(event) => {
           setDraft(event.target.value);
+          onDraftChange?.(event.target.value);
           setCursor(event.target.selectionStart ?? event.target.value.length);
         }}
         onSelect={(event) => {
@@ -493,6 +563,7 @@ function FormulaField({
         }}
         onBlur={() => {
           setFocused(false);
+          onFocusChange?.(false);
           if (draft !== value) onCommit(draft);
         }}
       />

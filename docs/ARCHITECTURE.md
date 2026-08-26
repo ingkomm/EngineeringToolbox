@@ -72,7 +72,7 @@ Input이 Edge로 연결되면 사용자 편집은 비활성화되고, Source Obj
 
 ### Calculation Object (Node)
 
-React Flow Custom Node. 내부 3개 테이블은 UI 표현이며, 저장 모델은 아래 JSON이다.
+React Flow Custom Node. 내부 테이블은 UI 표현이며, Input은 왼쪽, Calculation은 오른쪽에 둔다. 수식이 참조하는 Input은 객체 안 링크로 렌더링한다. 이 내부 링크는 저장 모델 Edge가 아니다. 해당 Calculation을 수정하거나 커서를 올리면 관련된 Input 링크만 강조한다.
 
 ### Port
 
@@ -295,6 +295,7 @@ Object A의 PIN/POUT만 바꾸면 Object A와 B가 갱신된다. 매핑되지 �
 | `object-{id}-input-{var}-search` | Input 행 | 소스 Object 검색 후 연결 / 끊기 |
 | `object-{id}-input-{var}-link` | Input 행 | 링크 접기/펼치기. 접혀도 라벨은 `링크` |
 | `object-{id}-calc-{var}-formula` | Calculation 행 | 수식, blur로 commit |
+| `object-{id}-formula-link-{input}-{calc}` | Input→Calc 내부 링크 | 수식 참조 시각화. 해당 Calc 호버/수정 시 `data-active=true` |
 | `object-{id}-output-{var}-search` | Output 행 | 대상 Object 검색 후 연결 / 끊기 |
 | `object-{id}-output-{var}-link` | Output 행 | 링크 접기/펼치기. 접혀도 라벨은 `링크` |
 | `handle-out-{var}` | Output 행 우측 | RF source handle (`id=out:{var}`) |

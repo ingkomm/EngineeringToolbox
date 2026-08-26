@@ -23,7 +23,7 @@ export const prototypeProject: ProjectDocument = {
     {
       id: "obj-b",
       name: "Object B",
-      position: { x: 560, y: 96 },
+      position: { x: 1280, y: 96 },
       inputs: [{ id: "POWER", name: "POWER", value: null, quantity: "power" }],
       calculations: [{ id: "RESULT", name: "RESULT", formula: "POWER * 2", quantity: "power" }],
       outputs: [{ id: "RESULT", name: "RESULT", sourceVariableId: "RESULT" }],
