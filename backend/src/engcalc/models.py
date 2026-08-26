@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 VariableStatus = Literal["idle", "ok", "mapped", "error"]
 
@@ -20,17 +20,25 @@ class InputVariable(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str
+    name: str = ""
     value: float | None = None
     quantity: str | None = None
     unit: str | None = None
     status: VariableStatus = "idle"
     error: str | None = None
 
+    @model_validator(mode="after")
+    def default_name(self) -> InputVariable:
+        if not self.name.strip():
+            self.name = self.id
+        return self
+
 
 class FormulaVariable(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str
+    name: str = ""
     formula: str = ""
     value: float | None = None
     quantity: str | None = None
@@ -38,17 +46,30 @@ class FormulaVariable(BaseModel):
     status: VariableStatus = "idle"
     error: str | None = None
 
+    @model_validator(mode="after")
+    def default_name(self) -> FormulaVariable:
+        if not self.name.strip():
+            self.name = self.id
+        return self
+
 
 class OutputBinding(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str
+    name: str = ""
     sourceVariableId: str
     value: float | None = None
     quantity: str | None = None
     unit: str | None = None
     status: VariableStatus = "idle"
     error: str | None = None
+
+    @model_validator(mode="after")
+    def default_name(self) -> OutputBinding:
+        if not self.name.strip():
+            self.name = self.id
+        return self
 
 
 class CalculationObject(BaseModel):
@@ -70,6 +91,7 @@ class Edge(BaseModel):
     sourceVariableId: str
     targetObjectId: str
     targetVariableId: str
+    enabled: bool = True
 
 
 class ProjectDocument(BaseModel):

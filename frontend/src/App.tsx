@@ -98,13 +98,19 @@ export function App() {
           objects: project.objects.map((object) => ({
             id: object.id,
             name: object.name,
-            inputs: object.inputs.map((item) => ({ id: item.id, quantity: item.quantity ?? null, unit: item.unit ?? null })),
+            inputs: object.inputs.map((item) => ({
+              id: item.id,
+              name: item.name,
+              quantity: item.quantity ?? null,
+              unit: item.unit ?? null,
+            })),
             calculations: object.calculations.map((item) => ({
               id: item.id,
+              name: item.name,
               formula: item.formula,
               quantity: item.quantity ?? null,
             })),
-            outputs: object.outputs.map((item) => ({ id: item.id, sourceVariableId: item.sourceVariableId })),
+            outputs: object.outputs.map((item) => ({ id: item.id, name: item.name, sourceVariableId: item.sourceVariableId })),
           })),
           edges: project.edges,
         },
@@ -153,7 +159,6 @@ export function App() {
               project={project}
               quantities={quantities}
               onProjectChange={setProject}
-              onGraphEvaluate={(next, dirty) => void runEvaluate(next, dirty)}
               onEdit={onEdit}
             />
           </ReactFlowProvider>
@@ -162,8 +167,8 @@ export function App() {
           <section>
             <h2>워크시트</h2>
             <p className="side-pane__hint">
-              Input/Calculation 변수는 Output 포트로 자동 연동됩니다. 값을 바꾸면 Python이 이 객체와 연결된
-              객체까지 다시 계산합니다. 객체 사이 연결선은 데이터 매핑입니다.
+              Input/Calculation 변수는 워크시트 전역 ID/이름을 가집니다. 다른 객체로 연결하면 Input이 그 변수를
+              그대로 가져오고, 커넥터 On/Off로 연동을 끊거나 다시 이을 수 있습니다.
             </p>
             <button
               className="ghost-btn"

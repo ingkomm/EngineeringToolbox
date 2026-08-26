@@ -57,7 +57,7 @@ def test_user_authored_worksheet_evaluates_through_python() -> None:
     flow = next(item for item in objects["obj_1"]["inputs"] if item["id"] == "FLOW")
     dp = next(item for item in objects["obj_1"]["calculations"] if item["id"] == "DP")
     power = next(item for item in objects["obj_1"]["calculations"] if item["id"] == "POWER")
-    mapped = next(item for item in objects["obj_2"]["inputs"] if item["id"] == "INPUT_POWER")
+    mapped = next(item for item in objects["obj_2"]["inputs"] if item["id"] == "POWER")
     result = next(item for item in objects["obj_2"]["calculations"] if item["id"] == "RESULT")
 
     assert flow["unit"] == "kg/s"
@@ -66,6 +66,8 @@ def test_user_authored_worksheet_evaluates_through_python() -> None:
     assert power["quantity"] is None
     assert power["unit"] == "kg2/(m·s3)"
     assert mapped["status"] == "mapped" and mapped["value"] == 360.0
+    assert mapped["name"] == "POWER"
+    assert result["formula"] == "POWER * 2"
     assert result["value"] == 720.0 and result["quantity"] == "power" and result["unit"] == "W"
 
     flow["value"] = 200

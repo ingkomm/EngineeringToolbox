@@ -89,6 +89,50 @@ describe("auto-linked ports", () => {
     expect(object?.outputs.map((item) => item.id)).toEqual(["MASS", "POWER"]);
   });
 
+  it("rejects duplicate global ids", () => {
+    const project = applyAll([
+      { type: "addInput", objectId: "obj_1" },
+      { type: "updateInput", objectId: "obj_1", index: 0, patch: { id: "FLOW" } },
+      { type: "addObject" },
+      { type: "addInput", objectId: "obj_2" },
+      { type: "updateInput", objectId: "obj_2", index: 0, patch: { id: "FLOW" } },
+    ]);
+    expect(project.objects[1]?.inputs[0]?.id).toBe("IN_1");
+  });
+
+  it("connects an input to the source variable identity and toggles Off/On", () => {
+    let project = applyAll([
+      { type: "addInput", objectId: "obj_1" },
+      { type: "updateInput", objectId: "obj_1", index: 0, patch: { id: "POWER", name: "동력", value: 10 } },
+      { type: "addObject" },
+      { type: "addInput", objectId: "obj_2" },
+    ]);
+    const localId = project.objects[1]?.inputs[0]?.id ?? "";
+    project = applyWorkspaceEdit(
+      project,
+      {
+        type: "connectMapping",
+        sourceObjectId: "obj_1",
+        sourceVariableId: "POWER",
+        targetObjectId: "obj_2",
+        targetVariableId: localId,
+      },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(project.objects[1]?.inputs[0]?.id).toBe("POWER");
+    expect(project.objects[1]?.inputs[0]?.name).toBe("동력");
+    expect(project.edges[0]?.enabled).toBe(true);
+
+    project = applyWorkspaceEdit(project, { type: "toggleEdge", edgeId: project.edges[0]!.id }, FALLBACK_QUANTITIES).project;
+    expect(project.edges[0]?.enabled).toBe(false);
+    expect(project.objects[1]?.inputs[0]?.id).not.toBe("POWER");
+
+    project = applyWorkspaceEdit(project, { type: "toggleEdge", edgeId: project.edges[0]!.id }, FALLBACK_QUANTITIES).project;
+    expect(project.edges[0]?.enabled).toBe(true);
+    expect(project.objects[1]?.inputs[0]?.id).toBe("POWER");
+    expect(project.objects[1]?.inputs[0]?.name).toBe("동력");
+  });
+
   it("drops mapping edges when the source variable is removed", () => {
     let project = applyAll([
       { type: "addInput", objectId: "obj_1" },
@@ -105,6 +149,7 @@ describe("auto-linked ports", () => {
           sourceVariableId: "FLOW",
           targetObjectId: "obj_2",
           targetVariableId: "IN_1",
+          enabled: true,
         },
       ],
     };

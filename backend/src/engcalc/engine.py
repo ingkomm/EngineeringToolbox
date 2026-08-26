@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from collections import defaultdict, deque
 
-from engcalc.formulas import FormulaError, evaluate_formula, referenced_names
+from engcalc.formulas import FormulaError, evaluate_formula, referenced_names, rewrite_identifier
 from engcalc.models import (
     CalculationObject,
     Edge,
@@ -35,7 +35,7 @@ def evaluate_project(
 
     structural = _validate_structure(working)
     errors.extend(structural)
-    if any(err.code in {"DUPLICATE_VARIABLE_ID", "INVALID_VARIABLE_ID"} for err in structural):
+    if any(err.code in {"DUPLICATE_VARIABLE_ID", "DUPLICATE_VARIABLE_NAME", "INVALID_VARIABLE_ID"} for err in structural):
         return EvaluateResponse(project=working, evaluatedObjectIds=[], errors=errors)
 
     try:
@@ -76,28 +76,75 @@ def _validate_structure(project: ProjectDocument) -> list[EvalError]:
     errors: list[EvalError] = []
     object_ids = {obj.id for obj in project.objects}
 
+    mapped_keys = {
+        (edge.targetObjectId, edge.targetVariableId)
+        for edge in project.edges
+        if edge.enabled
+    }
+    seen_ids: dict[str, tuple[str, str]] = {}
+    seen_names: dict[str, tuple[str, str]] = {}
+
     for obj in project.objects:
-        seen: set[str] = set()
-        for variable in _all_named_variables(obj):
-            if not VARIABLE_ID_RE.match(variable):
+        local_seen: set[str] = set()
+        owned: list[tuple[str, str, str]] = []
+        for item in obj.calculations:
+            owned.append((item.id, item.name, "calculation"))
+        for item in obj.inputs:
+            if (obj.id, item.id) not in mapped_keys:
+                owned.append((item.id, item.name, "input"))
+
+        for variable_id, variable_name, _kind in owned:
+            if not VARIABLE_ID_RE.match(variable_id):
                 errors.append(
                     EvalError(
                         objectId=obj.id,
-                        variableId=variable,
+                        variableId=variable_id,
                         code="INVALID_VARIABLE_ID",
-                        message=f"Variable id must be semantic (e.g. FLOW), not a cell address: {variable}",
+                        message=f"Variable id must be semantic (e.g. FLOW), not a cell address: {variable_id}",
                     )
                 )
-            if variable in seen:
+            if variable_id in local_seen:
                 errors.append(
                     EvalError(
                         objectId=obj.id,
-                        variableId=variable,
+                        variableId=variable_id,
                         code="DUPLICATE_VARIABLE_ID",
-                        message=f"Variable id {variable} is not unique inside {obj.id}",
+                        message=f"Variable id {variable_id} is not unique inside {obj.id}",
                     )
                 )
-            seen.add(variable)
+            local_seen.add(variable_id)
+            previous = seen_ids.get(variable_id)
+            if previous:
+                errors.append(
+                    EvalError(
+                        objectId=obj.id,
+                        variableId=variable_id,
+                        code="DUPLICATE_VARIABLE_ID",
+                        message=(
+                            f"Variable id {variable_id} is already defined on {previous[0]} "
+                            f"({previous[1]}). IDs are global."
+                        ),
+                    )
+                )
+            else:
+                seen_ids[variable_id] = (obj.id, variable_name)
+            name_key = variable_name.strip()
+            if name_key:
+                previous_name = seen_names.get(name_key)
+                if previous_name and previous_name[1] != variable_id:
+                    errors.append(
+                        EvalError(
+                            objectId=obj.id,
+                            variableId=variable_id,
+                            code="DUPLICATE_VARIABLE_NAME",
+                            message=(
+                                f"Variable name '{name_key}' is already used by {previous_name[0]}.{previous_name[1]}. "
+                                "Names are global."
+                            ),
+                        )
+                    )
+                elif not previous_name:
+                    seen_names[name_key] = (obj.id, variable_id)
 
         for item in [*obj.inputs, *obj.calculations, *obj.outputs]:
             if item.quantity and not is_known_quantity(item.quantity):
@@ -188,11 +235,6 @@ def _validate_structure(project: ProjectDocument) -> list[EvalError]:
     return errors
 
 
-def _all_named_variables(obj: CalculationObject) -> list[str]:
-    names = [item.id for item in obj.inputs] + [item.id for item in obj.calculations]
-    return names
-
-
 def _object_adjacency(project: ProjectDocument) -> dict[str, set[str]]:
     graph: dict[str, set[str]] = {obj.id: set() for obj in project.objects}
     for edge in project.edges:
@@ -255,21 +297,56 @@ def _inbound_edges(edges: list[Edge]) -> dict[str, list[Edge]]:
     return grouped
 
 
+def _align_mapped_identities(
+    obj: CalculationObject,
+    objects_by_id: dict[str, CalculationObject],
+    active_inbound: list[Edge],
+) -> None:
+    """Mapped inputs inherit the source variable's global id and name."""
+    for edge in active_inbound:
+        target = next((item for item in obj.inputs if item.id == edge.targetVariableId), None)
+        source_obj = objects_by_id.get(edge.sourceObjectId)
+        if target is None or source_obj is None:
+            continue
+        source_output = next((item for item in source_obj.outputs if item.id == edge.sourceVariableId), None)
+        if source_output is None:
+            continue
+        old_id = target.id
+        new_id = source_output.id
+        target.id = new_id
+        target.name = source_output.name or source_output.id
+        edge.targetVariableId = new_id
+        if old_id == new_id:
+            continue
+        for calc in obj.calculations:
+            calc.formula = rewrite_identifier(calc.formula, old_id, new_id)
+        for output in obj.outputs:
+            if output.id == old_id:
+                output.id = new_id
+            if output.sourceVariableId == old_id:
+                output.sourceVariableId = new_id
+            if not output.name or output.name == old_id:
+                output.name = target.name
+
+
 def _evaluate_object(
     obj: CalculationObject,
     objects_by_id: dict[str, CalculationObject],
     inbound: list[Edge],
 ) -> list[EvalError]:
     errors: list[EvalError] = []
-    inputs_by_id = {item.id: item for item in obj.inputs}
     calculations_by_id = {item.id: item for item in obj.calculations}
 
     for item in obj.inputs:
         if item.quantity:
             item.unit = si_unit_for(item.quantity)
 
-    mapped_targets = {edge.targetVariableId for edge in inbound}
-    for edge in inbound:
+    active_inbound = [edge for edge in inbound if edge.enabled]
+    _align_mapped_identities(obj, objects_by_id, active_inbound)
+
+    inputs_by_id = {item.id: item for item in obj.inputs}
+    mapped_targets = {edge.targetVariableId for edge in active_inbound}
+    for edge in active_inbound:
         target = inputs_by_id.get(edge.targetVariableId)
         if target is None:
             continue
@@ -337,7 +414,8 @@ def _evaluate_object(
         target.value = source_output.value
         target.status = "mapped"
         target.error = None
-        if source_output.quantity and not target.quantity:
+        target.name = source_output.name or source_output.id
+        if source_output.quantity:
             target.quantity = source_output.quantity
             target.unit = source_output.unit
 
@@ -431,11 +509,11 @@ def _evaluate_object(
                 )
             )
 
-    local_meta: dict[str, tuple[float | None, str | None, str | None, str]] = {}
+    local_meta: dict[str, tuple[float | None, str | None, str | None, str, str]] = {}
     for item in obj.inputs:
-        local_meta[item.id] = (item.value, item.unit, item.quantity, item.status)
+        local_meta[item.id] = (item.value, item.unit, item.quantity, item.status, item.name)
     for item in obj.calculations:
-        local_meta[item.id] = (item.value, item.unit, item.quantity, item.status)
+        local_meta[item.id] = (item.value, item.unit, item.quantity, item.status, item.name)
 
     for output in obj.outputs:
         if not output.sourceVariableId:
@@ -456,9 +534,10 @@ def _evaluate_object(
                 )
             )
             continue
-        source_value, source_unit, source_quantity, source_status = local_meta[output.sourceVariableId]
+        source_value, source_unit, source_quantity, source_status, source_name = local_meta[output.sourceVariableId]
         output.quantity = source_quantity
         output.unit = source_unit
+        output.name = source_name
         if source_value is None:
             output.value = None
             output.status = "error" if source_status == "error" else "idle"

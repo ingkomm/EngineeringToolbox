@@ -35,10 +35,12 @@ def test_prototype_example_values() -> None:
     assert power_out.value == 360.0
 
     object_b = by_id["obj-b"]
-    mapped = next(item for item in object_b.inputs if item.id == "INPUT_POWER")
+    mapped = next(item for item in object_b.inputs if item.id == "POWER")
     result_var = next(item for item in object_b.calculations if item.id == "RESULT")
     assert mapped.status == "mapped"
     assert mapped.value == 360.0
+    assert mapped.name == "POWER"
+    assert result_var.formula == "POWER * 2"
     assert result_var.value == 720.0
     assert result.evaluatedObjectIds == ["obj-a", "obj-b"]
 
@@ -87,33 +89,33 @@ def test_cycle_is_rejected() -> None:
                 id="left",
                 name="Left",
                 position=Position(x=0, y=0),
-                inputs=[InputVariable(id="IN", value=1)],
-                calculations=[FormulaVariable(id="OUTV", formula="IN")],
-                outputs=[OutputBinding(id="OUTV", sourceVariableId="OUTV")],
+                inputs=[InputVariable(id="IN_L", value=1)],
+                calculations=[FormulaVariable(id="LEFT_OUT", formula="IN_L")],
+                outputs=[OutputBinding(id="LEFT_OUT", sourceVariableId="LEFT_OUT")],
             ),
             CalculationObject(
                 id="right",
                 name="Right",
                 position=Position(x=1, y=0),
-                inputs=[InputVariable(id="IN", value=None)],
-                calculations=[FormulaVariable(id="OUTV", formula="IN")],
-                outputs=[OutputBinding(id="OUTV", sourceVariableId="OUTV")],
+                inputs=[InputVariable(id="IN_R", value=None)],
+                calculations=[FormulaVariable(id="RIGHT_OUT", formula="IN_R")],
+                outputs=[OutputBinding(id="RIGHT_OUT", sourceVariableId="RIGHT_OUT")],
             ),
         ],
         edges=[
             Edge(
                 id="e1",
                 sourceObjectId="left",
-                sourceVariableId="OUTV",
+                sourceVariableId="LEFT_OUT",
                 targetObjectId="right",
-                targetVariableId="IN",
+                targetVariableId="IN_R",
             ),
             Edge(
                 id="e2",
                 sourceObjectId="right",
-                sourceVariableId="OUTV",
+                sourceVariableId="RIGHT_OUT",
                 targetObjectId="left",
-                targetVariableId="IN",
+                targetVariableId="IN_L",
             ),
         ],
     )
@@ -191,3 +193,141 @@ def test_quantity_mismatch_on_mapping() -> None:
     assert any(err.code == "QUANTITY_MISMATCH" for err in result.errors)
     dest = next(obj for obj in result.project.objects if obj.id == "dst")
     assert dest.inputs[0].value is None
+
+
+def test_global_variable_ids_must_be_unique() -> None:
+    project = ProjectDocument(
+        id="dup",
+        name="dup",
+        objects=[
+            CalculationObject(
+                id="a",
+                name="A",
+                position=Position(x=0, y=0),
+                inputs=[InputVariable(id="FLOW", value=1)],
+                calculations=[],
+                outputs=[OutputBinding(id="FLOW", sourceVariableId="FLOW")],
+            ),
+            CalculationObject(
+                id="b",
+                name="B",
+                position=Position(x=1, y=0),
+                inputs=[InputVariable(id="FLOW", value=2)],
+                calculations=[],
+                outputs=[],
+            ),
+        ],
+        edges=[],
+    )
+    result = evaluate_project(project)
+    assert any(err.code == "DUPLICATE_VARIABLE_ID" for err in result.errors)
+
+
+def test_global_variable_names_must_be_unique() -> None:
+    project = ProjectDocument(
+        id="dup",
+        name="dup",
+        objects=[
+            CalculationObject(
+                id="a",
+                name="A",
+                position=Position(x=0, y=0),
+                inputs=[InputVariable(id="FLOW", name="유량", value=1)],
+                calculations=[],
+                outputs=[],
+            ),
+            CalculationObject(
+                id="b",
+                name="B",
+                position=Position(x=1, y=0),
+                calculations=[FormulaVariable(id="Q", name="유량", formula="1")],
+                outputs=[],
+            ),
+        ],
+        edges=[],
+    )
+    result = evaluate_project(project)
+    assert any(err.code == "DUPLICATE_VARIABLE_NAME" for err in result.errors)
+
+
+def test_mapped_input_inherits_source_id_and_name() -> None:
+    project = ProjectDocument(
+        id="map",
+        name="map",
+        objects=[
+            CalculationObject(
+                id="src",
+                name="Src",
+                position=Position(x=0, y=0),
+                inputs=[InputVariable(id="P", name="압력", value=10, quantity="pressure")],
+                calculations=[],
+                outputs=[OutputBinding(id="P", name="압력", sourceVariableId="P")],
+            ),
+            CalculationObject(
+                id="dst",
+                name="Dst",
+                position=Position(x=1, y=0),
+                inputs=[InputVariable(id="IN_1", value=None)],
+                calculations=[FormulaVariable(id="TWICE", formula="IN_1 * 2")],
+                outputs=[OutputBinding(id="TWICE", sourceVariableId="TWICE")],
+            ),
+        ],
+        edges=[
+            Edge(
+                id="e1",
+                sourceObjectId="src",
+                sourceVariableId="P",
+                targetObjectId="dst",
+                targetVariableId="IN_1",
+            )
+        ],
+    )
+    result = evaluate_project(project)
+    assert result.errors == []
+    dest = next(obj for obj in result.project.objects if obj.id == "dst")
+    mapped = dest.inputs[0]
+    assert mapped.id == "P"
+    assert mapped.name == "압력"
+    assert mapped.value == 10
+    assert dest.calculations[0].formula == "P * 2"
+    assert dest.calculations[0].value == 20
+
+
+def test_disabled_edge_does_not_map_values() -> None:
+    project = ProjectDocument(
+        id="off",
+        name="off",
+        objects=[
+            CalculationObject(
+                id="src",
+                name="Src",
+                position=Position(x=0, y=0),
+                inputs=[InputVariable(id="P", value=10, quantity="pressure")],
+                calculations=[],
+                outputs=[OutputBinding(id="P", sourceVariableId="P")],
+            ),
+            CalculationObject(
+                id="dst",
+                name="Dst",
+                position=Position(x=1, y=0),
+                inputs=[InputVariable(id="LOCAL", value=4)],
+                calculations=[],
+                outputs=[],
+            ),
+        ],
+        edges=[
+            Edge(
+                id="e1",
+                sourceObjectId="src",
+                sourceVariableId="P",
+                targetObjectId="dst",
+                targetVariableId="LOCAL",
+                enabled=False,
+            )
+        ],
+    )
+    result = evaluate_project(project)
+    dest = next(obj for obj in result.project.objects if obj.id == "dst")
+    assert dest.inputs[0].id == "LOCAL"
+    assert dest.inputs[0].value == 4.0
+    assert dest.inputs[0].status == "ok"

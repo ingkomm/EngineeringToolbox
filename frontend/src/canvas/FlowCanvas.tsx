@@ -13,17 +13,19 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { CalculationObjectNode, type CalculationObjectNodeType } from "./CalculationObjectNode";
+import { CalculationObjectNode } from "./CalculationObjectNode";
+import { MappingEdge } from "./MappingEdge";
 import { mergeFlowNodes, toFlowEdges, toFlowNodeRecords } from "./flowModel";
 import { parseHandleId } from "../lib/display";
 import type { WorkspaceEdit } from "../lib/projectEdits";
 import type { QuantitySpec } from "../lib/quantities";
-import type { MappingEdge, ProjectDocument } from "../types/contract";
+import type { ProjectDocument } from "../types/contract";
 
 const nodeTypes = { calculationObject: CalculationObjectNode };
+const edgeTypes = { mapping: MappingEdge };
 
 const defaultEdgeOptions = {
-  type: "smoothstep" as const,
+  type: "mapping" as const,
   animated: false,
   className: "mapping-edge",
 };
@@ -32,7 +34,6 @@ interface FlowCanvasProps {
   project: ProjectDocument;
   quantities: QuantitySpec[];
   onProjectChange: (project: ProjectDocument) => void;
-  onGraphEvaluate: (project: ProjectDocument, dirtyObjectIds?: string[]) => void;
   onEdit: (edit: WorkspaceEdit) => void;
 }
 
@@ -40,22 +41,24 @@ function toFlowNodes(
   project: ProjectDocument,
   quantities: QuantitySpec[],
   onEdit: (edit: WorkspaceEdit) => void,
-): CalculationObjectNodeType[] {
+) {
   return toFlowNodeRecords(project, quantities, onEdit);
 }
 
-export function FlowCanvas({ project, quantities, onProjectChange, onGraphEvaluate, onEdit }: FlowCanvasProps) {
-  const [nodes, setNodes, onNodesChange] = useNodesState<CalculationObjectNodeType>(
-    toFlowNodes(project, quantities, onEdit),
-  );
-  const [edges, setEdges, onEdgesChange] = useEdgesState(toFlowEdges(project.edges));
+export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: FlowCanvasProps) {
+  const onToggle = useCallback((edgeId: string) => {
+    onEdit({ type: "toggleEdge", edgeId });
+  }, [onEdit]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(toFlowNodes(project, quantities, onEdit));
+  const [edges, setEdges, onEdgesChange] = useEdgesState(toFlowEdges(project.edges, onToggle));
   const didFit = useRef(false);
 
   useEffect(() => {
     const nextNodes = toFlowNodes(project, quantities, onEdit);
     setNodes((current) => mergeFlowNodes(current, nextNodes));
-    setEdges(toFlowEdges(project.edges));
-  }, [onEdit, project, quantities, setEdges, setNodes]);
+    setEdges(toFlowEdges(project.edges, onToggle));
+  }, [onEdit, onToggle, project, quantities, setEdges, setNodes]);
 
   const onInit = useCallback((instance: { fitView: (options?: { padding?: number }) => void }) => {
     if (didFit.current) return;
@@ -70,40 +73,38 @@ export function FlowCanvas({ project, quantities, onProjectChange, onGraphEvalua
       if (!connection.source || !connection.target || source?.kind !== "out" || target?.kind !== "in") {
         return;
       }
-      const alreadyTaken = project.edges.some(
-        (edge) => edge.targetObjectId === connection.target && edge.targetVariableId === target.variableId,
-      );
-      if (alreadyTaken) return;
-
-      const mapping: MappingEdge = {
-        id: `edge-${connection.source}-${source.variableId}-${connection.target}-${target.variableId}`,
+      onEdit({
+        type: "connectMapping",
         sourceObjectId: connection.source,
         sourceVariableId: source.variableId,
         targetObjectId: connection.target,
         targetVariableId: target.variableId,
-      };
-      onGraphEvaluate(
-        {
-          ...project,
-          edges: [...project.edges, mapping],
-        },
-        [mapping.sourceObjectId],
-      );
+      });
     },
-    [onGraphEvaluate, project],
+    [onEdit],
   );
 
-  const isValidConnection = useCallback((connection: Connection | Edge) => {
-    const source = parseHandleId(connection.sourceHandle);
-    const target = parseHandleId(connection.targetHandle);
-    return source?.kind === "out" && target?.kind === "in" && connection.source !== connection.target;
-  }, []);
+  const isValidConnection = useCallback(
+    (connection: Connection | Edge) => {
+      const source = parseHandleId(connection.sourceHandle);
+      const target = parseHandleId(connection.targetHandle);
+      if (source?.kind !== "out" || target?.kind !== "in" || connection.source === connection.target) {
+        return false;
+      }
+      const targetObject = project.objects.find((item) => item.id === connection.target);
+      if (!targetObject) return false;
+      if (targetObject.calculations.some((item) => item.id === source.variableId)) return false;
+      return true;
+    },
+    [project.objects],
+  );
 
   return (
     <ReactFlow
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
@@ -121,15 +122,7 @@ export function FlowCanvas({ project, quantities, onProjectChange, onGraphEvalua
       }}
       deleteKeyCode={["Backspace", "Delete"]}
       onEdgesDelete={(deleted) => {
-        const removed = new Set(deleted.map((edge) => edge.id));
-        const next: ProjectDocument = {
-          ...project,
-          edges: project.edges.filter((edge) => !removed.has(edge.id)),
-        };
-        onGraphEvaluate(
-          next,
-          deleted.map((edge) => edge.target),
-        );
+        onEdit({ type: "deleteEdges", edgeIds: deleted.map((edge) => edge.id) });
       }}
       proOptions={{ hideAttribution: true }}
     >

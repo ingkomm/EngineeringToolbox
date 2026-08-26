@@ -4,7 +4,9 @@ import type { QuantitySpec } from "../lib/quantities";
 import { inputHandleId, outputHandleId } from "../lib/display";
 
 export function mappedInputsForObject(objectId: string, edges: MappingEdge[]): string[] {
-  return edges.filter((edge) => edge.targetObjectId === objectId).map((edge) => edge.targetVariableId);
+  return edges
+    .filter((edge) => edge.targetObjectId === objectId && edge.enabled !== false)
+    .map((edge) => edge.targetVariableId);
 }
 
 export function toFlowNodeRecords(
@@ -26,16 +28,19 @@ export function toFlowNodeRecords(
   }));
 }
 
-export function toFlowEdges(edges: MappingEdge[]) {
+export function toFlowEdges(edges: MappingEdge[], onToggle: (edgeId: string) => void) {
   return edges.map((edge) => ({
     id: edge.id,
     source: edge.sourceObjectId,
     target: edge.targetObjectId,
     sourceHandle: outputHandleId(edge.sourceVariableId),
     targetHandle: inputHandleId(edge.targetVariableId),
-    type: "smoothstep" as const,
-    className: "mapping-edge",
-    label: `${edge.sourceVariableId} → ${edge.targetVariableId}`,
+    type: "mapping" as const,
+    className: edge.enabled === false ? "mapping-edge mapping-edge--off" : "mapping-edge",
+    data: {
+      enabled: edge.enabled !== false,
+      onToggle,
+    },
   }));
 }
 

@@ -7,6 +7,7 @@ export type VariableStatus = "idle" | "ok" | "mapped" | "error";
 
 export interface InputVariable {
   id: string;
+  name: string;
   value: number | null;
   quantity?: string | null;
   unit?: string | null;
@@ -16,6 +17,7 @@ export interface InputVariable {
 
 export interface FormulaVariable {
   id: string;
+  name: string;
   formula: string;
   value?: number | null;
   quantity?: string | null;
@@ -26,6 +28,7 @@ export interface FormulaVariable {
 
 export interface OutputBinding {
   id: string;
+  name: string;
   sourceVariableId: string;
   value?: number | null;
   quantity?: string | null;
@@ -49,6 +52,7 @@ export interface MappingEdge {
   sourceVariableId: string;
   targetObjectId: string;
   targetVariableId: string;
+  enabled: boolean;
 }
 
 export interface ProjectDocument {

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import operator
+import re
 from typing import Iterable
 
 ALLOWED_BINOPS: dict[type[ast.operator], object] = {
@@ -114,3 +115,11 @@ def names_in(formulas: Iterable[str]) -> set[str]:
     for formula in formulas:
         found.update(referenced_names(formula))
     return found
+
+
+def rewrite_identifier(formula: str, from_id: str, to_id: str) -> str:
+    """Replace a variable ID in a formula without touching longer names (PIN vs PIN2)."""
+    if not from_id or from_id == to_id:
+        return formula
+    pattern = re.compile(rf"(^|[^\w]){re.escape(from_id)}(?![\w])")
+    return pattern.sub(lambda match: f"{match.group(1)}{to_id}", formula)

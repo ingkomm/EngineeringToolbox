@@ -34,8 +34,9 @@
 Variable ID는 셀 주소(`A1`, `B2`)가 아니라 의미 기반 식별자다.
 
 - 허용 패턴: `^[A-Za-z_][A-Za-z0-9_]*$`
-- 예: `FLOW`, `PIN`, `POUT`, `DP`, `POWER`, `INPUT_POWER`, `RESULT`
-- Object 내부에서 ID는 유일하다 (input / calculation namespace). Output port는 로컬 변수를 재노출한다.
+- 예: `FLOW`, `PIN`, `POUT`, `DP`, `POWER`, `RESULT`
+- ID와 이름(name)은 워크시트 **전역**에서 유일하다. Calculation이 만든 변수가 다른 Object Input으로 연결되면 새 ID를 만들지 않고 같은 ID/이름을 그대로 가져온다.
+- 커넥터 `enabled`(On/Off)로 연동을 끊거나 다시 이을 수 있다. Off면 대상 Input은 새로운 로컬 ID를 받는다.
 - Input과 Calculation 행은 사용자가 임의로 추가/삭제/편집한다. 기본 워크시트는 비어 있다.
 
 각 변수는 SI 표준 물성(`quantity`)과 그에 따른 SI 단위(`unit`)를 가질 수 있다. 카탈로그는 Python이 소유한다 (`GET /api/v1/quantities`).

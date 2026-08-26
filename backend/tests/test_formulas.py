@@ -1,4 +1,4 @@
-from engcalc.formulas import FormulaError, evaluate_formula, referenced_names
+from engcalc.formulas import FormulaError, evaluate_formula, referenced_names, rewrite_identifier
 import pytest
 
 
@@ -31,3 +31,8 @@ def test_division_by_zero() -> None:
     with pytest.raises(FormulaError) as exc:
         evaluate_formula("FLOW / ZERO", {"FLOW": 10, "ZERO": 0})
     assert exc.value.code == "DIVISION_BY_ZERO"
+
+
+def test_rewrite_identifier_does_not_touch_longer_names() -> None:
+    assert rewrite_identifier("POUT - PIN", "PIN", "P_IN") == "POUT - P_IN"
+    assert rewrite_identifier("PIN + PIN2", "PIN", "X") == "X + PIN2"

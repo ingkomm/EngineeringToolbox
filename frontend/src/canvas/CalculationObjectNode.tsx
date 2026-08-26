@@ -10,6 +10,7 @@ import {
   type FormulaCandidate,
 } from "../lib/formulaComplete";
 import { VARIABLE_ID_RE, type WorkspaceEdit } from "../lib/projectEdits";
+import { displayName } from "../lib/variables";
 import type { QuantitySpec } from "../lib/quantities";
 import { RowHandle } from "./RowHandle";
 
@@ -45,7 +46,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
       .filter((item) => item.id !== excludeId)
       .map((item) => ({
         id: item.id,
-        hint: quantityHint(item.quantity, item.unit, quantities),
+        hint: `${displayName(item)}${quantityHint(item.quantity, item.unit, quantities) ? ` · ${quantityHint(item.quantity, item.unit, quantities)}` : ""}`,
       }));
 
   return (
@@ -100,11 +101,28 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
                 position={Position.Left}
                 className="calc-handle calc-handle--in"
               />
-              <IdField
-                value={item.id}
-                testId={`object-${id}-input-${item.id}-id`}
-                onCommit={(nextId) => onEdit({ type: "updateInput", objectId: id, index, patch: { id: nextId } })}
-              />
+              {isMapped ? (
+                <span className="calc-row__id-input calc-row__id-input--mapped" data-testid={`object-${id}-input-${item.id}-id`}>
+                  {item.id}
+                </span>
+              ) : (
+                <IdField
+                  value={item.id}
+                  testId={`object-${id}-input-${item.id}-id`}
+                  onCommit={(nextId) => onEdit({ type: "updateInput", objectId: id, index, patch: { id: nextId } })}
+                />
+              )}
+              {isMapped ? (
+                <span className="calc-row__name calc-row__name--mapped" data-testid={`object-${id}-input-${item.id}-name`}>
+                  {displayName(item)}
+                </span>
+              ) : (
+                <NameField
+                  value={displayName(item)}
+                  testId={`object-${id}-input-${item.id}-name`}
+                  onCommit={(name) => onEdit({ type: "updateInput", objectId: id, index, patch: { name } })}
+                />
+              )}
               {isMapped ? (
                 <span
                   className="calc-row__value calc-row__value--mapped"
@@ -125,6 +143,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
                 quantities={quantities}
                 value={item.quantity ?? null}
                 testId={`object-${id}-input-${item.id}-quantity`}
+                disabled={isMapped}
                 onChange={(quantity) => onEdit({ type: "updateInput", objectId: id, index, patch: { quantity } })}
               />
               <button
@@ -166,6 +185,11 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
               value={item.id}
               testId={`object-${id}-calc-${item.id}-id`}
               onCommit={(nextId) => onEdit({ type: "updateCalculation", objectId: id, index, patch: { id: nextId } })}
+            />
+            <NameField
+              value={displayName(item)}
+              testId={`object-${id}-calc-${item.id}-name`}
+              onCommit={(name) => onEdit({ type: "updateCalculation", objectId: id, index, patch: { name } })}
             />
             <FormulaField
               value={item.formula}
@@ -221,6 +245,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
           >
             <span className="calc-row__port-id" data-testid={`object-${id}-output-${item.id}-source`}>
               {item.sourceVariableId}
+              {item.name && item.name !== item.id ? ` · ${item.name}` : ""}
             </span>
             <span className="calc-row__value" data-testid={`object-${id}-output-${item.id}-value`}>
               {formatValue(item.value)}
@@ -423,6 +448,45 @@ function FormulaField({
   );
 }
 
+function NameField({
+  value,
+  onCommit,
+  testId,
+}: {
+  value: string;
+  onCommit: (name: string) => void;
+  testId: string;
+}) {
+  const [draft, setDraft] = useState(value);
+  const focusedRef = useRef(false);
+  useEffect(() => {
+    if (!focusedRef.current) setDraft(value);
+  }, [value]);
+
+  return (
+    <input
+      className="calc-row__name-input nodrag nopan"
+      value={draft}
+      data-testid={testId}
+      onFocus={() => {
+        focusedRef.current = true;
+      }}
+      onKeyDown={(event) => {
+        stopKeys(event);
+        if (event.key === "Enter") event.currentTarget.blur();
+      }}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={() => {
+        focusedRef.current = false;
+        const next = draft.trim();
+        if (next && next !== value) onCommit(next);
+        else setDraft(value);
+      }}
+      aria-label="Variable name"
+    />
+  );
+}
+
 function IdField({
   value,
   onCommit,
@@ -485,17 +549,20 @@ function QuantityField({
   value,
   onChange,
   testId,
+  disabled,
 }: {
   quantities: QuantitySpec[];
   value: string | null;
   onChange: (quantity: string | null) => void;
   testId: string;
+  disabled?: boolean;
 }) {
   return (
     <select
       className="calc-row__qty nodrag nopan nowheel"
       value={value ?? ""}
       data-testid={testId}
+      disabled={disabled}
       onKeyDown={stopKeys}
       onChange={(event) => onChange(event.target.value || null)}
       title="SI 표준 물성"

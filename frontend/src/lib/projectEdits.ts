@@ -2,6 +2,12 @@ import type { CalculationObject, FormulaVariable, InputVariable, OutputBinding, 
 import { blankProject } from "../example/blankProject";
 import { prototypeProject } from "../example/prototypeProject";
 import { siUnitFor, type QuantitySpec } from "./quantities";
+import {
+  displayName,
+  identityTaken,
+  nextGlobalPrefixedId,
+  sourceVariable,
+} from "./variables";
 
 export const VARIABLE_ID_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -18,6 +24,15 @@ export type WorkspaceEdit =
   | { type: "addOutput"; objectId: string }
   | { type: "removeOutput"; objectId: string; index: number }
   | { type: "updateOutput"; objectId: string; index: number; patch: Partial<OutputBinding> }
+  | {
+      type: "connectMapping";
+      sourceObjectId: string;
+      sourceVariableId: string;
+      targetObjectId: string;
+      targetVariableId: string;
+    }
+  | { type: "toggleEdge"; edgeId: string }
+  | { type: "deleteEdges"; edgeIds: string[] }
   | { type: "loadExample" }
   | { type: "newWorkspace" };
 
@@ -27,19 +42,11 @@ export interface EditResult {
   shouldEvaluate: boolean;
 }
 
-function allIds(object: CalculationObject): string[] {
-  return [...object.inputs, ...object.calculations, ...object.outputs].map((item) => item.id);
-}
-
-function nextPrefixedId(existing: string[], prefix: string): string {
-  const used = new Set(existing);
-  let n = 1;
-  while (used.has(`${prefix}_${n}`)) n += 1;
-  return `${prefix}_${n}`;
-}
-
 function nextObjectId(project: ProjectDocument): string {
-  return nextPrefixedId(project.objects.map((item) => item.id), "obj");
+  const used = new Set(project.objects.map((item) => item.id));
+  let n = 1;
+  while (used.has(`obj_${n}`)) n += 1;
+  return `obj_${n}`;
 }
 
 function patchObject(
@@ -50,36 +57,6 @@ function patchObject(
   return {
     ...project,
     objects: project.objects.map((object) => (object.id === objectId ? mutate(object) : object)),
-  };
-}
-
-function retargetEdges(
-  project: ProjectDocument,
-  objectId: string,
-  fromId: string,
-  toId: string,
-): ProjectDocument {
-  if (fromId === toId) return project;
-  return {
-    ...project,
-    objects: project.objects.map((object) => {
-      if (object.id !== objectId) return object;
-      return {
-        ...object,
-        outputs: object.outputs.map((item) =>
-          item.sourceVariableId === fromId ? { ...item, sourceVariableId: toId, id: item.id === fromId ? toId : item.id } : item,
-        ),
-      };
-    }),
-    edges: project.edges.map((edge) => {
-      if (edge.sourceObjectId === objectId && edge.sourceVariableId === fromId) {
-        return { ...edge, sourceVariableId: toId };
-      }
-      if (edge.targetObjectId === objectId && edge.targetVariableId === fromId) {
-        return { ...edge, targetVariableId: toId };
-      }
-      return edge;
-    }),
   };
 }
 
@@ -101,19 +78,20 @@ function rewriteFormulas(object: CalculationObject, fromId: string, toId: string
 }
 
 export function syncObjectOutputs(object: CalculationObject): CalculationObject {
-  const sources = [...object.inputs, ...object.calculations].map((item) => item.id);
+  const sources = [...object.inputs, ...object.calculations];
   const previousBySource = new Map(object.outputs.map((item) => [item.sourceVariableId, item]));
   const previousById = new Map(object.outputs.map((item) => [item.id, item]));
   return {
     ...object,
-    outputs: sources.map((id) => {
-      const prev = previousBySource.get(id) ?? previousById.get(id);
+    outputs: sources.map((item) => {
+      const prev = previousBySource.get(item.id) ?? previousById.get(item.id);
       return {
-        id,
-        sourceVariableId: id,
-        value: prev?.value ?? null,
-        quantity: prev?.quantity ?? null,
-        unit: prev?.unit ?? null,
+        id: item.id,
+        name: displayName(item),
+        sourceVariableId: item.id,
+        value: prev?.value ?? item.value ?? null,
+        quantity: item.quantity ?? prev?.quantity ?? null,
+        unit: item.unit ?? prev?.unit ?? null,
         status: prev?.status,
         error: prev?.error ?? null,
       };
@@ -144,6 +122,69 @@ function syncAllObjects(project: ProjectDocument): ProjectDocument {
   };
 }
 
+function rekeyGlobalVariable(project: ProjectDocument, fromId: string, toId: string, nextName: string): ProjectDocument {
+  const renamed: ProjectDocument = {
+    ...project,
+    objects: project.objects.map((object) => ({
+      ...object,
+      inputs: object.inputs.map((item) => (item.id === fromId ? { ...item, id: toId, name: nextName } : item)),
+      calculations: object.calculations.map((item) => ({
+        ...item,
+        id: item.id === fromId ? toId : item.id,
+        name: item.id === fromId ? nextName : item.name,
+        formula: rewriteIdentifier(item.formula, fromId, toId),
+      })),
+    })),
+    edges: project.edges.map((edge) => ({
+      ...edge,
+      sourceVariableId: edge.sourceVariableId === fromId ? toId : edge.sourceVariableId,
+      targetVariableId: edge.targetVariableId === fromId ? toId : edge.targetVariableId,
+    })),
+  };
+  return syncAllObjects(renamed);
+}
+
+function applyDisplayName(project: ProjectDocument, variableId: string, nextName: string): ProjectDocument {
+  return syncAllObjects({
+    ...project,
+    objects: project.objects.map((object) => ({
+      ...object,
+      inputs: object.inputs.map((item) => (item.id === variableId ? { ...item, name: nextName } : item)),
+      calculations: object.calculations.map((item) =>
+        item.id === variableId ? { ...item, name: nextName } : item,
+      ),
+    })),
+  });
+}
+
+function withIdentityPatch<T extends { id: string; name: string }>(current: T, patch: Partial<T>): T {
+  const next = { ...current, ...patch };
+  if (patch.id && (!current.name || current.name === current.id) && patch.name === undefined) {
+    next.name = patch.id;
+  }
+  return next;
+}
+
+function detachMappedInput(
+  project: ProjectDocument,
+  objectId: string,
+  inputId: string,
+): { project: ProjectDocument; newId: string } {
+  const freshId = nextGlobalPrefixedId(project, "IN");
+  const next = patchObject(project, objectId, (object) => {
+    const rewritten = rewriteFormulas(object, inputId, freshId);
+    return {
+      ...rewritten,
+      inputs: rewritten.inputs.map((item) =>
+        item.id === inputId
+          ? { ...item, id: freshId, name: freshId, status: item.value == null ? "idle" : "ok", error: null }
+          : item,
+      ),
+    };
+  });
+  return { project: next, newId: freshId };
+}
+
 export function applyWorkspaceEdit(
   project: ProjectDocument,
   edit: WorkspaceEdit,
@@ -160,7 +201,7 @@ export function applyWorkspaceEdit(
       const object: CalculationObject = {
         id,
         name: `Object ${index + 1}`,
-        position: { x: 80 + index * 700, y: 88 },
+        position: { x: 80 + index * 820, y: 88 },
         inputs: [],
         calculations: [],
         outputs: [],
@@ -185,21 +226,20 @@ export function applyWorkspaceEdit(
         dirtyObjectIds: [],
         shouldEvaluate: false,
       };
-    case "addInput":
+    case "addInput": {
+      const id = nextGlobalPrefixedId(project, "IN");
       return {
         project: syncProjectObject(
           patchObject(project, edit.objectId, (object) => ({
             ...object,
-            inputs: [
-              ...object.inputs,
-              { id: nextPrefixedId(allIds(object), "IN"), value: null, quantity: null, unit: null },
-            ],
+            inputs: [...object.inputs, { id, name: id, value: null, quantity: null, unit: null }],
           })),
           edit.objectId,
         ),
         dirtyObjectIds: [edit.objectId],
         shouldEvaluate: true,
       };
+    }
     case "removeInput":
       return {
         project: syncProjectObject(
@@ -213,18 +253,29 @@ export function applyWorkspaceEdit(
         shouldEvaluate: true,
       };
     case "updateInput": {
-      let next = patchObject(project, edit.objectId, (object) => {
-        const current = object.inputs[edit.index];
-        if (!current) return object;
-        const patch = withSiUnit(edit.patch, catalog);
-        const inputs = object.inputs.map((item, index) => (index === edit.index ? { ...item, ...patch } : item));
-        return { ...object, inputs };
-      });
-      const previous = project.objects.find((item) => item.id === edit.objectId)?.inputs[edit.index]?.id;
-      const updated = next.objects.find((item) => item.id === edit.objectId)?.inputs[edit.index]?.id;
-      if (previous && updated && previous !== updated) {
-        next = patchObject(next, edit.objectId, (object) => rewriteFormulas(object, previous, updated));
-        next = retargetEdges(next, edit.objectId, previous, updated);
+      const current = project.objects.find((item) => item.id === edit.objectId)?.inputs[edit.index];
+      if (!current) return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      const enabledMapped = project.edges.some(
+        (edge) => edge.enabled !== false && edge.targetObjectId === edit.objectId && edge.targetVariableId === current.id,
+      );
+      if (enabledMapped && (edit.patch.id || edit.patch.name)) {
+        return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      }
+      const patch = withSiUnit(withIdentityPatch(current, edit.patch as Partial<InputVariable>), catalog);
+      if (patch.id !== current.id && identityTaken(project, { id: patch.id }, { objectId: edit.objectId, id: current.id })) {
+        return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      }
+      if (patch.name !== current.name && identityTaken(project, { name: patch.name }, { objectId: edit.objectId, id: current.id })) {
+        return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      }
+      let next = patchObject(project, edit.objectId, (object) => ({
+        ...object,
+        inputs: object.inputs.map((item, index) => (index === edit.index ? { ...item, ...patch } : item)),
+      }));
+      if (patch.id !== current.id) {
+        next = rekeyGlobalVariable(next, current.id, patch.id, patch.name);
+      } else if (patch.name !== current.name) {
+        next = applyDisplayName(next, current.id, patch.name);
       }
       return {
         project: syncProjectObject(next, edit.objectId),
@@ -232,14 +283,15 @@ export function applyWorkspaceEdit(
         shouldEvaluate: true,
       };
     }
-    case "addCalculation":
+    case "addCalculation": {
+      const id = nextGlobalPrefixedId(project, "CALC");
       return {
         project: syncProjectObject(
           patchObject(project, edit.objectId, (object) => ({
             ...object,
             calculations: [
               ...object.calculations,
-              { id: nextPrefixedId(allIds(object), "CALC"), formula: "", quantity: null, unit: null },
+              { id, name: id, formula: "", quantity: null, unit: null },
             ],
           })),
           edit.objectId,
@@ -247,6 +299,7 @@ export function applyWorkspaceEdit(
         dirtyObjectIds: [edit.objectId],
         shouldEvaluate: true,
       };
+    }
     case "removeCalculation":
       return {
         project: syncProjectObject(
@@ -260,20 +313,23 @@ export function applyWorkspaceEdit(
         shouldEvaluate: true,
       };
     case "updateCalculation": {
-      let next = patchObject(project, edit.objectId, (object) => {
-        const current = object.calculations[edit.index];
-        if (!current) return object;
-        const patch = withSiUnit(edit.patch, catalog);
-        const calculations = object.calculations.map((item, index) =>
-          index === edit.index ? { ...item, ...patch } : item,
-        );
-        return { ...object, calculations };
-      });
-      const previous = project.objects.find((item) => item.id === edit.objectId)?.calculations[edit.index]?.id;
-      const updated = next.objects.find((item) => item.id === edit.objectId)?.calculations[edit.index]?.id;
-      if (previous && updated && previous !== updated) {
-        next = patchObject(next, edit.objectId, (object) => rewriteFormulas(object, previous, updated));
-        next = retargetEdges(next, edit.objectId, previous, updated);
+      const current = project.objects.find((item) => item.id === edit.objectId)?.calculations[edit.index];
+      if (!current) return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      const patch = withSiUnit(withIdentityPatch(current, edit.patch as Partial<FormulaVariable>), catalog);
+      if (patch.id !== current.id && identityTaken(project, { id: patch.id }, { objectId: edit.objectId, id: current.id })) {
+        return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      }
+      if (patch.name !== current.name && identityTaken(project, { name: patch.name }, { objectId: edit.objectId, id: current.id })) {
+        return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      }
+      let next = patchObject(project, edit.objectId, (object) => ({
+        ...object,
+        calculations: object.calculations.map((item, index) => (index === edit.index ? { ...item, ...patch } : item)),
+      }));
+      if (patch.id !== current.id) {
+        next = rekeyGlobalVariable(next, current.id, patch.id, patch.name);
+      } else if (patch.name !== current.name) {
+        next = applyDisplayName(next, current.id, patch.name);
       }
       return {
         project: syncProjectObject(next, edit.objectId),
@@ -289,6 +345,124 @@ export function applyWorkspaceEdit(
         dirtyObjectIds: [edit.objectId],
         shouldEvaluate: true,
       };
+    case "connectMapping": {
+      const sourceObject = project.objects.find((item) => item.id === edit.sourceObjectId);
+      const targetObject = project.objects.find((item) => item.id === edit.targetObjectId);
+      if (!sourceObject || !targetObject || edit.sourceObjectId === edit.targetObjectId) {
+        return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      }
+      const source = sourceVariable(sourceObject, edit.sourceVariableId);
+      const target = targetObject.inputs.find((item) => item.id === edit.targetVariableId);
+      if (!source || !target) return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      if (targetObject.calculations.some((item) => item.id === source.id)) {
+        return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      }
+      if (
+        project.edges.some(
+          (edge) => edge.targetObjectId === edit.targetObjectId && edge.targetVariableId === edit.targetVariableId,
+        )
+      ) {
+        return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      }
+      const oldId = target.id;
+      let next = patchObject(project, edit.targetObjectId, (object) => {
+        const rewritten = rewriteFormulas(object, oldId, source.id);
+        return {
+          ...rewritten,
+          inputs: rewritten.inputs.map((item) =>
+            item.id === oldId
+              ? {
+                  ...item,
+                  id: source.id,
+                  name: source.name,
+                  quantity: source.quantity ?? item.quantity ?? null,
+                  unit: source.unit ?? item.unit ?? null,
+                }
+              : item,
+          ),
+        };
+      });
+      next = {
+        ...next,
+        edges: [
+          ...next.edges,
+          {
+            id: `edge-${edit.sourceObjectId}-${source.id}-${edit.targetObjectId}-${source.id}`,
+            sourceObjectId: edit.sourceObjectId,
+            sourceVariableId: source.id,
+            targetObjectId: edit.targetObjectId,
+            targetVariableId: source.id,
+            enabled: true,
+          },
+        ],
+      };
+      return {
+        project: syncProjectObject(next, edit.targetObjectId),
+        dirtyObjectIds: [edit.sourceObjectId, edit.targetObjectId],
+        shouldEvaluate: true,
+      };
+    }
+    case "toggleEdge": {
+      const edge = project.edges.find((item) => item.id === edit.edgeId);
+      if (!edge) return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      if (edge.enabled !== false) {
+        const detached = detachMappedInput(project, edge.targetObjectId, edge.targetVariableId);
+        const next = {
+          ...detached.project,
+          edges: detached.project.edges.map((item) =>
+            item.id === edge.id ? { ...item, enabled: false, targetVariableId: detached.newId } : item,
+          ),
+        };
+        return {
+          project: syncProjectObject(next, edge.targetObjectId),
+          dirtyObjectIds: [edge.sourceObjectId, edge.targetObjectId],
+          shouldEvaluate: true,
+        };
+      }
+      const sourceObject = project.objects.find((item) => item.id === edge.sourceObjectId);
+      const source = sourceObject ? sourceVariable(sourceObject, edge.sourceVariableId) : null;
+      if (!source) return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      const oldId = edge.targetVariableId;
+      let next = patchObject(project, edge.targetObjectId, (object) => {
+        const rewritten = rewriteFormulas(object, oldId, source.id);
+        return {
+          ...rewritten,
+          inputs: rewritten.inputs.map((item) =>
+            item.id === oldId
+              ? { ...item, id: source.id, name: source.name, quantity: source.quantity ?? item.quantity ?? null, unit: source.unit ?? item.unit ?? null }
+              : item,
+          ),
+        };
+      });
+      next = {
+        ...next,
+        edges: next.edges.map((item) =>
+          item.id === edge.id ? { ...item, enabled: true, targetVariableId: source.id } : item,
+        ),
+      };
+      return {
+        project: syncProjectObject(next, edge.targetObjectId),
+        dirtyObjectIds: [edge.sourceObjectId, edge.targetObjectId],
+        shouldEvaluate: true,
+      };
+    }
+    case "deleteEdges": {
+      const removed = new Set(edit.edgeIds);
+      const dropping = project.edges.filter((edge) => removed.has(edge.id));
+      let next = project;
+      for (const edge of dropping) {
+        if (edge.enabled !== false) {
+          next = detachMappedInput(next, edge.targetObjectId, edge.targetVariableId).project;
+        }
+      }
+      next = { ...next, edges: next.edges.filter((edge) => !removed.has(edge.id)) };
+      next = syncAllObjects(next);
+      return {
+        project: next,
+        dirtyObjectIds: dropping.map((edge) => edge.targetObjectId),
+        shouldEvaluate: true,
+      };
+    }
   }
 }
 

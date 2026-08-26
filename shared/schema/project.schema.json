@@ -33,6 +33,7 @@
       "required": ["id"],
       "properties": {
         "id": { "$ref": "#/$defs/variableId" },
+        "name": { "type": "string" },
         "value": { "type": ["number", "null"] },
         "quantity": { "type": ["string", "null"] },
         "unit": { "type": ["string", "null"] },
@@ -46,6 +47,7 @@
       "required": ["id", "formula"],
       "properties": {
         "id": { "$ref": "#/$defs/variableId" },
+        "name": { "type": "string" },
         "formula": { "type": "string" },
         "value": { "type": ["number", "null"] },
         "quantity": { "type": ["string", "null"] },
@@ -60,6 +62,7 @@
       "required": ["id", "sourceVariableId"],
       "properties": {
         "id": { "$ref": "#/$defs/variableId" },
+        "name": { "type": "string" },
         "sourceVariableId": { "$ref": "#/$defs/variableId" },
         "value": { "type": ["number", "null"] },
         "quantity": { "type": ["string", "null"] },
@@ -114,7 +117,8 @@
         "sourceObjectId": { "type": "string" },
         "sourceVariableId": { "$ref": "#/$defs/variableId" },
         "targetObjectId": { "type": "string" },
-        "targetVariableId": { "$ref": "#/$defs/variableId" }
+        "targetVariableId": { "$ref": "#/$defs/variableId" },
+        "enabled": { "type": "boolean" }
       }
     }
   }
