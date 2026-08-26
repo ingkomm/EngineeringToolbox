@@ -11,6 +11,7 @@ from engcalc.models import (
     EvaluateResponse,
     FormulaVariable,
     InputVariable,
+    OutputBinding,
     ProjectDocument,
 )
 from engcalc.quantities import QuantityError, infer_formula_quantity, is_known_quantity, si_unit_for
@@ -315,6 +316,7 @@ def _align_mapped_identities(
         new_id = source_output.id
         target.id = new_id
         target.name = source_output.name or source_output.id
+        _inherit_source_quantity(target, source_obj, source_output)
         edge.targetVariableId = new_id
         if old_id == new_id:
             continue
@@ -327,6 +329,38 @@ def _align_mapped_identities(
                 output.sourceVariableId = new_id
             if not output.name or output.name == old_id:
                 output.name = target.name
+
+
+def _inherit_source_quantity(
+    target: InputVariable,
+    source_obj: CalculationObject,
+    source_output: OutputBinding,
+) -> None:
+    """Mapped inputs always follow the upstream quantity/unit, including later changes."""
+    quantity, unit = _source_quantity_unit(source_obj, source_output)
+    target.quantity = quantity
+    target.unit = unit
+
+
+def _source_quantity_unit(
+    source_obj: CalculationObject,
+    source_output: OutputBinding,
+) -> tuple[str | None, str | None]:
+    source_var = next(
+        (
+            item
+            for item in [*source_obj.inputs, *source_obj.calculations]
+            if item.id in {source_output.sourceVariableId, source_output.id}
+        ),
+        None,
+    )
+    quantity = source_var.quantity if source_var is not None else source_output.quantity
+    if quantity is None:
+        quantity = source_output.quantity
+    unit = source_var.unit if source_var is not None and source_var.unit is not None else source_output.unit
+    if unit is None:
+        unit = si_unit_for(quantity)
+    return quantity, unit
 
 
 def _evaluate_object(
@@ -377,26 +411,8 @@ def _evaluate_object(
                 )
             )
             continue
-        if (
-            target.quantity
-            and source_output.quantity
-            and target.quantity != source_output.quantity
-        ):
-            _mark_input_error(
-                target,
-                "QUANTITY_MISMATCH",
-                f"{source_output.quantity} cannot map onto {target.quantity}",
-            )
-            errors.append(
-                EvalError(
-                    objectId=obj.id,
-                    variableId=target.id,
-                    code="QUANTITY_MISMATCH",
-                    message=f"{edge.sourceObjectId}.{edge.sourceVariableId} ({source_output.quantity}) "
-                    f"cannot map onto {target.id} ({target.quantity})",
-                )
-            )
-            continue
+        _inherit_source_quantity(target, source_obj, source_output)
+        target.name = source_output.name or source_output.id
         if source_output.value is None:
             target.value = None
             target.status = "idle" if source_output.status != "error" else "error"
@@ -414,10 +430,6 @@ def _evaluate_object(
         target.value = source_output.value
         target.status = "mapped"
         target.error = None
-        target.name = source_output.name or source_output.id
-        if source_output.quantity:
-            target.quantity = source_output.quantity
-            target.unit = source_output.unit
 
     for item in obj.inputs:
         if item.id not in mapped_targets:

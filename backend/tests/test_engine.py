@@ -157,10 +157,10 @@ def test_draft_object_is_idle_not_error() -> None:
     assert obj.outputs[0].status == "idle"
 
 
-def test_quantity_mismatch_on_mapping() -> None:
+def test_mapped_quantity_follows_source_including_later_changes() -> None:
     project = ProjectDocument(
-        id="mismatch",
-        name="mismatch",
+        id="follow",
+        name="follow",
         objects=[
             CalculationObject(
                 id="src",
@@ -171,12 +171,12 @@ def test_quantity_mismatch_on_mapping() -> None:
                 outputs=[OutputBinding(id="P", sourceVariableId="P")],
             ),
             CalculationObject(
-                id="dst",
-                name="Dst",
+                id="mid",
+                name="Mid",
                 position=Position(x=1, y=0),
                 inputs=[InputVariable(id="T", value=None, quantity="temperature")],
-                calculations=[],
-                outputs=[],
+                calculations=[FormulaVariable(id="TWICE", formula="P * 2")],
+                outputs=[OutputBinding(id="TWICE", sourceVariableId="TWICE")],
             ),
         ],
         edges=[
@@ -184,15 +184,99 @@ def test_quantity_mismatch_on_mapping() -> None:
                 id="e1",
                 sourceObjectId="src",
                 sourceVariableId="P",
-                targetObjectId="dst",
+                targetObjectId="mid",
                 targetVariableId="T",
             )
         ],
     )
     result = evaluate_project(project)
-    assert any(err.code == "QUANTITY_MISMATCH" for err in result.errors)
-    dest = next(obj for obj in result.project.objects if obj.id == "dst")
-    assert dest.inputs[0].value is None
+    assert result.errors == []
+    mid = next(obj for obj in result.project.objects if obj.id == "mid")
+    mapped = mid.inputs[0]
+    assert mapped.id == "P"
+    assert mapped.quantity == "pressure"
+    assert mapped.unit == "Pa"
+    assert mapped.value == 10.0
+    twice = next(item for item in mid.calculations if item.id == "TWICE")
+    assert twice.quantity == "pressure"
+    assert twice.unit == "Pa"
+
+    mutated = result.project.model_copy(deep=True)
+    source = next(obj for obj in mutated.objects if obj.id == "src")
+    source.inputs[0].quantity = "temperature"
+    source.inputs[0].unit = "K"
+    again = evaluate_project(mutated, dirty_object_ids=["src"])
+    mid = next(obj for obj in again.project.objects if obj.id == "mid")
+    mapped = mid.inputs[0]
+    assert mapped.quantity == "temperature"
+    assert mapped.unit == "K"
+    twice = next(item for item in mid.calculations if item.id == "TWICE")
+    assert twice.quantity == "temperature"
+    assert twice.unit == "K"
+
+
+def test_mapped_quantity_follows_source_through_a_chain() -> None:
+    project = ProjectDocument(
+        id="chain",
+        name="chain",
+        objects=[
+            CalculationObject(
+                id="src",
+                name="Src",
+                position=Position(x=0, y=0),
+                inputs=[InputVariable(id="P", value=10, quantity="pressure")],
+                calculations=[],
+                outputs=[OutputBinding(id="P", sourceVariableId="P")],
+            ),
+            CalculationObject(
+                id="mid",
+                name="Mid",
+                position=Position(x=1, y=0),
+                inputs=[InputVariable(id="P", value=None, quantity="temperature")],
+                calculations=[],
+                outputs=[OutputBinding(id="P", sourceVariableId="P")],
+            ),
+            CalculationObject(
+                id="dst",
+                name="Dst",
+                position=Position(x=2, y=0),
+                inputs=[InputVariable(id="P", value=None, quantity="length")],
+                calculations=[],
+                outputs=[OutputBinding(id="P", sourceVariableId="P")],
+            ),
+        ],
+        edges=[
+            Edge(
+                id="e1",
+                sourceObjectId="src",
+                sourceVariableId="P",
+                targetObjectId="mid",
+                targetVariableId="P",
+            ),
+            Edge(
+                id="e2",
+                sourceObjectId="mid",
+                sourceVariableId="P",
+                targetObjectId="dst",
+                targetVariableId="P",
+            ),
+        ],
+    )
+    result = evaluate_project(project)
+    assert result.errors == []
+    by_id = {obj.id: obj for obj in result.project.objects}
+    assert by_id["mid"].inputs[0].quantity == "pressure"
+    assert by_id["dst"].inputs[0].quantity == "pressure"
+    assert by_id["dst"].inputs[0].unit == "Pa"
+
+    mutated = result.project.model_copy(deep=True)
+    next(obj for obj in mutated.objects if obj.id == "src").inputs[0].quantity = "temperature"
+    again = evaluate_project(mutated, dirty_object_ids=["src"])
+    by_id = {obj.id: obj for obj in again.project.objects}
+    assert by_id["mid"].inputs[0].quantity == "temperature"
+    assert by_id["mid"].inputs[0].unit == "K"
+    assert by_id["dst"].inputs[0].quantity == "temperature"
+    assert by_id["dst"].inputs[0].unit == "K"
 
 
 def test_global_variable_ids_must_be_unique() -> None:

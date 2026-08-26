@@ -53,7 +53,7 @@ Variable ID는 셀 주소(`A1`, `B2`)가 아니라 의미 기반 식별자다.
 | power | 동력 | W |
 | … | … | … |
 
-Edge mapping 시 source/target quantity가 둘 다 지정되어 있고 다르면 `QUANTITY_MISMATCH`. 단위 변환은 이 단계에서 하지 않는다.
+Edge mapping 시 연결된 Input은 소스 변수의 물성/단위를 그대로 따른다. 상단 소스의 quantity가 바뀌면 다운스트림 mapped Input과 그 수식 유추 단위도 다시 맞춰진다.
 
 | Table | 역할 | 값의 출처 | Port |
 |---|---|---|---|

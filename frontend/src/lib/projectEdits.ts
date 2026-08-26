@@ -165,6 +165,48 @@ function withIdentityPatch<T extends { id: string; name: string }>(current: T, p
   return next;
 }
 
+function sourceQuantityFields(
+  source: { quantity?: string | null; unit?: string | null },
+  catalog: QuantitySpec[],
+): { quantity: string | null; unit: string | null } {
+  const quantity = source.quantity ?? null;
+  return { quantity, unit: source.unit ?? siUnitFor(quantity, catalog) };
+}
+
+function inheritMappedQuantity(
+  project: ProjectDocument,
+  sourceObjectId: string,
+  sourceVariableId: string,
+  quantity: string | null,
+  unit: string | null,
+): ProjectDocument {
+  const visited = new Set<string>();
+  const queue: Array<{ objectId: string; variableId: string }> = [
+    { objectId: sourceObjectId, variableId: sourceVariableId },
+  ];
+  let next = project;
+  while (queue.length) {
+    const current = queue.shift();
+    if (!current) break;
+    const key = `${current.objectId}::${current.variableId}`;
+    if (visited.has(key)) continue;
+    visited.add(key);
+    for (const edge of next.edges) {
+      if (edge.enabled === false) continue;
+      if (edge.sourceObjectId !== current.objectId || edge.sourceVariableId !== current.variableId) continue;
+      next = patchObject(next, edge.targetObjectId, (object) => ({
+        ...object,
+        inputs: object.inputs.map((item) =>
+          item.id === edge.targetVariableId ? { ...item, quantity, unit } : item,
+        ),
+      }));
+      next = syncProjectObject(next, edge.targetObjectId);
+      queue.push({ objectId: edge.targetObjectId, variableId: edge.targetVariableId });
+    }
+  }
+  return next;
+}
+
 function detachMappedInput(
   project: ProjectDocument,
   objectId: string,
@@ -277,6 +319,15 @@ export function applyWorkspaceEdit(
       } else if (patch.name !== current.name) {
         next = applyDisplayName(next, current.id, patch.name);
       }
+      if (patch.quantity !== current.quantity || patch.unit !== current.unit) {
+        next = inheritMappedQuantity(
+          next,
+          edit.objectId,
+          patch.id,
+          patch.quantity ?? null,
+          patch.unit ?? null,
+        );
+      }
       return {
         project: syncProjectObject(next, edit.objectId),
         dirtyObjectIds: [edit.objectId],
@@ -331,6 +382,15 @@ export function applyWorkspaceEdit(
       } else if (patch.name !== current.name) {
         next = applyDisplayName(next, current.id, patch.name);
       }
+      if (patch.quantity !== current.quantity || patch.unit !== current.unit) {
+        next = inheritMappedQuantity(
+          next,
+          edit.objectId,
+          patch.id,
+          patch.quantity ?? null,
+          patch.unit ?? null,
+        );
+      }
       return {
         project: syncProjectObject(next, edit.objectId),
         dirtyObjectIds: [edit.objectId],
@@ -364,6 +424,7 @@ export function applyWorkspaceEdit(
       ) {
         return { project, dirtyObjectIds: [], shouldEvaluate: false };
       }
+      const inherited = sourceQuantityFields(source, catalog);
       const oldId = target.id;
       let next = patchObject(project, edit.targetObjectId, (object) => {
         const rewritten = rewriteFormulas(object, oldId, source.id);
@@ -375,8 +436,8 @@ export function applyWorkspaceEdit(
                   ...item,
                   id: source.id,
                   name: source.name,
-                  quantity: source.quantity ?? item.quantity ?? null,
-                  unit: source.unit ?? item.unit ?? null,
+                  quantity: inherited.quantity,
+                  unit: inherited.unit,
                 }
               : item,
           ),
@@ -423,13 +484,14 @@ export function applyWorkspaceEdit(
       const source = sourceObject ? sourceVariable(sourceObject, edge.sourceVariableId) : null;
       if (!source) return { project, dirtyObjectIds: [], shouldEvaluate: false };
       const oldId = edge.targetVariableId;
+      const inherited = sourceQuantityFields(source, catalog);
       let next = patchObject(project, edge.targetObjectId, (object) => {
         const rewritten = rewriteFormulas(object, oldId, source.id);
         return {
           ...rewritten,
           inputs: rewritten.inputs.map((item) =>
             item.id === oldId
-              ? { ...item, id: source.id, name: source.name, quantity: source.quantity ?? item.quantity ?? null, unit: source.unit ?? item.unit ?? null }
+              ? { ...item, id: source.id, name: source.name, quantity: inherited.quantity, unit: inherited.unit }
               : item,
           ),
         };

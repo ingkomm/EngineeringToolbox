@@ -67,8 +67,10 @@ def test_user_authored_worksheet_evaluates_through_python() -> None:
     assert power["unit"] == "kg2/(m·s3)"
     assert mapped["status"] == "mapped" and mapped["value"] == 360.0
     assert mapped["name"] == "POWER"
+    assert mapped["quantity"] is None
+    assert mapped["unit"] == "kg2/(m·s3)"
     assert result["formula"] == "POWER * 2"
-    assert result["value"] == 720.0 and result["quantity"] == "power" and result["unit"] == "W"
+    assert result["value"] == 720.0
 
     flow["value"] = 200
     again = client.post(

@@ -133,6 +133,62 @@ describe("auto-linked ports", () => {
     expect(project.objects[1]?.inputs[0]?.name).toBe("동력");
   });
 
+  it("copies source quantity/unit onto a mapped input and follows later source changes", () => {
+    let project = applyAll([
+      { type: "addInput", objectId: "obj_1" },
+      { type: "updateInput", objectId: "obj_1", index: 0, patch: { id: "P", value: 10, quantity: "pressure" } },
+      { type: "addObject" },
+      { type: "addInput", objectId: "obj_2" },
+      { type: "addObject" },
+      { type: "addInput", objectId: "obj_3" },
+    ]);
+    const midId = project.objects[1]?.inputs[0]?.id ?? "";
+    project = applyWorkspaceEdit(
+      project,
+      {
+        type: "connectMapping",
+        sourceObjectId: "obj_1",
+        sourceVariableId: "P",
+        targetObjectId: "obj_2",
+        targetVariableId: midId,
+      },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(project.objects[1]?.inputs[0]).toMatchObject({ id: "P", quantity: "pressure", unit: "Pa" });
+
+    const dstId = project.objects[2]?.inputs[0]?.id ?? "";
+    project = applyWorkspaceEdit(
+      project,
+      {
+        type: "connectMapping",
+        sourceObjectId: "obj_2",
+        sourceVariableId: "P",
+        targetObjectId: "obj_3",
+        targetVariableId: dstId,
+      },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(project.objects[2]?.inputs[0]).toMatchObject({ id: "P", quantity: "pressure", unit: "Pa" });
+
+    project = applyWorkspaceEdit(
+      project,
+      { type: "updateInput", objectId: "obj_1", index: 0, patch: { quantity: "temperature" } },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(project.objects[0]?.inputs[0]).toMatchObject({ quantity: "temperature", unit: "K" });
+    expect(project.objects[1]?.inputs[0]).toMatchObject({ quantity: "temperature", unit: "K" });
+    expect(project.objects[2]?.inputs[0]).toMatchObject({ quantity: "temperature", unit: "K" });
+
+    project = applyWorkspaceEdit(project, { type: "toggleEdge", edgeId: project.edges[1]!.id }, FALLBACK_QUANTITIES).project;
+    project = applyWorkspaceEdit(
+      project,
+      { type: "updateInput", objectId: "obj_1", index: 0, patch: { quantity: "length" } },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(project.objects[1]?.inputs[0]).toMatchObject({ quantity: "length", unit: "m" });
+    expect(project.objects[2]?.inputs[0]?.quantity).not.toBe("length");
+  });
+
   it("drops mapping edges when the source variable is removed", () => {
     let project = applyAll([
       { type: "addInput", objectId: "obj_1" },
