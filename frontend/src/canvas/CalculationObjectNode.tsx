@@ -94,6 +94,9 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
         {object.inputs.length === 0 ? <p className="calc-empty">입력 변수를 추가하세요</p> : null}
         {object.inputs.map((item, index) => {
           const isMapped = mapped.has(item.id);
+          const inbound = project.edges.find(
+            (edge) => edge.targetObjectId === id && edge.targetVariableId === item.id,
+          );
           return (
             <div
               className="calc-row calc-row--input"
@@ -108,7 +111,14 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
                 position={Position.Left}
                 className="calc-handle calc-handle--in"
               />
-              {isMapped ? (
+              {isMapped && inbound ? (
+                <LinkCollapseButton
+                  edgeId={inbound.id}
+                  collapsed={inbound.collapsed === true}
+                  onEdit={onEdit}
+                  testId={`object-${id}-input-${item.id}-link`}
+                />
+              ) : isMapped ? (
                 <span className="port-search-spacer" />
               ) : (
                 <PortSearch
@@ -262,13 +272,17 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
         {object.outputs.length === 0 ? (
           <p className="calc-empty">Input/Calculation 변수가 생기면 오른쪽으로 자동 노출됩니다</p>
         ) : null}
-        {object.outputs.map((item) => (
-          <div
-            className="calc-row calc-row--output"
-            key={item.id}
-            data-status={item.status ?? "idle"}
-            data-testid={`object-${id}-output-row-${item.id}`}
-          >
+        {object.outputs.map((item) => {
+          const outbound = project.edges.filter(
+            (edge) => edge.sourceObjectId === id && edge.sourceVariableId === item.id,
+          );
+          return (
+            <div
+              className="calc-row calc-row--output"
+              key={item.id}
+              data-status={item.status ?? "idle"}
+              data-testid={`object-${id}-output-row-${item.id}`}
+            >
             <span className="calc-row__port-id" data-testid={`object-${id}-output-${item.id}-source`}>
               {item.sourceVariableId}
               {item.name && item.name !== item.id ? ` · ${item.name}` : ""}
@@ -277,21 +291,31 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
               {formatValue(item.value)}
             </span>
             <span className="calc-row__unit">{item.unit ?? "—"}</span>
-            <PortSearch
-              project={project}
-              selfObjectId={id}
-              direction="to-input"
-              testId={`object-${id}-output-${item.id}-search`}
-              onPick={(hit) =>
-                onEdit({
-                  type: "connectBySearch",
-                  sourceObjectId: id,
-                  sourceVariableId: item.id,
-                  targetObjectId: hit.objectId,
-                  targetVariableId: hit.createInput ? undefined : hit.variableId,
-                })
-              }
-            />
+            <div className="port-tools">
+              <PortSearch
+                project={project}
+                selfObjectId={id}
+                direction="to-input"
+                testId={`object-${id}-output-${item.id}-search`}
+                onPick={(hit) =>
+                  onEdit({
+                    type: "connectBySearch",
+                    sourceObjectId: id,
+                    sourceVariableId: item.id,
+                    targetObjectId: hit.objectId,
+                    targetVariableId: hit.createInput ? undefined : hit.variableId,
+                  })
+                }
+              />
+              {outbound[0] ? (
+                <LinkCollapseButton
+                  edgeId={outbound[0].id}
+                  collapsed={outbound[0].collapsed === true}
+                  onEdit={onEdit}
+                  testId={`object-${id}-output-${item.id}-link`}
+                />
+              ) : null}
+            </div>
             <RowHandle
               nodeId={id}
               handleId={outputHandleId(item.id)}
@@ -300,7 +324,8 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
               className="calc-handle calc-handle--out"
             />
           </div>
-        ))}
+          );
+        })}
       </section>
     </article>
   );
@@ -563,6 +588,30 @@ function IdField({
       }}
       aria-label="Variable ID"
     />
+  );
+}
+
+function LinkCollapseButton({
+  edgeId,
+  collapsed,
+  onEdit,
+  testId,
+}: {
+  edgeId: string;
+  collapsed: boolean;
+  onEdit: (edit: WorkspaceEdit) => void;
+  testId: string;
+}) {
+  return (
+    <button
+      type="button"
+      className={`port-link-btn nodrag ${collapsed ? "port-link-btn--on" : ""}`}
+      data-testid={testId}
+      title={collapsed ? "전체 링크로 펼치기" : "무선 링크로 접기"}
+      onClick={() => onEdit({ type: "toggleEdgeCollapsed", edgeId })}
+    >
+      {collapsed ? "펼치기" : "링크"}
+    </button>
   );
 }
 

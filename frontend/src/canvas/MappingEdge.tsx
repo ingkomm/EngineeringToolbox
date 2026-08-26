@@ -99,7 +99,7 @@ export function MappingEdge({
             className="edge-controls nodrag nopan"
             style={{
               position: "absolute",
-              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+              transform: `translate(-50%, -140%) translate(${labelX}px, ${labelY}px)`,
               pointerEvents: "all",
             }}
           >

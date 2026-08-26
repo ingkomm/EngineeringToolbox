@@ -344,7 +344,7 @@ body,
 }
 
 .calc-row--output {
-  grid-template-columns: minmax(0, 1fr) 72px 52px 22px;
+  grid-template-columns: minmax(0, 1fr) 72px 52px auto;
 }
 
 .calc-row__port-id {
@@ -543,6 +543,8 @@ body,
 
 .edge-controls {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 4px;
   pointer-events: all;
 }
@@ -593,9 +595,29 @@ body,
   padding: 0;
 }
 
-.port-search {
-  position: relative;
-  z-index: 6;
+.port-tools {
+  display: flex;
+  gap: 2px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.port-link-btn {
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--accent-2);
+  background: var(--input);
+  color: var(--accent-2);
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.port-link-btn--on {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 .port-search-spacer {
