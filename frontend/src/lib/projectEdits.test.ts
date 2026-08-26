@@ -287,4 +287,32 @@ describe("unique objects and search connectors", () => {
     ).project;
     expect(project.edges[0]?.collapsed).toBe(true);
   });
+
+  it("disconnects a mapped input through deleteEdges", () => {
+    let project = applyAll([
+      { type: "addInput", objectId: "obj_1" },
+      { type: "updateInput", objectId: "obj_1", index: 0, patch: { id: "POWER", value: 10 } },
+      { type: "addObject" },
+    ]);
+    project = applyWorkspaceEdit(
+      project,
+      {
+        type: "connectBySearch",
+        sourceObjectId: "obj_1",
+        sourceVariableId: "POWER",
+        targetObjectId: "obj_2",
+      },
+      FALLBACK_QUANTITIES,
+    ).project;
+    const edgeId = project.edges[0]?.id;
+    expect(edgeId).toBeDefined();
+    expect(project.objects[1]?.inputs[0]?.id).toBe("POWER");
+    project = applyWorkspaceEdit(
+      project,
+      { type: "deleteEdges", edgeIds: [edgeId!] },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(project.edges).toHaveLength(0);
+    expect(project.objects[1]?.inputs[0]?.id).toMatch(/^IN_/);
+  });
 });

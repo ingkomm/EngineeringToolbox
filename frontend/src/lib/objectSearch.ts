@@ -1,13 +1,17 @@
 import type { CalculationObject, MappingEdge, ProjectDocument } from "../types/contract";
 import { displayName } from "./variables";
 
+export type PortLinkStatus = "connected" | "occupied" | "available" | "create";
+
 export interface PortSearchHit {
   objectId: string;
   objectName: string;
   variableId: string;
   variableName: string;
   kind: "input" | "output";
+  status: PortLinkStatus;
   createInput?: boolean;
+  edgeId?: string;
 }
 
 export function matchesObjectQuery(object: CalculationObject, query: string): boolean {
@@ -16,21 +20,46 @@ export function matchesObjectQuery(object: CalculationObject, query: string): bo
   return object.id.toLowerCase().includes(needle) || object.name.toLowerCase().includes(needle);
 }
 
-export function occupiedInputKeys(edges: MappingEdge[]): Set<string> {
-  return new Set(edges.map((edge) => `${edge.targetObjectId}::${edge.targetVariableId}`));
+function inboundEdge(
+  edges: MappingEdge[],
+  objectId: string,
+  variableId: string,
+): MappingEdge | undefined {
+  return edges.find((edge) => edge.targetObjectId === objectId && edge.targetVariableId === variableId);
 }
 
 export function searchTargetPorts(
   project: ProjectDocument,
   query: string,
   selfObjectId: string,
+  selfVariableId: string,
 ): PortSearchHit[] {
-  const occupied = occupiedInputKeys(project.edges);
   const hits: PortSearchHit[] = [];
   for (const object of project.objects) {
     if (object.id === selfObjectId || !matchesObjectQuery(object, query)) continue;
-    const free = object.inputs.filter((item) => !occupied.has(`${object.id}::${item.id}`));
-    if (free.length === 0) {
+    let hasAvailable = false;
+    for (const item of object.inputs) {
+      const edge = inboundEdge(project.edges, object.id, item.id);
+      let status: PortLinkStatus = "available";
+      if (edge) {
+        status =
+          edge.sourceObjectId === selfObjectId && edge.sourceVariableId === selfVariableId
+            ? "connected"
+            : "occupied";
+      } else {
+        hasAvailable = true;
+      }
+      hits.push({
+        objectId: object.id,
+        objectName: object.name,
+        variableId: item.id,
+        variableName: displayName(item),
+        kind: "input",
+        status,
+        edgeId: status === "connected" ? edge?.id : undefined,
+      });
+    }
+    if (!hasAvailable) {
       hits.push({
         objectId: object.id,
         objectName: object.name,
@@ -38,16 +67,7 @@ export function searchTargetPorts(
         variableName: "새 Input으로 연결",
         kind: "input",
         createInput: true,
-      });
-      continue;
-    }
-    for (const item of free) {
-      hits.push({
-        objectId: object.id,
-        objectName: object.name,
-        variableId: item.id,
-        variableName: displayName(item),
-        kind: "input",
+        status: "create",
       });
     }
   }
@@ -58,17 +78,25 @@ export function searchSourcePorts(
   project: ProjectDocument,
   query: string,
   selfObjectId: string,
+  selfVariableId: string,
 ): PortSearchHit[] {
+  const inbound = inboundEdge(project.edges, selfObjectId, selfVariableId);
   const hits: PortSearchHit[] = [];
   for (const object of project.objects) {
     if (object.id === selfObjectId || !matchesObjectQuery(object, query)) continue;
     for (const item of object.outputs) {
+      const connected =
+        inbound != null &&
+        inbound.sourceObjectId === object.id &&
+        inbound.sourceVariableId === item.id;
       hits.push({
         objectId: object.id,
         objectName: object.name,
         variableId: item.id,
         variableName: displayName(item),
         kind: "output",
+        status: connected ? "connected" : inbound ? "occupied" : "available",
+        edgeId: connected ? inbound.id : undefined,
       });
     }
   }

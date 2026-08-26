@@ -56,7 +56,7 @@ describe("React Flow edge mapping", () => {
     ]);
   });
 
-  it("hides interaction on collapsed bluetooth-style links", () => {
+  it("hides interaction on collapsed links", () => {
     const collapsed = {
       ...project,
       edges: [{ ...project.edges[0]!, collapsed: true }],

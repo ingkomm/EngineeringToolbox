@@ -34,21 +34,80 @@ const project: ProjectDocument = {
   edges: [],
 };
 
+const linked: ProjectDocument = {
+  ...project,
+  objects: [
+    project.objects[0]!,
+    {
+      ...project.objects[1]!,
+      inputs: [{ id: "POWER", name: "POWER", value: null }],
+      outputs: [{ id: "POWER", name: "POWER", sourceVariableId: "POWER" }],
+    },
+    project.objects[2]!,
+  ],
+  edges: [
+    {
+      id: "edge-obj_a-POWER-obj_b-POWER",
+      sourceObjectId: "obj_a",
+      sourceVariableId: "POWER",
+      targetObjectId: "obj_b",
+      targetVariableId: "POWER",
+      enabled: true,
+      collapsed: false,
+    },
+  ],
+};
+
 describe("connector object search", () => {
   it("finds other objects by id or name and lists free inputs", () => {
-    const byName = searchTargetPorts(project, "sink", "obj_a");
+    const byName = searchTargetPorts(project, "sink", "obj_a", "POWER");
     expect(byName).toHaveLength(1);
-    expect(byName[0]).toMatchObject({ objectId: "obj_b", variableId: "IN_1" });
+    expect(byName[0]).toMatchObject({ objectId: "obj_b", variableId: "IN_1", status: "available" });
     expect(byName[0]?.createInput).toBeUndefined();
-    const byId = searchTargetPorts(project, "obj_c", "obj_a");
+    const byId = searchTargetPorts(project, "obj_c", "obj_a", "POWER");
     expect(byId).toHaveLength(1);
-    expect(byId[0]).toMatchObject({ objectId: "obj_c", createInput: true, variableName: "새 Input으로 연결" });
+    expect(byId[0]).toMatchObject({
+      objectId: "obj_c",
+      createInput: true,
+      variableName: "새 Input으로 연결",
+      status: "create",
+    });
   });
 
   it("lists source output ports on matching objects", () => {
-    const hits = searchSourcePorts(project, "heat", "obj_b");
+    const hits = searchSourcePorts(project, "heat", "obj_b", "IN_1");
     expect(hits).toEqual([
-      expect.objectContaining({ objectId: "obj_a", objectName: "Heater", variableId: "POWER" }),
+      expect.objectContaining({ objectId: "obj_a", objectName: "Heater", variableId: "POWER", status: "available" }),
+    ]);
+  });
+
+  it("marks the current link as connected and exposes the edge id for disconnect", () => {
+    const fromOutput = searchTargetPorts(linked, "sink", "obj_a", "POWER");
+    expect(fromOutput).toEqual([
+      expect.objectContaining({
+        objectId: "obj_b",
+        variableId: "POWER",
+        status: "connected",
+        edgeId: "edge-obj_a-POWER-obj_b-POWER",
+      }),
+      expect.objectContaining({ objectId: "obj_b", createInput: true, status: "create" }),
+    ]);
+    const fromInput = searchSourcePorts(linked, "heat", "obj_b", "POWER");
+    expect(fromInput).toEqual([
+      expect.objectContaining({
+        objectId: "obj_a",
+        variableId: "POWER",
+        status: "connected",
+        edgeId: "edge-obj_a-POWER-obj_b-POWER",
+      }),
+    ]);
+  });
+
+  it("marks another object's occupied input as in use without a disconnect edge", () => {
+    const hits = searchTargetPorts(linked, "sink", "obj_c", "IN_1");
+    expect(hits).toEqual([
+      expect.objectContaining({ objectId: "obj_b", variableId: "POWER", status: "occupied", edgeId: undefined }),
+      expect.objectContaining({ objectId: "obj_b", createInput: true, status: "create" }),
     ]);
   });
 });

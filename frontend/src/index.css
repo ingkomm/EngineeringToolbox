@@ -279,7 +279,7 @@ body,
 }
 
 .calc-row--input {
-  grid-template-columns: 22px 88px 96px 80px minmax(140px, 1fr) 22px;
+  grid-template-columns: 14px auto 88px 96px 80px minmax(120px, 1fr) 22px;
 }
 
 .calc-row--calc {
@@ -554,52 +554,15 @@ body,
   stroke-width: 0;
 }
 
-.link-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 220px;
-  padding: 4px 8px;
-  border: 1px dashed var(--accent-2);
-  background: #0d1624;
-  border-radius: 999px;
-  box-shadow: var(--shadow);
-  color: var(--text);
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-.link-chip--off {
-  border-color: #6b7c90;
-  color: var(--muted);
-}
-
-.link-chip__peer {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-weight: 600;
-}
-
-.link-chip__arrow {
-  color: var(--accent-2);
-  font-weight: 700;
-}
-
-.link-chip__btn {
-  border: 0;
-  background: transparent;
-  color: var(--accent-2);
-  font-size: 10px;
-  font-weight: 700;
-  cursor: pointer;
-  padding: 0;
-}
-
 .port-tools {
   display: flex;
   gap: 2px;
   justify-content: flex-end;
   align-items: center;
+}
+
+.calc-row--input .port-tools {
+  justify-content: flex-start;
 }
 
 .port-link-btn {
@@ -620,9 +583,8 @@ body,
   border-color: var(--accent);
 }
 
-.port-search-spacer {
-  width: 22px;
-  height: 22px;
+.port-search {
+  position: relative;
 }
 
 .port-search__btn {
@@ -642,7 +604,7 @@ body,
   top: 24px;
   left: 0;
   z-index: 8;
-  width: 240px;
+  width: 268px;
   padding: 8px;
   border: 1px solid var(--line-strong);
   background: #0d1624;
@@ -679,8 +641,15 @@ body,
   overflow: auto;
 }
 
+.port-search__row {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+
 .port-search__hit {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -695,6 +664,38 @@ body,
 
 .port-search__hit:hover {
   background: rgba(108, 182, 255, 0.08);
+}
+
+.port-search__hit--static {
+  cursor: default;
+}
+
+.port-search__hit--static:hover {
+  background: transparent;
+}
+
+.port-search__status {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.port-search__status--occupied {
+  color: var(--muted);
+}
+
+.port-search__disconnect {
+  flex-shrink: 0;
+  align-self: center;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--danger);
+  background: transparent;
+  color: var(--danger);
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .port-search__object {

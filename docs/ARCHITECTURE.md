@@ -38,8 +38,8 @@ Variable ID는 셀 주소(`A1`, `B2`)가 아니라 의미 기반 식별자다.
 - ID와 이름(name)은 워크시트 **전역**에서 유일하다. Calculation이 만든 변수가 다른 Object Input으로 연결되면 새 ID를 만들지 않고 같은 ID/이름을 그대로 가져온다.
 - Calculation Object의 ID와 이름도 워크시트에서 유일하다.
 - 커넥터 `enabled`(On/Off)로 연동을 끊거나 다시 이을 수 있다. Off면 대상 Input은 새로운 로컬 ID를 받는다.
-- 커넥터 `collapsed`로 긴 선을 접고, 양쪽 포트에 상대 Object ID/이름을 Bluetooth 링크처럼 표시한다. 다시 펼치면 전체 선을 그린다.
-- 커넥터 검색으로 다른 Object를 ID/이름으로 찾아 연결할 수 있다.
+- 커넥터 `collapsed`로 긴 선을 접는다. 접힌 상태에서는 캔버스 선/칩을 그리지 않고 포트 옆 **링크** 버튼만 남긴다. 다시 누르면 전체 선을 그린다.
+- 커넥터 검색으로 다른 Object를 ID/이름으로 찾아 연결할 수 있다. 검색 결과는 기존 연결 상태(`연결됨` / `사용 중`)를 보여주고, 현재 포트의 링크는 **끊기**로 해제한다.
 - Input과 Calculation 행은 사용자가 임의로 추가/삭제/편집한다. 기본 워크시트는 비어 있다.
 
 각 변수는 SI 표준 물성(`quantity`)과 그에 따른 SI 단위(`unit`)를 가질 수 있다. 카탈로그는 Python이 소유한다 (`GET /api/v1/quantities`).
@@ -292,14 +292,15 @@ Object A의 PIN/POUT만 바꾸면 Object A와 B가 갱신된다. 매핑되지 �
 | `object-{id}-input-{var}-id` | Input 행 | Variable ID, blur로 commit |
 | `object-{id}-input-{var}-value` | Input 행 | 값, blur로 commit |
 | `object-{id}-input-{var}-quantity` | Input 행 | option `value` = quantity id (`mass_flow`, `pressure`, `power`) |
-| `object-{id}-input-{var}-search` | Input 행 | 소스 Object 검색 후 연결 |
+| `object-{id}-input-{var}-search` | Input 행 | 소스 Object 검색 후 연결 / 끊기 |
+| `object-{id}-input-{var}-link` | Input 행 | 링크 접기/펼치기. 접혀도 라벨은 `링크` |
 | `object-{id}-calc-{var}-formula` | Calculation 행 | 수식, blur로 commit |
-| `object-{id}-output-{var}-search` | Output 행 | 대상 Object 검색 후 연결 |
+| `object-{id}-output-{var}-search` | Output 행 | 대상 Object 검색 후 연결 / 끊기 |
+| `object-{id}-output-{var}-link` | Output 행 | 링크 접기/펼치기. 접혀도 라벨은 `링크` |
 | `handle-out-{var}` | Output 행 우측 | RF source handle (`id=out:{var}`) |
 | `handle-in-{var}` | Input 행 좌측 | RF target handle (`id=in:{var}`) |
 | `edge-{id}-toggle` | 커넥터 | On/Off |
 | `edge-{id}-collapse` | 커넥터 | 무선 링크로 접기 |
-| `edge-{id}-expand` | 접힌 링크 칩 | 전체 링크로 펼치기 |
 
 첫 Input 추가 시 Variable ID는 `IN_1`이다. ID를 `FLOW`로 바꾼 뒤에 testid가 `object-obj_1-input-FLOW-*`로 바뀐다.
 

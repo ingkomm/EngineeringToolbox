@@ -111,19 +111,11 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
                 position={Position.Left}
                 className="calc-handle calc-handle--in"
               />
-              {isMapped && inbound ? (
-                <LinkCollapseButton
-                  edgeId={inbound.id}
-                  collapsed={inbound.collapsed === true}
-                  onEdit={onEdit}
-                  testId={`object-${id}-input-${item.id}-link`}
-                />
-              ) : isMapped ? (
-                <span className="port-search-spacer" />
-              ) : (
+              <div className="port-tools">
                 <PortSearch
                   project={project}
                   selfObjectId={id}
+                  selfVariableId={item.id}
                   direction="from-output"
                   testId={`object-${id}-input-${item.id}-search`}
                   onPick={(hit) =>
@@ -135,8 +127,19 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
                       targetVariableId: item.id,
                     })
                   }
+                  onDisconnect={(hit) => {
+                    if (hit.edgeId) onEdit({ type: "deleteEdges", edgeIds: [hit.edgeId] });
+                  }}
                 />
-              )}
+                {inbound ? (
+                  <LinkCollapseButton
+                    edgeId={inbound.id}
+                    collapsed={inbound.collapsed === true}
+                    onEdit={onEdit}
+                    testId={`object-${id}-input-${item.id}-link`}
+                  />
+                ) : null}
+              </div>
               {isMapped ? (
                 <span className="calc-row__id-input calc-row__id-input--mapped" data-testid={`object-${id}-input-${item.id}-id`}>
                   {item.id}
@@ -295,6 +298,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
               <PortSearch
                 project={project}
                 selfObjectId={id}
+                selfVariableId={item.id}
                 direction="to-input"
                 testId={`object-${id}-output-${item.id}-search`}
                 onPick={(hit) =>
@@ -306,6 +310,9 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
                     targetVariableId: hit.createInput ? undefined : hit.variableId,
                   })
                 }
+                onDisconnect={(hit) => {
+                  if (hit.edgeId) onEdit({ type: "deleteEdges", edgeIds: [hit.edgeId] });
+                }}
               />
               {outbound[0] ? (
                 <LinkCollapseButton
@@ -610,7 +617,7 @@ function LinkCollapseButton({
       title={collapsed ? "전체 링크로 펼치기" : "무선 링크로 접기"}
       onClick={() => onEdit({ type: "toggleEdgeCollapsed", edgeId })}
     >
-      {collapsed ? "펼치기" : "링크"}
+      링크
     </button>
   );
 }
