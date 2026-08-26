@@ -160,7 +160,7 @@ export function applyWorkspaceEdit(
       const object: CalculationObject = {
         id,
         name: `Object ${index + 1}`,
-        position: { x: 72 + index * 40, y: 96 + index * 36 },
+        position: { x: 80 + index * 700, y: 88 },
         inputs: [],
         calculations: [],
         outputs: [],
