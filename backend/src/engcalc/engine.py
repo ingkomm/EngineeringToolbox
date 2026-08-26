@@ -13,7 +13,7 @@ from engcalc.models import (
     InputVariable,
     ProjectDocument,
 )
-from engcalc.quantities import is_known_quantity, si_unit_for
+from engcalc.quantities import QuantityError, infer_formula_quantity, is_known_quantity, si_unit_for
 
 VARIABLE_ID_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -264,7 +264,7 @@ def _evaluate_object(
     inputs_by_id = {item.id: item for item in obj.inputs}
     calculations_by_id = {item.id: item for item in obj.calculations}
 
-    for item in [*obj.inputs, *obj.calculations]:
+    for item in obj.inputs:
         if item.quantity:
             item.unit = si_unit_for(item.quantity)
 
@@ -372,9 +372,13 @@ def _evaluate_object(
         _fail_outputs(obj)
         return errors
 
+    qty_env: dict[str, str | None] = {item.id: item.quantity for item in obj.inputs}
+
     for item in calc_order:
         if not item.formula.strip():
             item.value = None
+            item.quantity = None
+            item.unit = None
             item.status = "idle"
             item.error = None
             continue
@@ -393,9 +397,25 @@ def _evaluate_object(
                     f"Unresolved variables: {', '.join(sorted(set(unresolved_local)))}",
                 )
             item.value = evaluate_formula(item.formula, env)
+            try:
+                quantity_id, unit = infer_formula_quantity(item.formula, qty_env)
+                item.quantity = quantity_id
+                item.unit = unit
+            except QuantityError as exc:
+                item.quantity = None
+                item.unit = None
+                errors.append(
+                    EvalError(
+                        objectId=obj.id,
+                        variableId=item.id,
+                        code=exc.code,
+                        message=exc.message,
+                    )
+                )
             item.status = "ok"
             item.error = None
             env[item.id] = item.value
+            qty_env[item.id] = item.quantity
         except FormulaError as exc:
             item.value = None
             item.status = "error"

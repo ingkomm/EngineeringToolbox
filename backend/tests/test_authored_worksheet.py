@@ -61,10 +61,12 @@ def test_user_authored_worksheet_evaluates_through_python() -> None:
     result = next(item for item in objects["obj_2"]["calculations"] if item["id"] == "RESULT")
 
     assert flow["unit"] == "kg/s"
-    assert dp["value"] == 3.0 and dp["unit"] == "Pa"
-    assert power["value"] == 360.0 and power["unit"] == "W"
+    assert dp["value"] == 3.0 and dp["quantity"] == "pressure" and dp["unit"] == "Pa"
+    assert power["value"] == 360.0
+    assert power["quantity"] is None
+    assert power["unit"] == "kg2/(m·s3)"
     assert mapped["status"] == "mapped" and mapped["value"] == 360.0
-    assert result["value"] == 720.0 and result["unit"] == "W"
+    assert result["value"] == 720.0 and result["quantity"] == "power" and result["unit"] == "W"
 
     flow["value"] = 200
     again = client.post(

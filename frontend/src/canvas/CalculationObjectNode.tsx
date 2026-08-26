@@ -140,7 +140,9 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
             + 수식
           </button>
         </div>
-        {object.calculations.length === 0 ? <p className="calc-empty">수식을 직접 작성하세요. 예: POUT - PIN</p> : null}
+        {object.calculations.length === 0 ? (
+          <p className="calc-empty">수식을 직접 작성하세요. 연산자: + - * / ** % 와 괄호</p>
+        ) : null}
         {object.calculations.map((item, index) => (
           <div
             className="calc-row calc-row--calc"
@@ -166,12 +168,13 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
             >
               {formatValue(item.value)}
             </span>
-            <QuantityField
-              quantities={quantities}
-              value={item.quantity ?? null}
-              testId={`object-${id}-calc-${item.id}-quantity`}
-              onChange={(quantity) => onEdit({ type: "updateCalculation", objectId: id, index, patch: { quantity } })}
-            />
+            <span
+              className="calc-row__unit"
+              title="Python이 수식에서 유추한 SI 물성"
+              data-testid={`object-${id}-calc-${item.id}-quantity`}
+            >
+              {inferredQuantityLabel(item.quantity, item.unit, quantities)}
+            </span>
             <button
               type="button"
               className="icon-btn nodrag"
@@ -363,6 +366,17 @@ function IdField({
       aria-label="Variable ID"
     />
   );
+}
+
+function inferredQuantityLabel(
+  quantity: string | null | undefined,
+  unit: string | null | undefined,
+  quantities: QuantitySpec[],
+): string {
+  const spec = quantities.find((item) => item.id === quantity);
+  if (spec) return `${spec.nameKo} ${spec.siUnit}`;
+  if (unit) return unit;
+  return "—";
 }
 
 function QuantityField({
