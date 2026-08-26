@@ -83,6 +83,67 @@ function retargetEdges(
   };
 }
 
+function rewriteIdentifier(formula: string, fromId: string, toId: string): string {
+  if (!fromId || fromId === toId) return formula;
+  const escaped = fromId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return formula.replace(new RegExp(`(^|[^A-Za-z0-9_])${escaped}(?![A-Za-z0-9_])`, "g"), `$1${toId}`);
+}
+
+function rewriteFormulas(object: CalculationObject, fromId: string, toId: string): CalculationObject {
+  if (fromId === toId) return object;
+  return {
+    ...object,
+    calculations: object.calculations.map((item) => ({
+      ...item,
+      formula: rewriteIdentifier(item.formula, fromId, toId),
+    })),
+  };
+}
+
+export function syncObjectOutputs(object: CalculationObject): CalculationObject {
+  const sources = [...object.inputs, ...object.calculations].map((item) => item.id);
+  const previousBySource = new Map(object.outputs.map((item) => [item.sourceVariableId, item]));
+  const previousById = new Map(object.outputs.map((item) => [item.id, item]));
+  return {
+    ...object,
+    outputs: sources.map((id) => {
+      const prev = previousBySource.get(id) ?? previousById.get(id);
+      return {
+        id,
+        sourceVariableId: id,
+        value: prev?.value ?? null,
+        quantity: prev?.quantity ?? null,
+        unit: prev?.unit ?? null,
+        status: prev?.status,
+        error: prev?.error ?? null,
+      };
+    }),
+  };
+}
+
+function syncProjectObject(project: ProjectDocument, objectId: string): ProjectDocument {
+  const next = patchObject(project, objectId, syncObjectOutputs);
+  const object = next.objects.find((item) => item.id === objectId);
+  if (!object) return next;
+  const outputIds = new Set(object.outputs.map((item) => item.id));
+  const inputIds = new Set(object.inputs.map((item) => item.id));
+  return {
+    ...next,
+    edges: next.edges.filter((edge) => {
+      if (edge.sourceObjectId === objectId && !outputIds.has(edge.sourceVariableId)) return false;
+      if (edge.targetObjectId === objectId && !inputIds.has(edge.targetVariableId)) return false;
+      return true;
+    }),
+  };
+}
+
+function syncAllObjects(project: ProjectDocument): ProjectDocument {
+  return {
+    ...project,
+    objects: project.objects.map(syncObjectOutputs),
+  };
+}
+
 export function applyWorkspaceEdit(
   project: ProjectDocument,
   edit: WorkspaceEdit,
@@ -92,7 +153,7 @@ export function applyWorkspaceEdit(
     case "newWorkspace":
       return { project: structuredClone(blankProject), dirtyObjectIds: [], shouldEvaluate: false };
     case "loadExample":
-      return { project: structuredClone(prototypeProject), dirtyObjectIds: [], shouldEvaluate: true };
+      return { project: syncAllObjects(structuredClone(prototypeProject)), dirtyObjectIds: [], shouldEvaluate: true };
     case "addObject": {
       const id = nextObjectId(project);
       const index = project.objects.length;
@@ -126,22 +187,28 @@ export function applyWorkspaceEdit(
       };
     case "addInput":
       return {
-        project: patchObject(project, edit.objectId, (object) => ({
-          ...object,
-          inputs: [
-            ...object.inputs,
-            { id: nextPrefixedId(allIds(object), "IN"), value: null, quantity: null, unit: null },
-          ],
-        })),
+        project: syncProjectObject(
+          patchObject(project, edit.objectId, (object) => ({
+            ...object,
+            inputs: [
+              ...object.inputs,
+              { id: nextPrefixedId(allIds(object), "IN"), value: null, quantity: null, unit: null },
+            ],
+          })),
+          edit.objectId,
+        ),
         dirtyObjectIds: [edit.objectId],
-        shouldEvaluate: false,
+        shouldEvaluate: true,
       };
     case "removeInput":
       return {
-        project: patchObject(project, edit.objectId, (object) => ({
-          ...object,
-          inputs: object.inputs.filter((_, index) => index !== edit.index),
-        })),
+        project: syncProjectObject(
+          patchObject(project, edit.objectId, (object) => ({
+            ...object,
+            inputs: object.inputs.filter((_, index) => index !== edit.index),
+          })),
+          edit.objectId,
+        ),
         dirtyObjectIds: [edit.objectId],
         shouldEvaluate: true,
       };
@@ -156,28 +223,39 @@ export function applyWorkspaceEdit(
       const previous = project.objects.find((item) => item.id === edit.objectId)?.inputs[edit.index]?.id;
       const updated = next.objects.find((item) => item.id === edit.objectId)?.inputs[edit.index]?.id;
       if (previous && updated && previous !== updated) {
+        next = patchObject(next, edit.objectId, (object) => rewriteFormulas(object, previous, updated));
         next = retargetEdges(next, edit.objectId, previous, updated);
       }
-      return { project: next, dirtyObjectIds: [edit.objectId], shouldEvaluate: true };
+      return {
+        project: syncProjectObject(next, edit.objectId),
+        dirtyObjectIds: [edit.objectId],
+        shouldEvaluate: true,
+      };
     }
     case "addCalculation":
       return {
-        project: patchObject(project, edit.objectId, (object) => ({
-          ...object,
-          calculations: [
-            ...object.calculations,
-            { id: nextPrefixedId(allIds(object), "CALC"), formula: "", quantity: null, unit: null },
-          ],
-        })),
+        project: syncProjectObject(
+          patchObject(project, edit.objectId, (object) => ({
+            ...object,
+            calculations: [
+              ...object.calculations,
+              { id: nextPrefixedId(allIds(object), "CALC"), formula: "", quantity: null, unit: null },
+            ],
+          })),
+          edit.objectId,
+        ),
         dirtyObjectIds: [edit.objectId],
-        shouldEvaluate: false,
+        shouldEvaluate: true,
       };
     case "removeCalculation":
       return {
-        project: patchObject(project, edit.objectId, (object) => ({
-          ...object,
-          calculations: object.calculations.filter((_, index) => index !== edit.index),
-        })),
+        project: syncProjectObject(
+          patchObject(project, edit.objectId, (object) => ({
+            ...object,
+            calculations: object.calculations.filter((_, index) => index !== edit.index),
+          })),
+          edit.objectId,
+        ),
         dirtyObjectIds: [edit.objectId],
         shouldEvaluate: true,
       };
@@ -194,61 +272,23 @@ export function applyWorkspaceEdit(
       const previous = project.objects.find((item) => item.id === edit.objectId)?.calculations[edit.index]?.id;
       const updated = next.objects.find((item) => item.id === edit.objectId)?.calculations[edit.index]?.id;
       if (previous && updated && previous !== updated) {
+        next = patchObject(next, edit.objectId, (object) => rewriteFormulas(object, previous, updated));
         next = retargetEdges(next, edit.objectId, previous, updated);
       }
-      return { project: next, dirtyObjectIds: [edit.objectId], shouldEvaluate: true };
+      return {
+        project: syncProjectObject(next, edit.objectId),
+        dirtyObjectIds: [edit.objectId],
+        shouldEvaluate: true,
+      };
     }
     case "addOutput":
-      return {
-        project: patchObject(project, edit.objectId, (object) => {
-          const source =
-            object.calculations.at(-1)?.id ?? object.inputs.at(-1)?.id ?? nextPrefixedId(allIds(object), "OUT");
-          const outputId = object.outputs.some((item) => item.id === source)
-            ? nextPrefixedId(allIds(object), "OUT")
-            : source;
-          return {
-            ...object,
-            outputs: [...object.outputs, { id: outputId, sourceVariableId: source }],
-          };
-        }),
-        dirtyObjectIds: [edit.objectId],
-        shouldEvaluate: true,
-      };
     case "removeOutput":
+    case "updateOutput":
       return {
-        project: {
-          ...patchObject(project, edit.objectId, (object) => ({
-            ...object,
-            outputs: object.outputs.filter((_, index) => index !== edit.index),
-          })),
-          edges: project.edges.filter((edge) => {
-            const output = project.objects.find((item) => item.id === edit.objectId)?.outputs[edit.index];
-            if (!output) return true;
-            return !(edge.sourceObjectId === edit.objectId && edge.sourceVariableId === output.id);
-          }),
-        },
+        project: syncProjectObject(project, edit.objectId),
         dirtyObjectIds: [edit.objectId],
         shouldEvaluate: true,
       };
-    case "updateOutput": {
-      const previous = project.objects.find((item) => item.id === edit.objectId)?.outputs[edit.index];
-      let next = patchObject(project, edit.objectId, (object) => ({
-        ...object,
-        outputs: object.outputs.map((item, index) => (index === edit.index ? { ...item, ...edit.patch } : item)),
-      }));
-      const updatedId = edit.patch.id;
-      if (previous && updatedId && updatedId !== previous.id) {
-        next = {
-          ...next,
-          edges: next.edges.map((edge) =>
-            edge.sourceObjectId === edit.objectId && edge.sourceVariableId === previous.id
-              ? { ...edge, sourceVariableId: updatedId }
-              : edge,
-          ),
-        };
-      }
-      return { project: next, dirtyObjectIds: [edit.objectId], shouldEvaluate: true };
-    }
   }
 }
 

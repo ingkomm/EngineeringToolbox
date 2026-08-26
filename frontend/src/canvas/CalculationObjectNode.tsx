@@ -30,7 +30,6 @@ function stopKeys(event: KeyboardEvent) {
 export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectNodeType>) {
   const { object, mappedInputIds, quantities, onEdit } = data;
   const mapped = new Set(mappedInputIds);
-  const localSources = [...object.inputs, ...object.calculations].map((item) => item.id);
   const updateNodeInternals = useUpdateNodeInternals();
   const handleSignature = [
     ...object.inputs.map((item) => item.id),
@@ -208,56 +207,25 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
 
       <section className="calc-table calc-table--output">
         <div className="calc-table__title">
-          <span>Output Port</span>
-          <button
-            type="button"
-            className="link-btn nodrag"
-            data-testid={`object-${id}-add-output`}
-            disabled={localSources.length === 0}
-            onClick={() => onEdit({ type: "addOutput", objectId: id })}
-          >
-            + 포트
-          </button>
+          <span>Output Port · 자동 연동</span>
         </div>
-        {object.outputs.length === 0 ? <p className="calc-empty">다른 객체로 보낼 변수를 포트로 노출하세요</p> : null}
-        {object.outputs.map((item, index) => (
+        {object.outputs.length === 0 ? (
+          <p className="calc-empty">Input/Calculation 변수가 생기면 오른쪽으로 자동 노출됩니다</p>
+        ) : null}
+        {object.outputs.map((item) => (
           <div
             className="calc-row calc-row--output"
             key={item.id}
             data-status={item.status ?? "idle"}
             data-testid={`object-${id}-output-row-${item.id}`}
           >
-            <select
-              className="calc-row__select nodrag nopan nowheel"
-              value={item.sourceVariableId}
-              data-testid={`object-${id}-output-${item.id}-source`}
-              onKeyDown={stopKeys}
-              onChange={(event) =>
-                onEdit({
-                  type: "updateOutput",
-                  objectId: id,
-                  index,
-                  patch: { sourceVariableId: event.target.value, id: event.target.value },
-                })
-              }
-            >
-              {localSources.map((sourceId) => (
-                <option key={sourceId} value={sourceId}>
-                  {sourceId}
-                </option>
-              ))}
-            </select>
+            <span className="calc-row__port-id" data-testid={`object-${id}-output-${item.id}-source`}>
+              {item.sourceVariableId}
+            </span>
             <span className="calc-row__value" data-testid={`object-${id}-output-${item.id}-value`}>
               {formatValue(item.value)}
             </span>
             <span className="calc-row__unit">{item.unit ?? "—"}</span>
-            <button
-              type="button"
-              className="icon-btn nodrag"
-              onClick={() => onEdit({ type: "removeOutput", objectId: id, index })}
-            >
-              ×
-            </button>
             <RowHandle
               nodeId={id}
               handleId={outputHandleId(item.id)}

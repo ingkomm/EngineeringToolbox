@@ -162,8 +162,8 @@ export function App() {
           <section>
             <h2>워크시트</h2>
             <p className="side-pane__hint">
-              빈 객체에서 Input/Calculation을 직접 작성합니다. 연결은 데이터 매핑이고, 수식 평가는 Python만 수행합니다.
-              결과는 수식과 값이 있을 때만 계산됩니다.
+              Input/Calculation 변수는 Output 포트로 자동 연동됩니다. 값을 바꾸면 Python이 이 객체와 연결된
+              객체까지 다시 계산합니다. 객체 사이 연결선은 데이터 매핑입니다.
             </p>
             <button
               className="ghost-btn"

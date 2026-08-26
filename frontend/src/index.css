@@ -331,7 +331,14 @@ body,
 }
 
 .calc-row--output {
-  grid-template-columns: minmax(0, 1fr) 72px 52px 22px;
+  grid-template-columns: minmax(0, 1fr) 72px 52px;
+}
+
+.calc-row__port-id {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
 }
 
 .calc-row__id-input,

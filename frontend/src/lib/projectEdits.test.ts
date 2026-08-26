@@ -46,7 +46,6 @@ describe("user-authored tables", () => {
         index: 1,
         patch: { id: "POWER", formula: "FLOW * DP", quantity: "power" },
       },
-      { type: "addOutput", objectId: "obj_1" },
     ]);
 
     const object = project.objects[0];
@@ -59,7 +58,13 @@ describe("user-authored tables", () => {
       ["DP", "POUT - PIN", "Pa"],
       ["POWER", "FLOW * DP", "W"],
     ]);
-    expect(object?.outputs).toEqual([{ id: "POWER", sourceVariableId: "POWER" }]);
+    expect(object?.outputs.map((item) => [item.id, item.sourceVariableId])).toEqual([
+      ["FLOW", "FLOW"],
+      ["PIN", "PIN"],
+      ["POUT", "POUT"],
+      ["DP", "DP"],
+      ["POWER", "POWER"],
+    ]);
   });
 
   it("adds a second object without copying calculated results", () => {
@@ -67,5 +72,44 @@ describe("user-authored tables", () => {
     expect(project.objects.map((item) => item.id)).toEqual(["obj_1", "obj_2"]);
     expect(project.objects[1]?.inputs).toEqual([]);
     expect(project.objects[1]?.calculations).toEqual([]);
+  });
+});
+
+describe("auto-linked ports", () => {
+  it("rewrites formulas and ports when an input id is renamed", () => {
+    const project = applyAll([
+      { type: "addInput", objectId: "obj_1" },
+      { type: "updateInput", objectId: "obj_1", index: 0, patch: { id: "FLOW", value: 120, quantity: "mass_flow" } },
+      { type: "addCalculation", objectId: "obj_1" },
+      { type: "updateCalculation", objectId: "obj_1", index: 0, patch: { id: "POWER", formula: "FLOW * 2" } },
+      { type: "updateInput", objectId: "obj_1", index: 0, patch: { id: "MASS" } },
+    ]);
+    const object = project.objects[0];
+    expect(object?.calculations[0]?.formula).toBe("MASS * 2");
+    expect(object?.outputs.map((item) => item.id)).toEqual(["MASS", "POWER"]);
+  });
+
+  it("drops mapping edges when the source variable is removed", () => {
+    let project = applyAll([
+      { type: "addInput", objectId: "obj_1" },
+      { type: "updateInput", objectId: "obj_1", index: 0, patch: { id: "FLOW", value: 120 } },
+      { type: "addObject" },
+      { type: "addInput", objectId: "obj_2" },
+    ]);
+    project = {
+      ...project,
+      edges: [
+        {
+          id: "e1",
+          sourceObjectId: "obj_1",
+          sourceVariableId: "FLOW",
+          targetObjectId: "obj_2",
+          targetVariableId: "IN_1",
+        },
+      ],
+    };
+    project = applyWorkspaceEdit(project, { type: "removeInput", objectId: "obj_1", index: 0 }, FALLBACK_QUANTITIES).project;
+    expect(project.edges).toEqual([]);
+    expect(project.objects[0]?.outputs).toEqual([]);
   });
 });
