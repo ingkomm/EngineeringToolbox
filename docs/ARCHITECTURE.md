@@ -247,6 +247,43 @@ Object A의 PIN/POUT만 바꾸면 Object A와 B가 갱신된다. 매핑되지 �
 - 숫자 formatting (`toFixed`)
 - mapped input을 read-only로 표시
 - debounce 후 evaluate API 호출
+- 사용자가 Input/Calculation 행을 추가·수정하는 mapping 편집
+
+금지:
+
+- `POUT - PIN`, `FLOW * DP` 등 수식 평가
+- dependency graph 계산
+- 값 전파 로직을 클라이언트에서 흉내 내기
+
+## 9. UI test IDs
+
+브라우저 검증은 화면에서 버튼을 추측하지 않고 아래 testid만 사용한다.
+
+| testid | 위치 | 동작 |
+|---|---|---|
+| `btn-new-worksheet` | 상단 바 | `newWorkspace` |
+| `btn-evaluate` | 상단 바 | `POST /api/v1/evaluate` |
+| `btn-add-object` | Canvas Panel top-left | `addObject` |
+| `btn-load-example` | 우측 사이드바 | `loadExample` |
+| `object-{id}-add-input` | Node Input 헤더 | `addInput` |
+| `object-{id}-add-calc` | Node Calculation 헤더 | `addCalculation` |
+| `object-{id}-add-output` | Node Output 헤더 | `addOutput` |
+| `object-{id}-input-{var}-id` | Input 행 | Variable ID, blur로 commit |
+| `object-{id}-input-{var}-value` | Input 행 | 값, blur로 commit |
+| `object-{id}-input-{var}-quantity` | Input 행 | option `value` = quantity id (`mass_flow`, `pressure`, `power`) |
+| `object-{id}-calc-{var}-formula` | Calculation 행 | 수식, blur로 commit |
+| `handle-out-{var}` | Output 행 우측 | RF source handle (`id=out:{var}`) |
+| `handle-in-{var}` | Input 행 좌측 | RF target handle (`id=in:{var}`) |
+
+첫 Input 추가 시 Variable ID는 `IN_1`이다. ID를 `FLOW`로 바꾼 뒤에 testid가 `object-obj_1-input-FLOW-*`로 바뀐다.
+
+
+허용:
+
+- JSON 직렬화, React Flow interaction
+- 숫자 formatting (`toFixed`)
+- mapped input을 read-only로 표시
+- debounce 후 evaluate API 호출
 
 금지:
 

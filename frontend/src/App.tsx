@@ -114,16 +114,22 @@ export function App() {
           <h1>Calculation Object Canvas</h1>
         </div>
         <div className="topbar__meta">
-          <span className={`pill ${backendUp ? "pill--ok" : "pill--bad"}`}>
+          <span className={`pill ${backendUp ? "pill--ok" : "pill--bad"}`} data-testid="api-status">
             {backendUp ? "Python API" : "API offline"}
           </span>
-          <span className="pill">{busy ? "계산 중" : message}</span>
-          <button className="ghost-btn" type="button" onClick={() => onEdit({ type: "newWorkspace" })}>
+          <span className="pill" data-testid="eval-status">{busy ? "계산 중" : message}</span>
+          <button
+            className="ghost-btn"
+            type="button"
+            data-testid="btn-new-worksheet"
+            onClick={() => onEdit({ type: "newWorkspace" })}
+          >
             새 워크시트
           </button>
           <button
             className="ghost-btn"
             type="button"
+            data-testid="btn-evaluate"
             onClick={() => void runEvaluate(project)}
             disabled={busy || backendUp === false}
           >
@@ -151,7 +157,12 @@ export function App() {
               빈 객체에서 Input/Calculation을 직접 작성합니다. 연결은 데이터 매핑이고, 수식 평가는 Python만 수행합니다.
               결과는 수식과 값이 있을 때만 계산됩니다.
             </p>
-            <button className="ghost-btn" type="button" onClick={() => onEdit({ type: "loadExample" })}>
+            <button
+              className="ghost-btn"
+              type="button"
+              data-testid="btn-load-example"
+              onClick={() => onEdit({ type: "loadExample" })}
+            >
               참고 예제 열기
             </button>
           </section>
@@ -170,7 +181,7 @@ export function App() {
           </section>
           <section>
             <h2>Mapping JSON</h2>
-            <pre>{mappingJson}</pre>
+            <pre data-testid="mapping-json">{mappingJson}</pre>
           </section>
           <section>
             <h2>마지막 계산</h2>

@@ -21,6 +21,7 @@ export function RowHandle({ nodeId, handleId, type, position, className }: RowHa
       type={type}
       position={position}
       id={handleId}
+      data-testid={`handle-${handleId.replace(":", "-")}`}
       className={className}
       isConnectable
     />

@@ -134,7 +134,7 @@ export function applyWorkspaceEdit(
           ],
         })),
         dirtyObjectIds: [edit.objectId],
-        shouldEvaluate: true,
+        shouldEvaluate: false,
       };
     case "removeInput":
       return {
@@ -170,7 +170,7 @@ export function applyWorkspaceEdit(
           ],
         })),
         dirtyObjectIds: [edit.objectId],
-        shouldEvaluate: true,
+        shouldEvaluate: false,
       };
     case "removeCalculation":
       return {

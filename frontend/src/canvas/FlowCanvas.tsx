@@ -14,11 +14,8 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import {
-  CalculationObjectNode,
-  mappedInputsForObject,
-  type CalculationObjectNodeType,
-} from "./CalculationObjectNode";
+import { CalculationObjectNode, type CalculationObjectNodeType } from "./CalculationObjectNode";
+import { toFlowEdges, toFlowNodeRecords } from "./flowModel";
 import { parseHandleId } from "../lib/display";
 import type { WorkspaceEdit } from "../lib/projectEdits";
 import type { QuantitySpec } from "../lib/quantities";
@@ -45,31 +42,7 @@ function toFlowNodes(
   quantities: QuantitySpec[],
   onEdit: (edit: WorkspaceEdit) => void,
 ): CalculationObjectNodeType[] {
-  return project.objects.map((object) => ({
-    id: object.id,
-    type: "calculationObject" as const,
-    position: object.position,
-    data: {
-      object,
-      mappedInputIds: mappedInputsForObject(object.id, project.edges),
-      quantities,
-      onEdit,
-    },
-    draggable: true,
-  }));
-}
-
-function toFlowEdges(edges: MappingEdge[]): Edge[] {
-  return edges.map((edge) => ({
-    id: edge.id,
-    source: edge.sourceObjectId,
-    target: edge.targetObjectId,
-    sourceHandle: `out:${edge.sourceVariableId}`,
-    targetHandle: `in:${edge.targetVariableId}`,
-    type: "smoothstep",
-    className: "mapping-edge",
-    label: `${edge.sourceVariableId} → ${edge.targetVariableId}`,
-  }));
+  return toFlowNodeRecords(project, quantities, onEdit);
 }
 
 export function FlowCanvas({ project, quantities, onProjectChange, onGraphEvaluate, onEdit }: FlowCanvasProps) {
@@ -158,7 +131,12 @@ export function FlowCanvas({ project, quantities, onProjectChange, onGraphEvalua
       <Controls />
       <MiniMap pannable zoomable nodeColor="#16324a" maskColor="rgba(6, 10, 16, 0.72)" />
       <Panel position="top-left" className="canvas-panel">
-        <button type="button" className="ghost-btn" onClick={() => onEdit({ type: "addObject" })}>
+        <button
+          type="button"
+          className="ghost-btn"
+          data-testid="btn-add-object"
+          onClick={() => onEdit({ type: "addObject" })}
+        >
           + 객체 추가
         </button>
       </Panel>
