@@ -37,7 +37,14 @@ export function MappingEdge({
   const collapsed = data?.collapsed === true;
 
   if (collapsed) {
-    return null;
+    return (
+      <BaseEdge
+        id={id}
+        path={edgePath}
+        className="mapping-edge mapping-edge--collapsed"
+        style={{ stroke: "transparent", strokeWidth: 0 }}
+      />
+    );
   }
 
   return (
