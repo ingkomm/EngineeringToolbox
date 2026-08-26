@@ -168,7 +168,7 @@ export function App() {
             <h2>워크시트</h2>
             <p className="side-pane__hint">
               Object와 변수의 ID/이름은 워크시트에서 유일합니다. 커넥터 ⌕ 검색으로 다른 객체를 찾아 연결하고,
-              검색창에서 기존 링크 상태를 보거나 끊을 수 있습니다. 링크 버튼으로 선을 접으면 포트 옆 링크 버튼만 남습니다.
+              검색창에서 기존 링크 상태를 보거나 끊을 수 있습니다. 한 Object의 한 Output은 하나의 Input에만 연결됩니다.
             </p>
             <button
               className="ghost-btn"

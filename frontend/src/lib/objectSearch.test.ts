@@ -90,7 +90,6 @@ describe("connector object search", () => {
         status: "connected",
         edgeId: "edge-obj_a-POWER-obj_b-POWER",
       }),
-      expect.objectContaining({ objectId: "obj_b", createInput: true, status: "create" }),
     ]);
     const fromInput = searchSourcePorts(linked, "heat", "obj_b", "POWER");
     expect(fromInput).toEqual([
@@ -108,6 +107,37 @@ describe("connector object search", () => {
     expect(hits).toEqual([
       expect.objectContaining({ objectId: "obj_b", variableId: "POWER", status: "occupied", edgeId: undefined }),
       expect.objectContaining({ objectId: "obj_b", createInput: true, status: "create" }),
+    ]);
+  });
+
+  it("does not offer another input for an output that is already mapped", () => {
+    const withFree = {
+      ...linked,
+      objects: [
+        linked.objects[0]!,
+        {
+          ...linked.objects[1]!,
+          inputs: [
+            { id: "POWER", name: "POWER", value: null },
+            { id: "IN_2", name: "IN_2", value: null },
+          ],
+        },
+        {
+          ...linked.objects[2]!,
+          inputs: [{ id: "IN_3", name: "IN_3", value: null }],
+          outputs: [{ id: "IN_3", name: "IN_3", sourceVariableId: "IN_3" }],
+        },
+      ],
+    };
+    const fromOutput = searchTargetPorts(withFree, "", "obj_a", "POWER");
+    expect(fromOutput).toEqual([
+      expect.objectContaining({ objectId: "obj_b", variableId: "POWER", status: "connected" }),
+      expect.objectContaining({ objectId: "obj_b", variableId: "IN_2", status: "occupied" }),
+      expect.objectContaining({ objectId: "obj_c", variableId: "IN_3", status: "occupied" }),
+    ]);
+    const fromOtherInput = searchSourcePorts(withFree, "heat", "obj_c", "IN_3");
+    expect(fromOtherInput).toEqual([
+      expect.objectContaining({ objectId: "obj_a", variableId: "POWER", status: "occupied" }),
     ]);
   });
 });

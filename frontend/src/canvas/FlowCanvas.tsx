@@ -97,9 +97,15 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
       const targetObject = project.objects.find((item) => item.id === connection.target);
       if (!targetObject) return false;
       if (targetObject.calculations.some((item) => item.id === source.variableId)) return false;
-      return true;
+      const sourceBusy = project.edges.some(
+        (edge) => edge.sourceObjectId === connection.source && edge.sourceVariableId === source.variableId,
+      );
+      const targetBusy = project.edges.some(
+        (edge) => edge.targetObjectId === connection.target && edge.targetVariableId === target.variableId,
+      );
+      return !sourceBusy && !targetBusy;
     },
-    [project.objects],
+    [project.edges, project.objects],
   );
 
   return (

@@ -217,6 +217,7 @@ def _validate_structure(project: ProjectDocument) -> list[EvalError]:
                 )
 
     occupied_targets: dict[tuple[str, str], str] = {}
+    occupied_sources: dict[tuple[str, str], str] = {}
     for edge in project.edges:
         if edge.sourceObjectId not in object_ids:
             errors.append(
@@ -267,6 +268,19 @@ def _validate_structure(project: ProjectDocument) -> list[EvalError]:
                 )
             )
         occupied_targets[key] = edge.id
+        source_key = (edge.sourceObjectId, edge.sourceVariableId)
+        if source_key in occupied_sources:
+            errors.append(
+                EvalError(
+                    objectId=edge.sourceObjectId,
+                    variableId=edge.sourceVariableId,
+                    code="FAN_OUT_CONFLICT",
+                    message=(
+                        f"Output {edge.sourceVariableId} is already mapped to another input"
+                    ),
+                )
+            )
+        occupied_sources[source_key] = edge.id
 
     return errors
 

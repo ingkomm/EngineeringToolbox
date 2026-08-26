@@ -271,6 +271,26 @@ function detachMappedInput(
   return { project: next, newId: freshId };
 }
 
+function sourcePortTaken(
+  project: ProjectDocument,
+  sourceObjectId: string,
+  sourceVariableId: string,
+): boolean {
+  return project.edges.some(
+    (edge) => edge.sourceObjectId === sourceObjectId && edge.sourceVariableId === sourceVariableId,
+  );
+}
+
+function targetPortTaken(
+  project: ProjectDocument,
+  targetObjectId: string,
+  targetVariableId: string,
+): boolean {
+  return project.edges.some(
+    (edge) => edge.targetObjectId === targetObjectId && edge.targetVariableId === targetVariableId,
+  );
+}
+
 export function applyWorkspaceEdit(
   project: ProjectDocument,
   edit: WorkspaceEdit,
@@ -482,11 +502,10 @@ export function applyWorkspaceEdit(
       if (targetObject.calculations.some((item) => item.id === source.id)) {
         return { project, dirtyObjectIds: [], shouldEvaluate: false };
       }
-      if (
-        project.edges.some(
-          (edge) => edge.targetObjectId === edit.targetObjectId && edge.targetVariableId === edit.targetVariableId,
-        )
-      ) {
+      if (sourcePortTaken(project, edit.sourceObjectId, edit.sourceVariableId)) {
+        return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      }
+      if (targetPortTaken(project, edit.targetObjectId, edit.targetVariableId)) {
         return { project, dirtyObjectIds: [], shouldEvaluate: false };
       }
       const inherited = sourceQuantityFields(source, catalog);
@@ -531,6 +550,9 @@ export function applyWorkspaceEdit(
     }
     case "connectBySearch": {
       if (edit.sourceObjectId === edit.targetObjectId) {
+        return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      }
+      if (sourcePortTaken(project, edit.sourceObjectId, edit.sourceVariableId)) {
         return { project, dirtyObjectIds: [], shouldEvaluate: false };
       }
       let next = project;

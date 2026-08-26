@@ -96,7 +96,7 @@ sourceObjectId.outputs[sourceVariableId]
 - Source는 output port여야 한다.
 - Target은 input port여야 한다.
 - 한 Input은 동시에 하나의 Edge만 받는다 (fan-in 1).
-- Fan-out은 허용한다 (한 Output을 여러 Input에 연결).
+- 한 Output도 동시에 하나의 Input만 연결한다 (fan-out 1). 같은 Object의 같은 Output이 여러 Input으로 들어가지 않는다.
 - Object 그래프에 cycle이 있으면 evaluation error.
 - 커넥터 검색: Output/Input 행의 찾기 버튼으로 다른 Object ID/이름을 검색해 연결한다. 결과는 기존 링크 상태(`연결됨` / `사용 중`)를 보여주고, 현재 포트의 링크는 끊을 수 있다.
 - `collapsed: true`면 캔버스에 전체 선을 그리지 않고, 포트 옆 **링크** 버튼만 남긴다. Object ID/이름 칩은 표시하지 않는다.

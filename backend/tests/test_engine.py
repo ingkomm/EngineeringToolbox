@@ -473,3 +473,54 @@ def test_excel_functions_evaluate_on_a_calculation_object() -> None:
     assert by_id["RATIO"].value == 2.0
     assert by_id["RATIO"].quantity == "dimensionless"
     assert by_id["GROWTH"].value == 1.0
+
+
+def test_one_output_cannot_map_to_two_inputs() -> None:
+    project = ProjectDocument(
+        id="fanout",
+        name="fanout",
+        objects=[
+            CalculationObject(
+                id="src",
+                name="Src",
+                position=Position(x=0, y=0),
+                inputs=[InputVariable(id="P", value=10, quantity="pressure")],
+                calculations=[],
+                outputs=[OutputBinding(id="P", sourceVariableId="P")],
+            ),
+            CalculationObject(
+                id="dst_a",
+                name="Dst A",
+                position=Position(x=1, y=0),
+                inputs=[InputVariable(id="IN_A", value=None)],
+                calculations=[],
+                outputs=[],
+            ),
+            CalculationObject(
+                id="dst_b",
+                name="Dst B",
+                position=Position(x=2, y=0),
+                inputs=[InputVariable(id="IN_B", value=None)],
+                calculations=[],
+                outputs=[],
+            ),
+        ],
+        edges=[
+            Edge(
+                id="e1",
+                sourceObjectId="src",
+                sourceVariableId="P",
+                targetObjectId="dst_a",
+                targetVariableId="IN_A",
+            ),
+            Edge(
+                id="e2",
+                sourceObjectId="src",
+                sourceVariableId="P",
+                targetObjectId="dst_b",
+                targetVariableId="IN_B",
+            ),
+        ],
+    )
+    result = evaluate_project(project)
+    assert any(err.code == "FAN_OUT_CONFLICT" for err in result.errors)

@@ -315,4 +315,38 @@ describe("unique objects and search connectors", () => {
     expect(project.edges).toHaveLength(0);
     expect(project.objects[1]?.inputs[0]?.id).toMatch(/^IN_/);
   });
+
+  it("rejects a second mapping from the same object output", () => {
+    let project = applyAll([
+      { type: "addInput", objectId: "obj_1" },
+      { type: "updateInput", objectId: "obj_1", index: 0, patch: { id: "POWER", value: 10 } },
+      { type: "addObject" },
+      { type: "addObject" },
+    ]);
+    project = applyWorkspaceEdit(
+      project,
+      {
+        type: "connectBySearch",
+        sourceObjectId: "obj_1",
+        sourceVariableId: "POWER",
+        targetObjectId: "obj_2",
+      },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(project.edges).toHaveLength(1);
+    const before = project.objects[2]?.inputs.length ?? 0;
+    project = applyWorkspaceEdit(
+      project,
+      {
+        type: "connectBySearch",
+        sourceObjectId: "obj_1",
+        sourceVariableId: "POWER",
+        targetObjectId: "obj_3",
+      },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(project.edges).toHaveLength(1);
+    expect(project.edges[0]?.targetObjectId).toBe("obj_2");
+    expect(project.objects[2]?.inputs.length).toBe(before);
+  });
 });
