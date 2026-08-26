@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://engineeringtoolbox.local/schema/project.json",
+  "title": "Engineering Toolbox Project Document",
+  "description": "Canonical JSON contract between React Flow UI and Python calculation backend. Cell addresses are forbidden; variables use semantic IDs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "objects", "edges"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string" },
+    "objects": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/calculationObject" }
+    },
+    "edges": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/edge" }
+    }
+  },
+  "$defs": {
+    "variableId": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "variableStatus": {
+      "type": "string",
+      "enum": ["idle", "ok", "mapped", "error"]
+    },
+    "inputVariable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "$ref": "#/$defs/variableId" },
+        "value": { "type": ["number", "null"] },
+        "unit": { "type": ["string", "null"] },
+        "status": { "$ref": "#/$defs/variableStatus" },
+        "error": { "type": ["string", "null"] }
+      }
+    },
+    "formulaVariable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "formula"],
+      "properties": {
+        "id": { "$ref": "#/$defs/variableId" },
+        "formula": { "type": "string", "minLength": 1 },
+        "value": { "type": ["number", "null"] },
+        "unit": { "type": ["string", "null"] },
+        "status": { "$ref": "#/$defs/variableStatus" },
+        "error": { "type": ["string", "null"] }
+      }
+    },
+    "outputBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sourceVariableId"],
+      "properties": {
+        "id": { "$ref": "#/$defs/variableId" },
+        "sourceVariableId": { "$ref": "#/$defs/variableId" },
+        "value": { "type": ["number", "null"] },
+        "unit": { "type": ["string", "null"] },
+        "status": { "$ref": "#/$defs/variableStatus" },
+        "error": { "type": ["string", "null"] }
+      }
+    },
+    "position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "calculationObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "position", "inputs", "calculations", "outputs"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string" },
+        "position": { "$ref": "#/$defs/position" },
+        "inputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/inputVariable" }
+        },
+        "calculations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/formulaVariable" }
+        },
+        "outputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/outputBinding" }
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sourceObjectId",
+        "sourceVariableId",
+        "targetObjectId",
+        "targetVariableId"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "sourceObjectId": { "type": "string" },
+        "sourceVariableId": { "$ref": "#/$defs/variableId" },
+        "targetObjectId": { "type": "string" },
+        "targetVariableId": { "$ref": "#/$defs/variableId" }
+      }
+    }
+  }
+}

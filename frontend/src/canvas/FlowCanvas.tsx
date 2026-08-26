@@ -1,0 +1,147 @@
+import { useCallback, useEffect, useMemo } from "react";
+import {
+  Background,
+  BackgroundVariant,
+  Controls,
+  MiniMap,
+  ReactFlow,
+  useEdgesState,
+  useNodesState,
+  type Connection,
+  type Edge,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+
+import {
+  CalculationObjectNode,
+  mappedInputsForObject,
+  type CalculationObjectNodeType,
+} from "./CalculationObjectNode";
+import { parseHandleId } from "../lib/display";
+import type { MappingEdge, ProjectDocument } from "../types/contract";
+
+const nodeTypes = { calculationObject: CalculationObjectNode };
+
+interface FlowCanvasProps {
+  project: ProjectDocument;
+  onProjectChange: (project: ProjectDocument) => void;
+  onGraphEvaluate: (project: ProjectDocument, dirtyObjectIds?: string[]) => void;
+  onInputChange: (objectId: string, variableId: string, raw: string) => void;
+}
+
+function toFlowNodes(
+  project: ProjectDocument,
+  onInputChange: FlowCanvasProps["onInputChange"],
+): CalculationObjectNodeType[] {
+  return project.objects.map((object) => ({
+    id: object.id,
+    type: "calculationObject" as const,
+    position: object.position,
+    data: {
+      object,
+      mappedInputIds: mappedInputsForObject(object.id, project.edges),
+      onInputChange,
+    },
+    draggable: true,
+  }));
+}
+
+function toFlowEdges(edges: MappingEdge[]): Edge[] {
+  return edges.map((edge) => ({
+    id: edge.id,
+    source: edge.sourceObjectId,
+    target: edge.targetObjectId,
+    sourceHandle: `out:${edge.sourceVariableId}`,
+    targetHandle: `in:${edge.targetVariableId}`,
+    animated: true,
+    className: "mapping-edge",
+    label: `${edge.sourceVariableId} → ${edge.targetVariableId}`,
+  }));
+}
+
+export function FlowCanvas({ project, onProjectChange, onGraphEvaluate, onInputChange }: FlowCanvasProps) {
+  const initialNodes = useMemo(() => toFlowNodes(project, onInputChange), [project, onInputChange]);
+  const initialEdges = useMemo(() => toFlowEdges(project.edges), [project.edges]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<CalculationObjectNodeType>(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  useEffect(() => {
+    setNodes(toFlowNodes(project, onInputChange));
+    setEdges(toFlowEdges(project.edges));
+  }, [onInputChange, project, setEdges, setNodes]);
+
+  const onConnect = useCallback(
+    (connection: Connection) => {
+      const source = parseHandleId(connection.sourceHandle);
+      const target = parseHandleId(connection.targetHandle);
+      if (!connection.source || !connection.target || source?.kind !== "out" || target?.kind !== "in") {
+        return;
+      }
+      const alreadyTaken = project.edges.some(
+        (edge) => edge.targetObjectId === connection.target && edge.targetVariableId === target.variableId,
+      );
+      if (alreadyTaken) return;
+
+      const mapping: MappingEdge = {
+        id: `edge-${connection.source}-${source.variableId}-${connection.target}-${target.variableId}`,
+        sourceObjectId: connection.source,
+        sourceVariableId: source.variableId,
+        targetObjectId: connection.target,
+        targetVariableId: target.variableId,
+      };
+      onGraphEvaluate(
+        {
+          ...project,
+          edges: [...project.edges, mapping],
+        },
+        [mapping.sourceObjectId],
+      );
+    },
+    [onGraphEvaluate, project],
+  );
+
+  const isValidConnection = useCallback((connection: Connection | Edge) => {
+    const source = parseHandleId(connection.sourceHandle);
+    const target = parseHandleId(connection.targetHandle);
+    return source?.kind === "out" && target?.kind === "in" && connection.source !== connection.target;
+  }, []);
+
+  return (
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      nodeTypes={nodeTypes}
+      onNodesChange={onNodesChange}
+      onEdgesChange={onEdgesChange}
+      onConnect={onConnect}
+      isValidConnection={isValidConnection}
+      onNodeDragStop={(_event, node) => {
+        onProjectChange({
+          ...project,
+          objects: project.objects.map((object) =>
+            object.id === node.id ? { ...object, position: node.position } : object,
+          ),
+        });
+      }}
+      fitView
+      fitViewOptions={{ padding: 0.2 }}
+      deleteKeyCode={["Backspace", "Delete"]}
+      onEdgesDelete={(deleted) => {
+        const removed = new Set(deleted.map((edge) => edge.id));
+        const next: ProjectDocument = {
+          ...project,
+          edges: project.edges.filter((edge) => !removed.has(edge.id)),
+        };
+        onGraphEvaluate(
+          next,
+          deleted.map((edge) => edge.target),
+        );
+      }}
+      proOptions={{ hideAttribution: true }}
+    >
+      <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} color="#243044" />
+      <Controls />
+      <MiniMap pannable zoomable nodeColor="#16324a" maskColor="rgba(6, 10, 16, 0.72)" />
+    </ReactFlow>
+  );
+}

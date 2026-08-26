@@ -1,0 +1,41 @@
+import type { ProjectDocument } from "../types/contract";
+
+/** Seed document for the first prototype. Values are evaluated by Python, not here. */
+export const prototypeProject: ProjectDocument = {
+  id: "prototype-1",
+  name: "FLOW-POWER Prototype",
+  objects: [
+    {
+      id: "obj-a",
+      name: "Object A",
+      position: { x: 72, y: 96 },
+      inputs: [
+        { id: "FLOW", value: 120 },
+        { id: "PIN", value: 12 },
+        { id: "POUT", value: 15 },
+      ],
+      calculations: [
+        { id: "DP", formula: "POUT - PIN" },
+        { id: "POWER", formula: "FLOW * DP" },
+      ],
+      outputs: [{ id: "POWER", sourceVariableId: "POWER" }],
+    },
+    {
+      id: "obj-b",
+      name: "Object B",
+      position: { x: 560, y: 96 },
+      inputs: [{ id: "INPUT_POWER", value: null }],
+      calculations: [{ id: "RESULT", formula: "INPUT_POWER * 2" }],
+      outputs: [{ id: "RESULT", sourceVariableId: "RESULT" }],
+    },
+  ],
+  edges: [
+    {
+      id: "edge-a-power-b-input",
+      sourceObjectId: "obj-a",
+      sourceVariableId: "POWER",
+      targetObjectId: "obj-b",
+      targetVariableId: "INPUT_POWER",
+    },
+  ],
+};
