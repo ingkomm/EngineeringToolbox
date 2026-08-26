@@ -17,6 +17,7 @@ from engcalc.models import (
 from engcalc.quantities import QuantityError, infer_formula_quantity, is_known_quantity, si_unit_for
 
 VARIABLE_ID_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+OBJECT_ID_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 
 
 def evaluate_project(
@@ -36,7 +37,17 @@ def evaluate_project(
 
     structural = _validate_structure(working)
     errors.extend(structural)
-    if any(err.code in {"DUPLICATE_VARIABLE_ID", "DUPLICATE_VARIABLE_NAME", "INVALID_VARIABLE_ID"} for err in structural):
+    if any(
+        err.code
+        in {
+            "DUPLICATE_VARIABLE_ID",
+            "DUPLICATE_VARIABLE_NAME",
+            "INVALID_VARIABLE_ID",
+            "DUPLICATE_OBJECT_NAME",
+            "INVALID_OBJECT_ID",
+        }
+        for err in structural
+    ):
         return EvaluateResponse(project=working, evaluatedObjectIds=[], errors=errors)
 
     try:
@@ -76,6 +87,30 @@ class GraphError(Exception):
 def _validate_structure(project: ProjectDocument) -> list[EvalError]:
     errors: list[EvalError] = []
     object_ids = {obj.id for obj in project.objects}
+
+    seen_object_names: dict[str, str] = {}
+    for obj in project.objects:
+        if not OBJECT_ID_RE.match(obj.id):
+            errors.append(
+                EvalError(
+                    objectId=obj.id,
+                    code="INVALID_OBJECT_ID",
+                    message=f"Object id must be semantic (e.g. obj_1), not a cell address: {obj.id}",
+                )
+            )
+        name_key = obj.name.strip()
+        if name_key:
+            previous = seen_object_names.get(name_key)
+            if previous:
+                errors.append(
+                    EvalError(
+                        objectId=obj.id,
+                        code="DUPLICATE_OBJECT_NAME",
+                        message=f"Object name '{name_key}' is already used by {previous}. Object names are unique.",
+                    )
+                )
+            else:
+                seen_object_names[name_key] = obj.id
 
     mapped_keys = {
         (edge.targetObjectId, edge.targetVariableId)

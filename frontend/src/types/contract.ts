@@ -53,6 +53,7 @@ export interface MappingEdge {
   targetObjectId: string;
   targetVariableId: string;
   enabled: boolean;
+  collapsed?: boolean;
 }
 
 export interface ProjectDocument {

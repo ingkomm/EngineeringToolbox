@@ -92,6 +92,7 @@ class Edge(BaseModel):
     targetObjectId: str
     targetVariableId: str
     enabled: bool = True
+    collapsed: bool = False
 
 
 class ProjectDocument(BaseModel):

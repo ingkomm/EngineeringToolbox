@@ -10,11 +10,13 @@ import {
 } from "./variables";
 
 export const VARIABLE_ID_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+export const OBJECT_ID_RE = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 
 export type WorkspaceEdit =
   | { type: "addObject" }
   | { type: "deleteObject"; objectId: string }
   | { type: "renameObject"; objectId: string; name: string }
+  | { type: "updateObject"; objectId: string; patch: { id?: string; name?: string } }
   | { type: "addInput"; objectId: string }
   | { type: "removeInput"; objectId: string; index: number }
   | { type: "updateInput"; objectId: string; index: number; patch: Partial<InputVariable> }
@@ -31,7 +33,15 @@ export type WorkspaceEdit =
       targetObjectId: string;
       targetVariableId: string;
     }
+  | {
+      type: "connectBySearch";
+      sourceObjectId: string;
+      sourceVariableId: string;
+      targetObjectId: string;
+      targetVariableId?: string;
+    }
   | { type: "toggleEdge"; edgeId: string }
+  | { type: "toggleEdgeCollapsed"; edgeId: string }
   | { type: "deleteEdges"; edgeIds: string[] }
   | { type: "loadExample" }
   | { type: "newWorkspace" };
@@ -47,6 +57,40 @@ function nextObjectId(project: ProjectDocument): string {
   let n = 1;
   while (used.has(`obj_${n}`)) n += 1;
   return `obj_${n}`;
+}
+
+function nextObjectName(project: ProjectDocument): string {
+  const used = new Set(project.objects.map((item) => item.name.trim()));
+  let n = 1;
+  while (used.has(`Object ${n}`)) n += 1;
+  return `Object ${n}`;
+}
+
+function objectIdentityTaken(
+  project: ProjectDocument,
+  candidate: { id?: string; name?: string },
+  exceptId: string,
+): "id" | "name" | null {
+  for (const object of project.objects) {
+    if (object.id === exceptId) continue;
+    if (candidate.id && object.id === candidate.id) return "id";
+    const name = candidate.name?.trim();
+    if (name && object.name.trim() === name) return "name";
+  }
+  return null;
+}
+
+function rekeyObject(project: ProjectDocument, fromId: string, toId: string): ProjectDocument {
+  if (fromId === toId) return project;
+  return {
+    ...project,
+    objects: project.objects.map((object) => (object.id === fromId ? { ...object, id: toId } : object)),
+    edges: project.edges.map((edge) => ({
+      ...edge,
+      sourceObjectId: edge.sourceObjectId === fromId ? toId : edge.sourceObjectId,
+      targetObjectId: edge.targetObjectId === fromId ? toId : edge.targetObjectId,
+    })),
+  };
 }
 
 function patchObject(
@@ -242,7 +286,7 @@ export function applyWorkspaceEdit(
       const index = project.objects.length;
       const object: CalculationObject = {
         id,
-        name: `Object ${index + 1}`,
+        name: nextObjectName(project),
         position: { x: 80 + index * 820, y: 88 },
         inputs: [],
         calculations: [],
@@ -263,11 +307,32 @@ export function applyWorkspaceEdit(
         shouldEvaluate: true,
       };
     case "renameObject":
+      return applyWorkspaceEdit(
+        project,
+        { type: "updateObject", objectId: edit.objectId, patch: { name: edit.name } },
+        catalog,
+      );
+    case "updateObject": {
+      const current = project.objects.find((item) => item.id === edit.objectId);
+      if (!current) return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      const nextId = edit.patch.id ?? current.id;
+      const nextName = (edit.patch.name ?? current.name).trim();
+      if (!nextName) return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      if (edit.patch.id && !OBJECT_ID_RE.test(edit.patch.id)) {
+        return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      }
+      if (objectIdentityTaken(project, { id: edit.patch.id, name: edit.patch.name }, current.id)) {
+        return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      }
+      let next = project;
+      if (nextId !== current.id) next = rekeyObject(next, current.id, nextId);
+      next = patchObject(next, nextId, (object) => ({ ...object, name: nextName }));
       return {
-        project: patchObject(project, edit.objectId, (object) => ({ ...object, name: edit.name })),
-        dirtyObjectIds: [],
-        shouldEvaluate: false,
+        project: next,
+        dirtyObjectIds: nextId === current.id ? [] : [nextId],
+        shouldEvaluate: nextId !== current.id,
       };
+    }
     case "addInput": {
       const id = nextGlobalPrefixedId(project, "IN");
       return {
@@ -454,6 +519,7 @@ export function applyWorkspaceEdit(
             targetObjectId: edit.targetObjectId,
             targetVariableId: source.id,
             enabled: true,
+            collapsed: false,
           },
         ],
       };
@@ -462,6 +528,29 @@ export function applyWorkspaceEdit(
         dirtyObjectIds: [edit.sourceObjectId, edit.targetObjectId],
         shouldEvaluate: true,
       };
+    }
+    case "connectBySearch": {
+      if (edit.sourceObjectId === edit.targetObjectId) {
+        return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      }
+      let next = project;
+      let targetVariableId = edit.targetVariableId;
+      if (!targetVariableId) {
+        next = applyWorkspaceEdit(next, { type: "addInput", objectId: edit.targetObjectId }, catalog).project;
+        targetVariableId = next.objects.find((item) => item.id === edit.targetObjectId)?.inputs.at(-1)?.id;
+      }
+      if (!targetVariableId) return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      return applyWorkspaceEdit(
+        next,
+        {
+          type: "connectMapping",
+          sourceObjectId: edit.sourceObjectId,
+          sourceVariableId: edit.sourceVariableId,
+          targetObjectId: edit.targetObjectId,
+          targetVariableId,
+        },
+        catalog,
+      );
     }
     case "toggleEdge": {
       const edge = project.edges.find((item) => item.id === edit.edgeId);
@@ -506,6 +595,21 @@ export function applyWorkspaceEdit(
         project: syncProjectObject(next, edge.targetObjectId),
         dirtyObjectIds: [edge.sourceObjectId, edge.targetObjectId],
         shouldEvaluate: true,
+      };
+    }
+    case "toggleEdgeCollapsed": {
+      if (!project.edges.some((item) => item.id === edit.edgeId)) {
+        return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      }
+      return {
+        project: {
+          ...project,
+          edges: project.edges.map((item) =>
+            item.id === edit.edgeId ? { ...item, collapsed: item.collapsed !== true } : item,
+          ),
+        },
+        dirtyObjectIds: [],
+        shouldEvaluate: false,
       };
     }
     case "deleteEdges": {

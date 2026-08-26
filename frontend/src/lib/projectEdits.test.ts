@@ -214,3 +214,77 @@ describe("auto-linked ports", () => {
     expect(project.objects[0]?.outputs).toEqual([]);
   });
 });
+
+describe("unique objects and search connectors", () => {
+  it("keeps object ids and names unique and rekeys edges", () => {
+    let project = applyAll([{ type: "addObject" }]);
+    expect(project.objects.map((item) => [item.id, item.name])).toEqual([
+      ["obj_1", "Object 1"],
+      ["obj_2", "Object 2"],
+    ]);
+    project = applyWorkspaceEdit(
+      project,
+      { type: "updateObject", objectId: "obj_2", patch: { name: "Object 1" } },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(project.objects[1]?.name).toBe("Object 2");
+    project = applyWorkspaceEdit(
+      project,
+      { type: "updateObject", objectId: "obj_2", patch: { id: "obj_1" } },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(project.objects[1]?.id).toBe("obj_2");
+
+    project = applyAll([
+      { type: "addInput", objectId: "obj_1" },
+      { type: "updateInput", objectId: "obj_1", index: 0, patch: { id: "POWER" } },
+      { type: "addObject" },
+      { type: "addInput", objectId: "obj_2" },
+    ]);
+    const localId = project.objects[1]?.inputs[0]?.id ?? "";
+    project = applyWorkspaceEdit(
+      project,
+      {
+        type: "connectMapping",
+        sourceObjectId: "obj_1",
+        sourceVariableId: "POWER",
+        targetObjectId: "obj_2",
+        targetVariableId: localId,
+      },
+      FALLBACK_QUANTITIES,
+    ).project;
+    project = applyWorkspaceEdit(
+      project,
+      { type: "updateObject", objectId: "obj_2", patch: { id: "sink", name: "Sink" } },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(project.objects[1]?.id).toBe("sink");
+    expect(project.edges[0]?.targetObjectId).toBe("sink");
+  });
+
+  it("connects through object search and can collapse the edge", () => {
+    let project = applyAll([
+      { type: "addInput", objectId: "obj_1" },
+      { type: "updateInput", objectId: "obj_1", index: 0, patch: { id: "POWER", value: 10 } },
+      { type: "addObject" },
+    ]);
+    project = applyWorkspaceEdit(
+      project,
+      {
+        type: "connectBySearch",
+        sourceObjectId: "obj_1",
+        sourceVariableId: "POWER",
+        targetObjectId: "obj_2",
+      },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(project.objects[1]?.inputs[0]?.id).toBe("POWER");
+    expect(project.edges[0]?.collapsed).toBe(false);
+    project = applyWorkspaceEdit(
+      project,
+      { type: "toggleEdgeCollapsed", edgeId: project.edges[0]!.id },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(project.edges[0]?.collapsed).toBe(true);
+  });
+});

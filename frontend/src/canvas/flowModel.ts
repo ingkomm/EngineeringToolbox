@@ -20,6 +20,7 @@ export function toFlowNodeRecords(
     position: object.position,
     data: {
       object,
+      project,
       mappedInputIds: mappedInputsForObject(object.id, project.edges),
       quantities,
       onEdit,
@@ -28,20 +29,43 @@ export function toFlowNodeRecords(
   }));
 }
 
-export function toFlowEdges(edges: MappingEdge[], onToggle: (edgeId: string) => void) {
-  return edges.map((edge) => ({
-    id: edge.id,
-    source: edge.sourceObjectId,
-    target: edge.targetObjectId,
-    sourceHandle: outputHandleId(edge.sourceVariableId),
-    targetHandle: inputHandleId(edge.targetVariableId),
-    type: "mapping" as const,
-    className: edge.enabled === false ? "mapping-edge mapping-edge--off" : "mapping-edge",
-    data: {
-      enabled: edge.enabled !== false,
-      onToggle,
-    },
-  }));
+export function toFlowEdges(
+  project: ProjectDocument,
+  onToggle: (edgeId: string) => void,
+  onToggleCollapsed: (edgeId: string) => void,
+) {
+  const objects = new Map(project.objects.map((item) => [item.id, item]));
+  return project.edges.map((edge) => {
+    const source = objects.get(edge.sourceObjectId);
+    const target = objects.get(edge.targetObjectId);
+    const collapsed = edge.collapsed === true;
+    return {
+      id: edge.id,
+      source: edge.sourceObjectId,
+      target: edge.targetObjectId,
+      sourceHandle: outputHandleId(edge.sourceVariableId),
+      targetHandle: inputHandleId(edge.targetVariableId),
+      type: "mapping" as const,
+      className: [
+        "mapping-edge",
+        edge.enabled === false ? "mapping-edge--off" : "",
+        collapsed ? "mapping-edge--collapsed" : "",
+      ]
+        .filter(Boolean)
+        .join(" "),
+      interactionWidth: collapsed ? 0 : 20,
+      data: {
+        enabled: edge.enabled !== false,
+        collapsed,
+        sourceObjectId: source?.id ?? edge.sourceObjectId,
+        sourceObjectName: source?.name ?? edge.sourceObjectId,
+        targetObjectId: target?.id ?? edge.targetObjectId,
+        targetObjectName: target?.name ?? edge.targetObjectId,
+        onToggle,
+        onToggleCollapsed,
+      },
+    };
+  });
 }
 
 export function mergeFlowNodes<T extends { id: string; data: unknown; position: { x: number; y: number } }>(

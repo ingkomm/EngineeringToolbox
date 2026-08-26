@@ -183,6 +183,10 @@ body,
   gap: 8px;
 }
 
+.react-flow__node {
+  overflow: visible;
+}
+
 .calc-node {
   width: 760px;
   background: var(--bg-node);
@@ -197,7 +201,7 @@ body,
   padding: 8px 10px 8px 12px;
   border-bottom: 1px solid var(--line);
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 110px minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
 }
@@ -210,18 +214,27 @@ body,
   text-transform: uppercase;
 }
 
-.calc-node__name {
+.calc-node__id,
+.calc-node__header .calc-row__name-input {
   width: 100%;
-  border: 0;
-  background: transparent;
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--input);
   color: var(--text);
-  font-size: 15px;
-  font-weight: 600;
+  border-radius: 6px;
+  padding: 4px 8px;
   font-family: inherit;
 }
 
-.calc-node__name:focus {
-  outline: none;
+.calc-node__id {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.calc-node__header .calc-row__name-input {
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .calc-table {
@@ -266,7 +279,7 @@ body,
 }
 
 .calc-row--input {
-  grid-template-columns: 88px 96px 80px minmax(140px, 1fr) 22px;
+  grid-template-columns: 22px 88px 96px 80px minmax(140px, 1fr) 22px;
 }
 
 .calc-row--calc {
@@ -331,7 +344,7 @@ body,
 }
 
 .calc-row--output {
-  grid-template-columns: minmax(0, 1fr) 72px 52px;
+  grid-template-columns: minmax(0, 1fr) 72px 52px 22px;
 }
 
 .calc-row__port-id {
@@ -400,7 +413,7 @@ body,
 .calc-row__formula-input:focus,
 .calc-row__qty:focus,
 .calc-row__select:focus,
-.calc-node__name:focus {
+.calc-node__id:focus {
   outline: 1px solid var(--accent-2);
 }
 
@@ -522,4 +535,152 @@ body,
 .edge-toggle--off {
   color: var(--danger);
   border-color: #7a3030;
+}
+
+.edge-toggle--link {
+  color: var(--accent-2);
+}
+
+.edge-controls {
+  display: flex;
+  gap: 4px;
+  pointer-events: all;
+}
+
+.react-flow__edge.mapping-edge--collapsed .react-flow__edge-path {
+  stroke: transparent;
+  stroke-width: 0;
+}
+
+.link-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  padding: 4px 8px;
+  border: 1px dashed var(--accent-2);
+  background: #0d1624;
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.link-chip--off {
+  border-color: #6b7c90;
+  color: var(--muted);
+}
+
+.link-chip__peer {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+
+.link-chip__arrow {
+  color: var(--accent-2);
+  font-weight: 700;
+}
+
+.link-chip__btn {
+  border: 0;
+  background: transparent;
+  color: var(--accent-2);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.port-search {
+  position: relative;
+  z-index: 6;
+}
+
+.port-search-spacer {
+  width: 22px;
+  height: 22px;
+}
+
+.port-search__btn {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--line);
+  background: var(--input);
+  color: var(--accent-2);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.port-search__pop {
+  position: absolute;
+  top: 24px;
+  left: 0;
+  z-index: 8;
+  width: 240px;
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  background: #0d1624;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.calc-row--output .port-search__pop {
+  left: auto;
+  right: 0;
+}
+
+.port-search__query {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--input);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.port-search__empty {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.port-search__list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.port-search__hit {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 6px 4px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.port-search__hit:hover {
+  background: rgba(108, 182, 255, 0.08);
+}
+
+.port-search__object {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.port-search__var {
+  font-size: 10px;
+  color: var(--muted);
 }

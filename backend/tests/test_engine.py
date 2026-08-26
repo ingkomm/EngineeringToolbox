@@ -307,6 +307,34 @@ def test_global_variable_ids_must_be_unique() -> None:
     assert any(err.code == "DUPLICATE_VARIABLE_ID" for err in result.errors)
 
 
+def test_object_names_must_be_unique() -> None:
+    project = ProjectDocument(
+        id="dup",
+        name="dup",
+        objects=[
+            CalculationObject(
+                id="a",
+                name="Unit",
+                position=Position(x=0, y=0),
+                inputs=[],
+                calculations=[],
+                outputs=[],
+            ),
+            CalculationObject(
+                id="b",
+                name="Unit",
+                position=Position(x=1, y=0),
+                inputs=[],
+                calculations=[],
+                outputs=[],
+            ),
+        ],
+        edges=[],
+    )
+    result = evaluate_project(project)
+    assert any(err.code == "DUPLICATE_OBJECT_NAME" for err in result.errors)
+
+
 def test_global_variable_names_must_be_unique() -> None:
     project = ProjectDocument(
         id="dup",

@@ -36,7 +36,10 @@ Variable ID는 셀 주소(`A1`, `B2`)가 아니라 의미 기반 식별자다.
 - 허용 패턴: `^[A-Za-z_][A-Za-z0-9_]*$`
 - 예: `FLOW`, `PIN`, `POUT`, `DP`, `POWER`, `RESULT`
 - ID와 이름(name)은 워크시트 **전역**에서 유일하다. Calculation이 만든 변수가 다른 Object Input으로 연결되면 새 ID를 만들지 않고 같은 ID/이름을 그대로 가져온다.
+- Calculation Object의 ID와 이름도 워크시트에서 유일하다.
 - 커넥터 `enabled`(On/Off)로 연동을 끊거나 다시 이을 수 있다. Off면 대상 Input은 새로운 로컬 ID를 받는다.
+- 커넥터 `collapsed`로 긴 선을 접고, 양쪽 포트에 상대 Object ID/이름을 Bluetooth 링크처럼 표시한다. 다시 펼치면 전체 선을 그린다.
+- 커넥터 검색으로 다른 Object를 ID/이름으로 찾아 연결할 수 있다.
 - Input과 Calculation 행은 사용자가 임의로 추가/삭제/편집한다. 기본 워크시트는 비어 있다.
 
 각 변수는 SI 표준 물성(`quantity`)과 그에 따른 SI 단위(`unit`)를 가질 수 있다. 카탈로그는 Python이 소유한다 (`GET /api/v1/quantities`).
@@ -95,6 +98,8 @@ sourceObjectId.outputs[sourceVariableId]
 - 한 Input은 동시에 하나의 Edge만 받는다 (fan-in 1).
 - Fan-out은 허용한다 (한 Output을 여러 Input에 연결).
 - Object 그래프에 cycle이 있으면 evaluation error.
+- 커넥터 검색: Output/Input 행의 찾기 버튼으로 다른 Object ID/이름을 검색해 연결한다.
+- `collapsed: true`면 캔버스에 전체 선을 그리지 않고 `Object A → {targetId · targetName}`, `{sourceId · sourceName} → Object B` 칩만 보여 준다.
 
 ## 4. Project Document (저장 JSON)
 
@@ -279,15 +284,22 @@ Object A의 PIN/POUT만 바꾸면 Object A와 B가 갱신된다. 매핑되지 �
 | `btn-evaluate` | 상단 바 | `POST /api/v1/evaluate` |
 | `btn-add-object` | Canvas Panel top-left | `addObject` |
 | `btn-load-example` | 우측 사이드바 | `loadExample` |
+| `object-{id}-id` | Node 헤더 | Object ID, blur로 commit. 전역 유일 |
+| `object-{id}-name` | Node 헤더 | Object 이름, blur로 commit. 전역 유일 |
 | `object-{id}-add-input` | Node Input 헤더 | `addInput` |
 | `object-{id}-add-calc` | Node Calculation 헤더 | `addCalculation` |
 | `object-{id}-add-output` | Node Output 헤더 | `addOutput` |
 | `object-{id}-input-{var}-id` | Input 행 | Variable ID, blur로 commit |
 | `object-{id}-input-{var}-value` | Input 행 | 값, blur로 commit |
 | `object-{id}-input-{var}-quantity` | Input 행 | option `value` = quantity id (`mass_flow`, `pressure`, `power`) |
+| `object-{id}-input-{var}-search` | Input 행 | 소스 Object 검색 후 연결 |
 | `object-{id}-calc-{var}-formula` | Calculation 행 | 수식, blur로 commit |
+| `object-{id}-output-{var}-search` | Output 행 | 대상 Object 검색 후 연결 |
 | `handle-out-{var}` | Output 행 우측 | RF source handle (`id=out:{var}`) |
 | `handle-in-{var}` | Input 행 좌측 | RF target handle (`id=in:{var}`) |
+| `edge-{id}-toggle` | 커넥터 | On/Off |
+| `edge-{id}-collapse` | 커넥터 | 무선 링크로 접기 |
+| `edge-{id}-expand` | 접힌 링크 칩 | 전체 링크로 펼치기 |
 
 첫 Input 추가 시 Variable ID는 `IN_1`이다. ID를 `FLOW`로 바꾼 뒤에 testid가 `object-obj_1-input-FLOW-*`로 바뀐다.
 

@@ -49,16 +49,19 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
   const onToggle = useCallback((edgeId: string) => {
     onEdit({ type: "toggleEdge", edgeId });
   }, [onEdit]);
+  const onToggleCollapsed = useCallback((edgeId: string) => {
+    onEdit({ type: "toggleEdgeCollapsed", edgeId });
+  }, [onEdit]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(toFlowNodes(project, quantities, onEdit));
-  const [edges, setEdges, onEdgesChange] = useEdgesState(toFlowEdges(project.edges, onToggle));
+  const [edges, setEdges, onEdgesChange] = useEdgesState(toFlowEdges(project, onToggle, onToggleCollapsed));
   const didFit = useRef(false);
 
   useEffect(() => {
     const nextNodes = toFlowNodes(project, quantities, onEdit);
     setNodes((current) => mergeFlowNodes(current, nextNodes));
-    setEdges(toFlowEdges(project.edges, onToggle));
-  }, [onEdit, onToggle, project, quantities, setEdges, setNodes]);
+    setEdges(toFlowEdges(project, onToggle, onToggleCollapsed));
+  }, [onEdit, onToggle, onToggleCollapsed, project, quantities, setEdges, setNodes]);
 
   const onInit = useCallback((instance: { fitView: (options?: { padding?: number }) => void }) => {
     if (didFit.current) return;

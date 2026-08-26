@@ -1,6 +1,6 @@
 import { Position, type Node, type NodeProps, useUpdateNodeInternals } from "@xyflow/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import type { CalculationObject } from "../types/contract";
+import type { CalculationObject, ProjectDocument } from "../types/contract";
 import { formatValue, inputHandleId, outputHandleId } from "../lib/display";
 import {
   applyCandidate,
@@ -10,14 +10,16 @@ import {
   FORMULA_FUNCTIONS,
   type FormulaCandidate,
 } from "../lib/formulaComplete";
-import { VARIABLE_ID_RE, type WorkspaceEdit } from "../lib/projectEdits";
+import { OBJECT_ID_RE, VARIABLE_ID_RE, type WorkspaceEdit } from "../lib/projectEdits";
 import { displayName } from "../lib/variables";
 import type { QuantitySpec } from "../lib/quantities";
 import { RowHandle } from "./RowHandle";
+import { PortSearch } from "./PortSearch";
 
 export type CalculationObjectNodeType = Node<
   {
     object: CalculationObject;
+    project: ProjectDocument;
     mappedInputIds: string[];
     quantities: QuantitySpec[];
     onEdit: (edit: WorkspaceEdit) => void;
@@ -30,7 +32,7 @@ function stopKeys(event: KeyboardEvent) {
 }
 
 export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectNodeType>) {
-  const { object, mappedInputIds, quantities, onEdit } = data;
+  const { object, project, mappedInputIds, quantities, onEdit } = data;
   const mapped = new Set(mappedInputIds);
   const updateNodeInternals = useUpdateNodeInternals();
   const handleSignature = [
@@ -56,13 +58,15 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
     <article className="calc-node" data-testid={`object-${id}`}>
       <header className="calc-node__header">
         <span className="calc-node__kicker">Calculation Object</span>
-        <input
-          className="calc-node__name nodrag nopan"
+        <ObjectIdField
+          value={object.id}
+          testId={`object-${id}-id`}
+          onCommit={(nextId) => onEdit({ type: "updateObject", objectId: id, patch: { id: nextId } })}
+        />
+        <NameField
           value={object.name}
-          data-testid={`object-${id}-name`}
-          onChange={(event) => onEdit({ type: "renameObject", objectId: id, name: event.target.value })}
-          onKeyDown={stopKeys}
-          aria-label="Object name"
+          testId={`object-${id}-name`}
+          onCommit={(name) => onEdit({ type: "updateObject", objectId: id, patch: { name } })}
         />
         <button
           type="button"
@@ -104,6 +108,25 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
                 position={Position.Left}
                 className="calc-handle calc-handle--in"
               />
+              {isMapped ? (
+                <span className="port-search-spacer" />
+              ) : (
+                <PortSearch
+                  project={project}
+                  selfObjectId={id}
+                  direction="from-output"
+                  testId={`object-${id}-input-${item.id}-search`}
+                  onPick={(hit) =>
+                    onEdit({
+                      type: "connectBySearch",
+                      sourceObjectId: hit.objectId,
+                      sourceVariableId: hit.variableId,
+                      targetObjectId: id,
+                      targetVariableId: item.id,
+                    })
+                  }
+                />
+              )}
               {isMapped ? (
                 <span className="calc-row__id-input calc-row__id-input--mapped" data-testid={`object-${id}-input-${item.id}-id`}>
                   {item.id}
@@ -254,6 +277,21 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
               {formatValue(item.value)}
             </span>
             <span className="calc-row__unit">{item.unit ?? "—"}</span>
+            <PortSearch
+              project={project}
+              selfObjectId={id}
+              direction="to-input"
+              testId={`object-${id}-output-${item.id}-search`}
+              onPick={(hit) =>
+                onEdit({
+                  type: "connectBySearch",
+                  sourceObjectId: id,
+                  sourceVariableId: item.id,
+                  targetObjectId: hit.objectId,
+                  targetVariableId: hit.createInput ? undefined : hit.variableId,
+                })
+              }
+            />
             <RowHandle
               nodeId={id}
               handleId={outputHandleId(item.id)}
@@ -524,6 +562,44 @@ function IdField({
         else setDraft(value);
       }}
       aria-label="Variable ID"
+    />
+  );
+}
+
+function ObjectIdField({
+  value,
+  onCommit,
+  testId,
+}: {
+  value: string;
+  onCommit: (id: string) => void;
+  testId: string;
+}) {
+  const [draft, setDraft] = useState(value);
+  const focusedRef = useRef(false);
+  useEffect(() => {
+    if (!focusedRef.current) setDraft(value);
+  }, [value]);
+
+  return (
+    <input
+      className="calc-node__id nodrag nopan"
+      value={draft}
+      data-testid={testId}
+      onFocus={() => {
+        focusedRef.current = true;
+      }}
+      onKeyDown={(event) => {
+        stopKeys(event);
+        if (event.key === "Enter") event.currentTarget.blur();
+      }}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={() => {
+        focusedRef.current = false;
+        if (OBJECT_ID_RE.test(draft) && draft !== value) onCommit(draft);
+        else setDraft(value);
+      }}
+      aria-label="Object ID"
     />
   );
 }

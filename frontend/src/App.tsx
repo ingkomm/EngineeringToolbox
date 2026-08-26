@@ -167,8 +167,8 @@ export function App() {
           <section>
             <h2>워크시트</h2>
             <p className="side-pane__hint">
-              Input/Calculation 변수는 워크시트 전역 ID/이름을 가집니다. 다른 객체로 연결하면 Input이 그 변수를
-              그대로 가져오고, 커넥터 On/Off로 연동을 끊거나 다시 이을 수 있습니다.
+              Object와 변수의 ID/이름은 워크시트에서 유일합니다. 커넥터 ⌕ 검색으로 다른 객체를 찾아 연결하고,
+              링크 버튼으로 선을 접으면 상대 Object ID/이름이 Bluetooth 링크처럼 양쪽에 표시됩니다.
             </p>
             <button
               className="ghost-btn"
