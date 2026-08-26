@@ -142,11 +142,7 @@ def _infer_dim(node: ast.AST, quantity_env: dict[str, str | None]) -> Dim | None
         left = _infer_dim(node.left, quantity_env)
         right = _infer_dim(node.right, quantity_env)
         if isinstance(node.op, (ast.Add, ast.Sub, ast.Mod)):
-            if left is None or right is None:
-                return None
-            if left != right:
-                raise QuantityError("QUANTITY_MISMATCH", "Add/subtract requires the same quantity")
-            return left
+            return _combine_additive(node, left, right, quantity_env)
         if isinstance(node.op, ast.Mult):
             if left is None or right is None:
                 return None
@@ -163,7 +159,80 @@ def _infer_dim(node: ast.AST, quantity_env: dict[str, str | None]) -> Dim | None
             exponent = node.right.value
             if not isinstance(exponent, (int, float)) or exponent != int(exponent):
                 if left != DIMENSIONLESS:
-                    raise QuantityError("QUANTITY_MISMATCH", "Non-integer power is only allowed for dimensionless values")
+                    raise QuantityError(
+                        "QUANTITY_MISMATCH",
+                        "정수가 아닌 지수는 무차원 값에만 허용됩니다",
+                    )
                 return DIMENSIONLESS
             return left.pow(int(exponent))
     return None
+
+
+def _is_pure_number(node: ast.AST) -> bool:
+    """True when the subtree is only numeric literals and operators — no variable IDs."""
+    return not any(isinstance(child, ast.Name) for child in ast.walk(node))
+
+
+def _combine_additive(
+    node: ast.BinOp,
+    left: Dim | None,
+    right: Dim | None,
+    quantity_env: dict[str, str | None],
+) -> Dim | None:
+    left_pure = _is_pure_number(node.left)
+    right_pure = _is_pure_number(node.right)
+    # Untyped numbers inherit the other operand's quantity (POUT - 12 → pressure).
+    if left_pure and not right_pure:
+        return right
+    if right_pure and not left_pure:
+        return left
+    if left_pure and right_pure:
+        return DIMENSIONLESS
+    # Variable with no quantity inherits a known quantity on the other side.
+    if left is None:
+        return right
+    if right is None:
+        return left
+    if left != right:
+        raise QuantityError(
+            "QUANTITY_MISMATCH",
+            _mismatch_message(node, left, right, quantity_env),
+        )
+    return left
+
+
+def _mismatch_message(
+    node: ast.BinOp,
+    left: Dim,
+    right: Dim,
+    quantity_env: dict[str, str | None],
+) -> str:
+    left_label = _side_label(node.left, left, quantity_env)
+    right_label = _side_label(node.right, right, quantity_env)
+    return (
+        "덧셈/뺄셈 항의 단위가 서로 달라 하나의 물성으로 결합할 수 없습니다: "
+        f"{left_label} 와(과) {right_label}"
+    )
+
+
+def _side_label(node: ast.AST, dim: Dim, quantity_env: dict[str, str | None]) -> str:
+    names = [child.id for child in ast.walk(node) if isinstance(child, ast.Name)]
+    if names:
+        parts: list[str] = []
+        for name in names:
+            quantity_id = quantity_env.get(name)
+            spec = QUANTITY_BY_ID.get(quantity_id) if quantity_id else None
+            if spec:
+                parts.append(f"{name}({spec['nameKo']}/{spec['siUnit']})")
+            else:
+                parts.append(name)
+        return ", ".join(parts)
+    return _describe_dim(dim)
+
+
+def _describe_dim(dim: Dim) -> str:
+    quantity_id = DIM_TO_QUANTITY.get(dim)
+    if quantity_id:
+        spec = QUANTITY_BY_ID[quantity_id]
+        return f"{spec['nameKo']}({spec['siUnit']})"
+    return format_dim_unit(dim)

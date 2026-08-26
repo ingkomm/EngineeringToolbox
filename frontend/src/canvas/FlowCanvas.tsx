@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
   Background,
   BackgroundVariant,
   ConnectionLineType,
   Controls,
-  MiniMap,
   Panel,
   ReactFlow,
   useEdgesState,
@@ -15,7 +14,7 @@ import {
 import "@xyflow/react/dist/style.css";
 
 import { CalculationObjectNode, type CalculationObjectNodeType } from "./CalculationObjectNode";
-import { toFlowEdges, toFlowNodeRecords } from "./flowModel";
+import { mergeFlowNodes, toFlowEdges, toFlowNodeRecords } from "./flowModel";
 import { parseHandleId } from "../lib/display";
 import type { WorkspaceEdit } from "../lib/projectEdits";
 import type { QuantitySpec } from "../lib/quantities";
@@ -46,15 +45,23 @@ function toFlowNodes(
 }
 
 export function FlowCanvas({ project, quantities, onProjectChange, onGraphEvaluate, onEdit }: FlowCanvasProps) {
-  const initialNodes = useMemo(() => toFlowNodes(project, quantities, onEdit), [onEdit, project, quantities]);
-  const initialEdges = useMemo(() => toFlowEdges(project.edges), [project.edges]);
-  const [nodes, setNodes, onNodesChange] = useNodesState<CalculationObjectNodeType>(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState<CalculationObjectNodeType>(
+    toFlowNodes(project, quantities, onEdit),
+  );
+  const [edges, setEdges, onEdgesChange] = useEdgesState(toFlowEdges(project.edges));
+  const didFit = useRef(false);
 
   useEffect(() => {
-    setNodes(toFlowNodes(project, quantities, onEdit));
+    const nextNodes = toFlowNodes(project, quantities, onEdit);
+    setNodes((current) => mergeFlowNodes(current, nextNodes));
     setEdges(toFlowEdges(project.edges));
   }, [onEdit, project, quantities, setEdges, setNodes]);
+
+  const onInit = useCallback((instance: { fitView: (options?: { padding?: number }) => void }) => {
+    if (didFit.current) return;
+    didFit.current = true;
+    instance.fitView({ padding: 0.18 });
+  }, []);
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -103,6 +110,7 @@ export function FlowCanvas({ project, quantities, onProjectChange, onGraphEvalua
       isValidConnection={isValidConnection}
       defaultEdgeOptions={defaultEdgeOptions}
       connectionLineType={ConnectionLineType.SmoothStep}
+      onInit={onInit}
       onNodeDragStop={(_event, node) => {
         onProjectChange({
           ...project,
@@ -111,8 +119,6 @@ export function FlowCanvas({ project, quantities, onProjectChange, onGraphEvalua
           ),
         });
       }}
-      fitView
-      fitViewOptions={{ padding: 0.18 }}
       deleteKeyCode={["Backspace", "Delete"]}
       onEdgesDelete={(deleted) => {
         const removed = new Set(deleted.map((edge) => edge.id));
@@ -129,7 +135,6 @@ export function FlowCanvas({ project, quantities, onProjectChange, onGraphEvalua
     >
       <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} color="#243044" />
       <Controls />
-      <MiniMap pannable zoomable nodeColor="#16324a" maskColor="rgba(6, 10, 16, 0.72)" />
       <Panel position="top-left" className="canvas-panel">
         <button
           type="button"

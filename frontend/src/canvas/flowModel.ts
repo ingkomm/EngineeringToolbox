@@ -38,3 +38,20 @@ export function toFlowEdges(edges: MappingEdge[]) {
     label: `${edge.sourceVariableId} → ${edge.targetVariableId}`,
   }));
 }
+
+export function mergeFlowNodes<T extends { id: string; data: unknown; position: { x: number; y: number } }>(
+  current: Array<T & { dragging?: boolean; selected?: boolean }>,
+  next: T[],
+): Array<T & { dragging?: boolean; selected?: boolean }> {
+  const currentById = new Map(current.map((node) => [node.id, node]));
+  return next.map((record) => {
+    const existing = currentById.get(record.id);
+    if (!existing) return record;
+    return {
+      ...existing,
+      data: record.data,
+      selected: existing.selected,
+      position: existing.dragging ? existing.position : record.position,
+    };
+  });
+}

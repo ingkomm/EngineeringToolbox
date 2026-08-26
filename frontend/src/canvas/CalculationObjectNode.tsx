@@ -1,7 +1,14 @@
 import { Position, type Node, type NodeProps, useUpdateNodeInternals } from "@xyflow/react";
-import { useEffect, useLayoutEffect, useState, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import type { CalculationObject } from "../types/contract";
 import { formatValue, inputHandleId, outputHandleId } from "../lib/display";
+import {
+  applyCandidate,
+  identifierAt,
+  matchingCandidates,
+  shouldShowCallout,
+  type FormulaCandidate,
+} from "../lib/formulaComplete";
 import { VARIABLE_ID_RE, type WorkspaceEdit } from "../lib/projectEdits";
 import type { QuantitySpec } from "../lib/quantities";
 import { RowHandle } from "./RowHandle";
@@ -25,16 +32,22 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
   const mapped = new Set(mappedInputIds);
   const localSources = [...object.inputs, ...object.calculations].map((item) => item.id);
   const updateNodeInternals = useUpdateNodeInternals();
+  const handleSignature = [
+    ...object.inputs.map((item) => item.id),
+    ...object.outputs.map((item) => item.id),
+  ].join("|");
 
   useLayoutEffect(() => {
     updateNodeInternals(id);
-  }, [
-    id,
-    object.inputs,
-    object.calculations,
-    object.outputs,
-    updateNodeInternals,
-  ]);
+  }, [handleSignature, id, updateNodeInternals]);
+
+  const candidatesFor = (excludeId: string): FormulaCandidate[] =>
+    [...object.inputs, ...object.calculations]
+      .filter((item) => item.id !== excludeId)
+      .map((item) => ({
+        id: item.id,
+        hint: quantityHint(item.quantity, item.unit, quantities),
+      }));
 
   return (
     <article className="calc-node" data-testid={`object-${id}`}>
@@ -77,7 +90,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
           return (
             <div
               className="calc-row calc-row--input"
-              key={`in-${index}`}
+              key={item.id}
               data-status={item.status ?? "idle"}
               data-testid={`object-${id}-input-row-${item.id}`}
             >
@@ -146,7 +159,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
         {object.calculations.map((item, index) => (
           <div
             className="calc-row calc-row--calc"
-            key={`calc-${index}`}
+            key={item.id}
             data-status={item.status ?? "idle"}
             data-testid={`object-${id}-calc-row-${item.id}`}
           >
@@ -158,6 +171,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
             <FormulaField
               value={item.formula}
               testId={`object-${id}-calc-${item.id}-formula`}
+              candidates={candidatesFor(item.id)}
               onCommit={(formula) => onEdit({ type: "updateCalculation", objectId: id, index, patch: { formula } })}
               ariaLabel={`${item.id} formula`}
             />
@@ -170,10 +184,10 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
             </span>
             <span
               className="calc-row__unit"
-              title="Python이 수식에서 유추한 SI 물성"
+              title={item.error ?? "Python이 수식에서 유추한 SI 물성"}
               data-testid={`object-${id}-calc-${item.id}-quantity`}
             >
-              {inferredQuantityLabel(item.quantity, item.unit, quantities)}
+              {item.status === "error" ? "오류" : inferredQuantityLabel(item.quantity, item.unit, quantities)}
             </span>
             <button
               type="button"
@@ -183,6 +197,11 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
             >
               ×
             </button>
+            {item.error ? (
+              <p className="calc-row__error" data-testid={`object-${id}-calc-${item.id}-error`}>
+                {item.error}
+              </p>
+            ) : null}
           </div>
         ))}
       </section>
@@ -204,7 +223,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
         {object.outputs.map((item, index) => (
           <div
             className="calc-row calc-row--output"
-            key={`out-${index}`}
+            key={item.id}
             data-status={item.status ?? "idle"}
             data-testid={`object-${id}-output-row-${item.id}`}
           >
@@ -265,8 +284,9 @@ function ValueField({
   testId: string;
 }) {
   const [draft, setDraft] = useState(value == null ? "" : String(value));
+  const focusedRef = useRef(false);
   useEffect(() => {
-    setDraft(value == null ? "" : String(value));
+    if (!focusedRef.current) setDraft(value == null ? "" : String(value));
   }, [value]);
 
   return (
@@ -278,12 +298,16 @@ function ValueField({
       placeholder="값"
       aria-label={ariaLabel}
       data-testid={testId}
+      onFocus={() => {
+        focusedRef.current = true;
+      }}
       onKeyDown={(event) => {
         stopKeys(event);
         if (event.key === "Enter") event.currentTarget.blur();
       }}
       onChange={(event) => setDraft(event.target.value)}
       onBlur={() => {
+        focusedRef.current = false;
         const raw = draft.trim();
         if (raw === "") {
           onCommit(null);
@@ -305,33 +329,129 @@ function FormulaField({
   onCommit,
   ariaLabel,
   testId,
+  candidates,
 }: {
   value: string;
   onCommit: (formula: string) => void;
   ariaLabel: string;
   testId: string;
+  candidates: FormulaCandidate[];
 }) {
   const [draft, setDraft] = useState(value);
+  const [cursor, setCursor] = useState(value.length);
+  const [active, setActive] = useState(0);
+  const [focused, setFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
-    setDraft(value);
-  }, [value]);
+    if (!focused) {
+      setDraft(value);
+      setCursor(value.length);
+    }
+  }, [focused, value]);
+
+  const token = identifierAt(draft, cursor);
+  const matches = useMemo(
+    () => matchingCandidates(token?.prefix ?? "", candidates),
+    [candidates, token?.prefix],
+  );
+  const show = focused && token !== null && shouldShowCallout(token.prefix, matches);
+  const visible = show ? matches : [];
+
+  useEffect(() => {
+    setActive(0);
+  }, [token?.prefix]);
+
+  const apply = (id: string) => {
+    if (!token) return;
+    const next = applyCandidate(draft, token, id);
+    setDraft(next.text);
+    setCursor(next.cursor);
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(next.cursor, next.cursor);
+    });
+  };
 
   return (
-    <input
-      className="calc-row__formula-input nodrag nopan"
-      value={draft}
-      placeholder="POUT - PIN"
-      aria-label={ariaLabel}
-      data-testid={testId}
-      onKeyDown={(event) => {
-        stopKeys(event);
-        if (event.key === "Enter") event.currentTarget.blur();
-      }}
-      onChange={(event) => setDraft(event.target.value)}
-      onBlur={() => {
-        if (draft !== value) onCommit(draft);
-      }}
-    />
+    <div className="formula-complete">
+      <input
+        ref={inputRef}
+        className="calc-row__formula-input nodrag nopan nowheel"
+        value={draft}
+        placeholder="POUT - PIN"
+        aria-label={ariaLabel}
+        aria-autocomplete="list"
+        aria-expanded={visible.length > 0}
+        data-testid={testId}
+        onFocus={(event) => {
+          setFocused(true);
+          setCursor(event.currentTarget.selectionStart ?? event.currentTarget.value.length);
+        }}
+        onKeyDown={(event) => {
+          stopKeys(event);
+          if (visible.length > 0) {
+            if (event.key === "ArrowDown") {
+              event.preventDefault();
+              setActive((index) => (index + 1) % visible.length);
+              return;
+            }
+            if (event.key === "ArrowUp") {
+              event.preventDefault();
+              setActive((index) => (index - 1 + visible.length) % visible.length);
+              return;
+            }
+            if (event.key === "Enter" || event.key === "Tab") {
+              event.preventDefault();
+              const chosen = visible[active] ?? visible[0];
+              if (chosen) apply(chosen.id);
+              return;
+            }
+            if (event.key === "Escape") {
+              event.preventDefault();
+              setFocused(false);
+              event.currentTarget.blur();
+              return;
+            }
+          }
+          if (event.key === "Enter") event.currentTarget.blur();
+        }}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          setCursor(event.target.selectionStart ?? event.target.value.length);
+        }}
+        onSelect={(event) => {
+          setCursor(event.currentTarget.selectionStart ?? event.currentTarget.value.length);
+        }}
+        onBlur={() => {
+          setFocused(false);
+          if (draft !== value) onCommit(draft);
+        }}
+      />
+      {visible.length > 0 ? (
+        <ul className="formula-complete__list nodrag nopan nowheel" data-testid={`${testId}-complete`} role="listbox">
+          {visible.map((item, index) => (
+            <li key={item.id}>
+              <button
+                type="button"
+                className="formula-complete__item"
+                data-active={index === active}
+                role="option"
+                aria-selected={index === active}
+                onMouseDown={(event) => event.preventDefault()}
+                onMouseEnter={() => setActive(index)}
+                onClick={() => apply(item.id)}
+              >
+                <span>{item.id}</span>
+                {item.hint ? <span className="formula-complete__hint">{item.hint}</span> : null}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 
@@ -345,8 +465,9 @@ function IdField({
   testId: string;
 }) {
   const [draft, setDraft] = useState(value);
+  const focusedRef = useRef(false);
   useEffect(() => {
-    setDraft(value);
+    if (!focusedRef.current) setDraft(value);
   }, [value]);
 
   return (
@@ -354,12 +475,16 @@ function IdField({
       className="calc-row__id-input nodrag nopan"
       value={draft}
       data-testid={testId}
+      onFocus={() => {
+        focusedRef.current = true;
+      }}
       onKeyDown={(event) => {
         stopKeys(event);
         if (event.key === "Enter") event.currentTarget.blur();
       }}
       onChange={(event) => setDraft(event.target.value.toUpperCase())}
       onBlur={() => {
+        focusedRef.current = false;
         if (VARIABLE_ID_RE.test(draft) && draft !== value) onCommit(draft);
         else setDraft(value);
       }}
@@ -368,15 +493,23 @@ function IdField({
   );
 }
 
+function quantityHint(
+  quantity: string | null | undefined,
+  unit: string | null | undefined,
+  quantities: QuantitySpec[],
+): string | undefined {
+  const spec = quantities.find((item) => item.id === quantity);
+  if (spec) return `${spec.nameKo} ${spec.siUnit}`;
+  if (unit) return unit;
+  return undefined;
+}
+
 function inferredQuantityLabel(
   quantity: string | null | undefined,
   unit: string | null | undefined,
   quantities: QuantitySpec[],
 ): string {
-  const spec = quantities.find((item) => item.id === quantity);
-  if (spec) return `${spec.nameKo} ${spec.siUnit}`;
-  if (unit) return unit;
-  return "—";
+  return quantityHint(quantity, unit, quantities) ?? "—";
 }
 
 function QuantityField({

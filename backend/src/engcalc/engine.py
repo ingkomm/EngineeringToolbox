@@ -401,9 +401,13 @@ def _evaluate_object(
                 quantity_id, unit = infer_formula_quantity(item.formula, qty_env)
                 item.quantity = quantity_id
                 item.unit = unit
+                item.status = "ok"
+                item.error = None
             except QuantityError as exc:
                 item.quantity = None
                 item.unit = None
+                item.status = "error"
+                item.error = exc.message
                 errors.append(
                     EvalError(
                         objectId=obj.id,
@@ -412,8 +416,6 @@ def _evaluate_object(
                         message=exc.message,
                     )
                 )
-            item.status = "ok"
-            item.error = None
             env[item.id] = item.value
             qty_env[item.id] = item.quantity
         except FormulaError as exc:

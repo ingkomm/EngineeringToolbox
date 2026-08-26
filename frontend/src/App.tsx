@@ -17,13 +17,17 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("변수와 수식을 직접 정의하세요");
   const debounceRef = useRef<number | null>(null);
+  const busyTimerRef = useRef<number | null>(null);
   const projectRef = useRef(project);
   const requestSeq = useRef(0);
   projectRef.current = project;
 
   const runEvaluate = useCallback(async (next: ProjectDocument, dirtyObjectIds?: string[]) => {
     const seq = ++requestSeq.current;
-    setBusy(true);
+    if (busyTimerRef.current) window.clearTimeout(busyTimerRef.current);
+    busyTimerRef.current = window.setTimeout(() => {
+      if (seq === requestSeq.current) setBusy(true);
+    }, 280);
     try {
       const result = await evaluateProject(next, dirtyObjectIds);
       if (seq !== requestSeq.current) return;
@@ -43,6 +47,10 @@ export function App() {
       setBackendUp(false);
       setMessage(error instanceof Error ? error.message : "Evaluate request failed");
     } finally {
+      if (busyTimerRef.current) {
+        window.clearTimeout(busyTimerRef.current);
+        busyTimerRef.current = null;
+      }
       if (seq === requestSeq.current) setBusy(false);
     }
   }, []);
@@ -72,10 +80,10 @@ export function App() {
     (edit: WorkspaceEdit) => {
       const result = applyWorkspaceEdit(projectRef.current, edit, quantities);
       setProject(result.project);
-      setErrors([]);
       if (result.shouldEvaluate) {
         scheduleEvaluate(result.project, result.dirtyObjectIds);
       } else {
+        setErrors([]);
         setMessage("변수와 수식을 직접 정의하세요");
         setEvaluated([]);
       }

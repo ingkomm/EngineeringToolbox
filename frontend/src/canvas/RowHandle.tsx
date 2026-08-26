@@ -1,5 +1,4 @@
-import { Handle, Position, useUpdateNodeInternals } from "@xyflow/react";
-import { useLayoutEffect } from "react";
+import { Handle, Position } from "@xyflow/react";
 
 interface RowHandleProps {
   nodeId: string;
@@ -9,13 +8,7 @@ interface RowHandleProps {
   className: string;
 }
 
-export function RowHandle({ nodeId, handleId, type, position, className }: RowHandleProps) {
-  const updateNodeInternals = useUpdateNodeInternals();
-
-  useLayoutEffect(() => {
-    updateNodeInternals(nodeId);
-  }, [handleId, nodeId, updateNodeInternals]);
-
+export function RowHandle({ handleId, type, position, className }: RowHandleProps) {
   return (
     <Handle
       type={type}
