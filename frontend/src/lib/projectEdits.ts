@@ -307,7 +307,7 @@ export function applyWorkspaceEdit(
       const object: CalculationObject = {
         id,
         name: nextObjectName(project),
-        position: { x: 80 + index * 1280, y: 88 },
+        position: { x: 80 + index * 980, y: 88 },
         inputs: [],
         calculations: [],
         outputs: [],

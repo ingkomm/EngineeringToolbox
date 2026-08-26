@@ -169,7 +169,6 @@ export function App() {
             <p className="side-pane__hint">
               Object와 변수의 ID/이름은 워크시트에서 유일합니다. 커넥터 ⌕ 검색으로 다른 객체를 찾아 연결하고,
               검색창에서 기존 링크 상태를 보거나 끊을 수 있습니다. 한 Object의 한 Output은 하나의 Input에만 연결됩니다.
-              객체 안에서는 Input이 왼쪽, Calculation이 오른쪽이며, 수식에 쓰인 Input은 내부 링크로 보입니다.
             </p>
             <button
               className="ghost-btn"
