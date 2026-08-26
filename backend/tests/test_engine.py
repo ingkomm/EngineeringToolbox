@@ -415,3 +415,33 @@ def test_disabled_edge_does_not_map_values() -> None:
     assert dest.inputs[0].id == "LOCAL"
     assert dest.inputs[0].value == 4.0
     assert dest.inputs[0].status == "ok"
+
+
+def test_excel_functions_evaluate_on_a_calculation_object() -> None:
+    project = ProjectDocument(
+        id="xl",
+        name="xl",
+        objects=[
+            CalculationObject(
+                id="obj",
+                name="Obj",
+                position=Position(x=0, y=0),
+                inputs=[InputVariable(id="PIN", value=12.4, quantity="pressure")],
+                calculations=[
+                    FormulaVariable(id="P2", formula="ROUND(PIN, 0)"),
+                    FormulaVariable(id="RATIO", formula="LOG(100)"),
+                    FormulaVariable(id="GROWTH", formula="EXP(0)"),
+                ],
+                outputs=[],
+            )
+        ],
+        edges=[],
+    )
+    result = evaluate_project(project)
+    assert result.errors == []
+    by_id = {item.id: item for item in result.project.objects[0].calculations}
+    assert by_id["P2"].value == 12.0
+    assert by_id["P2"].quantity == "pressure"
+    assert by_id["RATIO"].value == 2.0
+    assert by_id["RATIO"].quantity == "dimensionless"
+    assert by_id["GROWTH"].value == 1.0

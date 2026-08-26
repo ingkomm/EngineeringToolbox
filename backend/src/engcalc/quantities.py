@@ -37,6 +37,12 @@ class Dim:
     def pow(self, exponent: int) -> Dim:
         return Dim(self.M * exponent, self.L * exponent, self.T * exponent, self.Theta * exponent)
 
+    def can_sqrt(self) -> bool:
+        return all(value % 2 == 0 for value in (self.M, self.L, self.T, self.Theta))
+
+    def sqrt(self) -> Dim:
+        return Dim(self.M // 2, self.L // 2, self.T // 2, self.Theta // 2)
+
 
 QUANTITIES: tuple[QuantitySpec, ...] = (
     {"id": "pressure", "nameKo": "압력", "nameEn": "Pressure", "siUnit": "Pa"},
@@ -138,6 +144,8 @@ def _infer_dim(node: ast.AST, quantity_env: dict[str, str | None]) -> Dim | None
         return QUANTITY_DIM.get(quantity_id)
     if isinstance(node, ast.UnaryOp):
         return _infer_dim(node.operand, quantity_env)
+    if isinstance(node, ast.Call):
+        return _infer_call_dim(node, quantity_env)
     if isinstance(node, ast.BinOp):
         left = _infer_dim(node.left, quantity_env)
         right = _infer_dim(node.right, quantity_env)
@@ -152,25 +160,86 @@ def _infer_dim(node: ast.AST, quantity_env: dict[str, str | None]) -> Dim | None
                 return None
             return left.div(right)
         if isinstance(node.op, ast.Pow):
-            if left is None:
-                return None
-            if not isinstance(node.right, ast.Constant) or isinstance(node.right.value, bool):
-                return None
-            exponent = node.right.value
-            if not isinstance(exponent, (int, float)) or exponent != int(exponent):
-                if left != DIMENSIONLESS:
-                    raise QuantityError(
-                        "QUANTITY_MISMATCH",
-                        "정수가 아닌 지수는 무차원 값에만 허용됩니다",
-                    )
-                return DIMENSIONLESS
-            return left.pow(int(exponent))
+            return _infer_power_dim(left, node.right, quantity_env)
     return None
 
 
+def _infer_call_dim(node: ast.Call, quantity_env: dict[str, str | None]) -> Dim | None:
+    if not isinstance(node.func, ast.Name):
+        return None
+    name = node.func.id.upper()
+    args = node.args
+    if name in {"LN", "LOG", "LOG10", "EXP"}:
+        arg = _infer_dim(args[0], quantity_env) if args else None
+        if arg is not None and arg != DIMENSIONLESS:
+            raise QuantityError(
+                "QUANTITY_MISMATCH",
+                f"{name}는 무차원 값에만 사용할 수 있습니다",
+            )
+        return DIMENSIONLESS
+    if name == "PI":
+        return DIMENSIONLESS
+    if name == "SIGN":
+        return DIMENSIONLESS
+    if name in {"ABS", "INT", "ROUND", "ROUNDDOWN", "ROUNDUP", "TRUNC"}:
+        return _infer_dim(args[0], quantity_env) if args else None
+    if name == "SQRT":
+        arg = _infer_dim(args[0], quantity_env) if args else None
+        if arg is None:
+            return None
+        if arg == DIMENSIONLESS:
+            return DIMENSIONLESS
+        if not arg.can_sqrt():
+            return None
+        return arg.sqrt()
+    if name == "POWER":
+        if len(args) < 2:
+            return None
+        return _infer_power_dim(_infer_dim(args[0], quantity_env), args[1], quantity_env)
+    if name == "MOD":
+        if len(args) < 2:
+            return None
+        dummy = ast.BinOp(left=args[0], op=ast.Mod(), right=args[1])
+        return _combine_additive(
+            dummy,
+            _infer_dim(args[0], quantity_env),
+            _infer_dim(args[1], quantity_env),
+            quantity_env,
+        )
+    if name in {"MIN", "MAX"}:
+        dims = [_infer_dim(arg, quantity_env) for arg in args]
+        result = dims[0] if dims else None
+        for index, dim in enumerate(dims[1:], start=1):
+            dummy = ast.BinOp(left=args[0], op=ast.Add(), right=args[index])
+            result = _combine_additive(dummy, result, dim, quantity_env)
+        return result
+    return None
+
+
+def _infer_power_dim(left: Dim | None, exponent_node: ast.AST, quantity_env: dict[str, str | None]) -> Dim | None:
+    if left is None:
+        return None
+    if not isinstance(exponent_node, ast.Constant) or isinstance(exponent_node.value, bool):
+        return None
+    exponent = exponent_node.value
+    if not isinstance(exponent, (int, float)):
+        return None
+    if exponent != int(exponent):
+        if left != DIMENSIONLESS:
+            raise QuantityError(
+                "QUANTITY_MISMATCH",
+                "정수가 아닌 지수는 무차원 값에만 허용됩니다",
+            )
+        return DIMENSIONLESS
+    return left.pow(int(exponent))
+
+
 def _is_pure_number(node: ast.AST) -> bool:
-    """True when the subtree is only numeric literals and operators — no variable IDs."""
-    return not any(isinstance(child, ast.Name) for child in ast.walk(node))
+    """True when the subtree is only numeric literals, Excel functions, and operators — no variable IDs."""
+    from engcalc.formulas import _call_func_ids
+
+    skip = _call_func_ids(node)
+    return not any(isinstance(child, ast.Name) and id(child) not in skip for child in ast.walk(node))
 
 
 def _combine_additive(
@@ -216,7 +285,10 @@ def _mismatch_message(
 
 
 def _side_label(node: ast.AST, dim: Dim, quantity_env: dict[str, str | None]) -> str:
-    names = [child.id for child in ast.walk(node) if isinstance(child, ast.Name)]
+    from engcalc.formulas import _call_func_ids
+
+    skip = _call_func_ids(node)
+    names = [child.id for child in ast.walk(node) if isinstance(child, ast.Name) and id(child) not in skip]
     if names:
         parts: list[str] = []
         for name in names:

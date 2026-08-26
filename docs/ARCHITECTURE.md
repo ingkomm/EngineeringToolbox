@@ -139,13 +139,26 @@ sourceObjectId.outputs[sourceVariableId]
 
 ## 5. Formula Language (Python only)
 
-프로토타입 연산자: `+ - * / **` 및 괄호, 숫자 리터럴, Variable ID.
+엑셀에 가까운 수식. 셀 주소는 없고 Variable ID만 참조한다. `eval()` / `exec()` 사용 금지.
 
-- 셀 주소 없음
-- 함수 호출 없음 (후속 모듈에서 확장)
+연산자: `+ - * / ^` (지수는 엑셀과 같이 `^`, `**`도 허용), 괄호, 숫자 리터럴, 접미사 `%` (10% = 0.1). 맨 앞 `=` 는 무시한다.
+
+함수 (대소문자 무관):
+
+| 함수 | 의미 |
+|---|---|
+| `LOG(number, [base])` | 로그. 밑 생략 시 10 |
+| `LOG10(number)` | 상용로그 |
+| `LN(number)` | 자연로그 |
+| `EXP(number)` | e^n |
+| `POWER(number, power)` | 거듭제곱 |
+| `ROUND(number, [digits])` | 엑셀 ROUND (0.5는 0에서 멀어지는 쪽) |
+| `ROUNDUP` / `ROUNDDOWN` / `TRUNC` / `INT` | 올림·내림·절사 |
+| `ABS` `SQRT` `SIGN` `MOD` `MIN` `MAX` `PI()` | 기본 수학 |
+
 - 다른 Object 변수를 수식에서 직접 참조하지 않음. Cross-object 참조는 Edge mapping만 사용
 - 수식 내 이름은 같은 Object의 input/calculation ID만 참조 가능
-- AST walk로 평가한다. `eval()` / `exec()` 사용 금지
+- AST walk로 평가한다
 
 ## 6. Python Calculation Interface
 

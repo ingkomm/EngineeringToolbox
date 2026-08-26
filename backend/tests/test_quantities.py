@@ -111,3 +111,34 @@ def test_engine_inherits_unit_for_pout_minus_number() -> None:
     assert calc.quantity == "pressure"
     assert calc.unit == "Pa"
     assert calc.status == "ok"
+
+
+def test_round_keeps_argument_quantity() -> None:
+    quantity, unit = infer_formula_quantity("ROUND(PIN, 0)", {"PIN": "pressure"})
+    assert quantity == "pressure"
+    assert unit == "Pa"
+
+
+def test_log_of_dimensionless_is_dimensionless() -> None:
+    quantity, unit = infer_formula_quantity("LOG(RATIO)", {"RATIO": "dimensionless"})
+    assert quantity == "dimensionless"
+    assert unit == "1"
+
+
+def test_log_of_pressure_raises() -> None:
+    with pytest.raises(QuantityError) as exc:
+        infer_formula_quantity("LN(PIN)", {"PIN": "pressure"})
+    assert exc.value.code == "QUANTITY_MISMATCH"
+    assert "무차원" in exc.value.message
+
+
+def test_sqrt_of_area_is_length() -> None:
+    quantity, unit = infer_formula_quantity("SQRT(AREA)", {"AREA": "area"})
+    assert quantity == "length"
+    assert unit == "m"
+
+
+def test_excel_power_operator_quantity() -> None:
+    quantity, unit = infer_formula_quantity("LEN^2", {"LEN": "length"})
+    assert quantity == "area"
+    assert unit == "m2"

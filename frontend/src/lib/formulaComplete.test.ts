@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyCandidate,
+  FORMULA_FUNCTIONS,
   identifierAt,
   matchingCandidates,
   shouldShowCallout,
@@ -24,5 +25,12 @@ describe("formula identifier autocomplete", () => {
     const token = identifierAt("X - PO", 6);
     expect(token).not.toBeNull();
     expect(applyCandidate("X - PO", token!, "POUT")).toEqual({ text: "X - POUT", cursor: 8 });
+  });
+
+  it("inserts Excel function names with an opening parenthesis", () => {
+    const token = identifierAt("RO", 2);
+    expect(token).not.toBeNull();
+    expect(applyCandidate("RO", token!, "ROUND(")).toEqual({ text: "ROUND(", cursor: 6 });
+    expect(matchingCandidates("LO", FORMULA_FUNCTIONS).map((item) => item.id)).toEqual(["LOG", "LOG10"]);
   });
 });

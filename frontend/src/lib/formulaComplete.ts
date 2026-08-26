@@ -1,7 +1,28 @@
 export interface FormulaCandidate {
   id: string;
   hint?: string;
+  insert?: string;
 }
+
+export const FORMULA_FUNCTIONS: FormulaCandidate[] = [
+  { id: "ABS", hint: "ABS(number)", insert: "ABS(" },
+  { id: "EXP", hint: "EXP(number) · e^n", insert: "EXP(" },
+  { id: "INT", hint: "INT(number)", insert: "INT(" },
+  { id: "LN", hint: "LN(number) · 자연로그", insert: "LN(" },
+  { id: "LOG", hint: "LOG(number, [base]) · 기본 밑 10", insert: "LOG(" },
+  { id: "LOG10", hint: "LOG10(number)", insert: "LOG10(" },
+  { id: "MAX", hint: "MAX(n1, n2, …)", insert: "MAX(" },
+  { id: "MIN", hint: "MIN(n1, n2, …)", insert: "MIN(" },
+  { id: "MOD", hint: "MOD(number, divisor)", insert: "MOD(" },
+  { id: "PI", hint: "PI()", insert: "PI()" },
+  { id: "POWER", hint: "POWER(number, power)", insert: "POWER(" },
+  { id: "ROUND", hint: "ROUND(number, [digits])", insert: "ROUND(" },
+  { id: "ROUNDDOWN", hint: "ROUNDDOWN(number, [digits])", insert: "ROUNDDOWN(" },
+  { id: "ROUNDUP", hint: "ROUNDUP(number, [digits])", insert: "ROUNDUP(" },
+  { id: "SIGN", hint: "SIGN(number)", insert: "SIGN(" },
+  { id: "SQRT", hint: "SQRT(number)", insert: "SQRT(" },
+  { id: "TRUNC", hint: "TRUNC(number, [digits])", insert: "TRUNC(" },
+];
 
 export function identifierAt(
   text: string,
@@ -34,8 +55,8 @@ export function shouldShowCallout(prefix: string, matches: FormulaCandidate[]): 
 export function applyCandidate(
   text: string,
   token: { start: number; end: number },
-  id: string,
+  inserted: string,
 ): { text: string; cursor: number } {
-  const next = `${text.slice(0, token.start)}${id}${text.slice(token.end)}`;
-  return { text: next, cursor: token.start + id.length };
+  const next = `${text.slice(0, token.start)}${inserted}${text.slice(token.end)}`;
+  return { text: next, cursor: token.start + inserted.length };
 }

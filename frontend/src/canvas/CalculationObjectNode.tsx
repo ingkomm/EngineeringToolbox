@@ -7,6 +7,7 @@ import {
   identifierAt,
   matchingCandidates,
   shouldShowCallout,
+  FORMULA_FUNCTIONS,
   type FormulaCandidate,
 } from "../lib/formulaComplete";
 import { VARIABLE_ID_RE, type WorkspaceEdit } from "../lib/projectEdits";
@@ -41,13 +42,15 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
     updateNodeInternals(id);
   }, [handleSignature, id, updateNodeInternals]);
 
-  const candidatesFor = (excludeId: string): FormulaCandidate[] =>
-    [...object.inputs, ...object.calculations]
+  const candidatesFor = (excludeId: string): FormulaCandidate[] => [
+    ...[...object.inputs, ...object.calculations]
       .filter((item) => item.id !== excludeId)
       .map((item) => ({
         id: item.id,
         hint: `${displayName(item)}${quantityHint(item.quantity, item.unit, quantities) ? ` · ${quantityHint(item.quantity, item.unit, quantities)}` : ""}`,
-      }));
+      })),
+    ...FORMULA_FUNCTIONS,
+  ];
 
   return (
     <article className="calc-node" data-testid={`object-${id}`}>
@@ -172,7 +175,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
           </button>
         </div>
         {object.calculations.length === 0 ? (
-          <p className="calc-empty">수식을 직접 작성하세요. 연산자: + - * / ** % 와 괄호</p>
+          <p className="calc-empty">수식: + - * / ^ % 와 괄호, LOG LN EXP ROUND POWER SQRT ABS</p>
         ) : null}
         {object.calculations.map((item, index) => (
           <div
@@ -399,7 +402,7 @@ function FormulaField({
             if (event.key === "Enter" || event.key === "Tab") {
               event.preventDefault();
               const chosen = visible[active] ?? visible[0];
-              if (chosen) apply(chosen.id);
+              if (chosen) apply(chosen.insert ?? chosen.id);
               return;
             }
             if (event.key === "Escape") {
@@ -426,7 +429,7 @@ function FormulaField({
       {visible.length > 0 ? (
         <ul className="formula-complete__list nodrag nopan nowheel" data-testid={`${testId}-complete`} role="listbox">
           {visible.map((item, index) => (
-            <li key={item.id}>
+            <li key={`${item.insert ?? "id"}:${item.id}`}>
               <button
                 type="button"
                 className="formula-complete__item"
@@ -435,7 +438,7 @@ function FormulaField({
                 aria-selected={index === active}
                 onMouseDown={(event) => event.preventDefault()}
                 onMouseEnter={() => setActive(index)}
-                onClick={() => apply(item.id)}
+                onClick={() => apply(item.insert ?? item.id)}
               >
                 <span>{item.id}</span>
                 {item.hint ? <span className="formula-complete__hint">{item.hint}</span> : null}
