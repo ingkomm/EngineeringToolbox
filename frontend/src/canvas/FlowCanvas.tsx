@@ -13,6 +13,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
+import { ArrangementObjectNode } from "./ArrangementObjectNode";
 import { CalculationObjectNode } from "./CalculationObjectNode";
 import { MappingEdge } from "./MappingEdge";
 import { mergeFlowNodes, toFlowEdges, toFlowNodeRecords } from "./flowModel";
@@ -20,8 +21,12 @@ import { parseHandleId } from "../lib/display";
 import type { WorkspaceEdit } from "../lib/projectEdits";
 import type { QuantitySpec } from "../lib/quantities";
 import type { ProjectDocument } from "../types/contract";
+import { isArrangementObject, isCalculationObject, isValueFlowEdge } from "../lib/worksheet";
 
-const nodeTypes = { calculationObject: CalculationObjectNode };
+const nodeTypes = {
+  calculationObject: CalculationObjectNode,
+  arrangementObject: ArrangementObjectNode,
+};
 const edgeTypes = { mapping: MappingEdge };
 
 const defaultEdgeOptions = {
@@ -43,6 +48,24 @@ function toFlowNodes(
   onEdit: (edit: WorkspaceEdit) => void,
 ) {
   return toFlowNodeRecords(project, quantities, onEdit);
+}
+
+function endpointExists(
+  project: ProjectDocument,
+  objectId: string | null | undefined,
+  portId: string,
+  role: "source" | "target",
+): boolean {
+  if (!objectId) return false;
+  const object = project.objects.find((item) => item.id === objectId);
+  if (!object) return false;
+  if (isArrangementObject(object)) {
+    return object.domain.points.some((point) => point.id === portId);
+  }
+  if (!isCalculationObject(object)) return false;
+  return role === "source"
+    ? object.outputs.some((item) => item.id === portId)
+    : object.inputs.some((item) => item.id === portId);
 }
 
 export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: FlowCanvasProps) {
@@ -76,15 +99,23 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
       if (!connection.source || !connection.target || source?.kind !== "out" || target?.kind !== "in") {
         return;
       }
+      const sourceObject = project.objects.find((item) => item.id === connection.source);
+      const targetObject = project.objects.find((item) => item.id === connection.target);
+      const relationType =
+        (sourceObject && isArrangementObject(sourceObject)) ||
+        (targetObject && isArrangementObject(targetObject))
+          ? "association"
+          : "value_flow";
       onEdit({
         type: "connectMapping",
         sourceObjectId: connection.source,
         sourceVariableId: source.variableId,
         targetObjectId: connection.target,
         targetVariableId: target.variableId,
+        relationType,
       });
     },
-    [onEdit],
+    [onEdit, project.objects],
   );
 
   const isValidConnection = useCallback(
@@ -94,18 +125,32 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
       if (source?.kind !== "out" || target?.kind !== "in" || connection.source === connection.target) {
         return false;
       }
+      const sourceObject = project.objects.find((item) => item.id === connection.source);
       const targetObject = project.objects.find((item) => item.id === connection.target);
-      if (!targetObject) return false;
+      if (!sourceObject || !targetObject) return false;
+      if (isArrangementObject(sourceObject) || isArrangementObject(targetObject)) {
+        return (
+          endpointExists(project, connection.source, source.variableId, "source") &&
+          endpointExists(project, connection.target, target.variableId, "target")
+        );
+      }
+      if (!isCalculationObject(targetObject)) return false;
       if (targetObject.calculations.some((item) => item.id === source.variableId)) return false;
       const sourceBusy = project.edges.some(
-        (edge) => edge.sourceObjectId === connection.source && edge.sourceVariableId === source.variableId,
+        (edge) =>
+          isValueFlowEdge(edge) &&
+          edge.sourceObjectId === connection.source &&
+          edge.sourceVariableId === source.variableId,
       );
       const targetBusy = project.edges.some(
-        (edge) => edge.targetObjectId === connection.target && edge.targetVariableId === target.variableId,
+        (edge) =>
+          isValueFlowEdge(edge) &&
+          edge.targetObjectId === connection.target &&
+          edge.targetVariableId === target.variableId,
       );
       return !sourceBusy && !targetBusy;
     },
-    [project.edges, project.objects],
+    [project],
   );
 
   return (
@@ -145,6 +190,14 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
           onClick={() => onEdit({ type: "addObject" })}
         >
           + 객체 추가
+        </button>
+        <button
+          type="button"
+          className="ghost-btn"
+          data-testid="btn-add-arrangement"
+          onClick={() => onEdit({ type: "addArrangement" })}
+        >
+          + Arrangement
         </button>
       </Panel>
     </ReactFlow>

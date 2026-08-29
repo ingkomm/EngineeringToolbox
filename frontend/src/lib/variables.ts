@@ -1,4 +1,5 @@
 import type { CalculationObject, MappingEdge, ProjectDocument } from "../types/contract";
+import { isCalculationObject, isValueFlowEdge } from "./worksheet";
 
 export function displayName(item: { id: string; name?: string | null }): string {
   const name = item.name?.trim();
@@ -7,7 +8,9 @@ export function displayName(item: { id: string; name?: string | null }): string 
 
 export function enabledMappedKeys(edges: MappingEdge[]): Set<string> {
   return new Set(
-    edges.filter((edge) => edge.enabled !== false).map((edge) => `${edge.targetObjectId}::${edge.targetVariableId}`),
+    edges
+      .filter((edge) => edge.enabled !== false && isValueFlowEdge(edge))
+      .map((edge) => `${edge.targetObjectId}::${edge.targetVariableId}`),
   );
 }
 
@@ -25,6 +28,7 @@ export function ownedVariables(project: ProjectDocument): OwnedVariable[] {
   const mapped = enabledMappedKeys(project.edges);
   const owned: OwnedVariable[] = [];
   for (const object of project.objects) {
+    if (!isCalculationObject(object)) continue;
     for (const item of object.calculations) {
       owned.push({ objectId: object.id, id: item.id, name: displayName(item) });
     }
@@ -38,7 +42,10 @@ export function ownedVariables(project: ProjectDocument): OwnedVariable[] {
 }
 
 export function allVariableIds(project: ProjectDocument): string[] {
-  return project.objects.flatMap((object) => [...object.inputs, ...object.calculations].map((item) => item.id));
+  return project.objects.flatMap((object) => {
+    if (!isCalculationObject(object)) return [];
+    return [...object.inputs, ...object.calculations].map((item) => item.id);
+  });
 }
 
 export function identityTaken(

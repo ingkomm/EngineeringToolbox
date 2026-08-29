@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from collections import defaultdict, deque
 
 from engcalc.formulas import FormulaError, evaluate_formula, referenced_names, rewrite_identifier
@@ -11,13 +10,15 @@ from engcalc.models import (
     EvaluateResponse,
     FormulaVariable,
     InputVariable,
+    OBJECT_ID_RE,
     OutputBinding,
     ProjectDocument,
+    VARIABLE_ID_RE,
+    is_arrangement_object,
+    is_calculation_object,
+    is_value_flow_edge,
 )
 from engcalc.quantities import QuantityError, infer_formula_quantity, is_known_quantity, si_unit_for
-
-VARIABLE_ID_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-OBJECT_ID_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 
 
 def evaluate_project(
@@ -50,9 +51,10 @@ def evaluate_project(
     ):
         return EvaluateResponse(project=working, evaluatedObjectIds=[], errors=errors)
 
+    calculation_ids = [obj.id for obj in working.objects if is_calculation_object(obj)]
     try:
         object_graph = _object_adjacency(working)
-        order = _topological_sort(list(objects_by_id), object_graph)
+        order = _topological_sort(calculation_ids, object_graph)
     except GraphError as exc:
         errors.append(EvalError(code=exc.code, message=exc.message))
         return EvaluateResponse(project=working, evaluatedObjectIds=[], errors=errors)
@@ -61,12 +63,13 @@ def evaluate_project(
     evaluated: list[str] = []
 
     inbound = _inbound_edges(working.edges)
+    calc_by_id = {obj.id: obj for obj in working.objects if is_calculation_object(obj)}
 
     for object_id in order:
         if object_id not in affected:
             continue
-        obj = objects_by_id[object_id]
-        obj_errors = _evaluate_object(obj, objects_by_id, inbound.get(object_id, []))
+        obj = calc_by_id[object_id]
+        obj_errors = _evaluate_object(obj, calc_by_id, inbound.get(object_id, []))
         errors.extend(obj_errors)
         evaluated.append(object_id)
 
@@ -115,12 +118,14 @@ def _validate_structure(project: ProjectDocument) -> list[EvalError]:
     mapped_keys = {
         (edge.targetObjectId, edge.targetVariableId)
         for edge in project.edges
-        if edge.enabled
+        if edge.enabled and is_value_flow_edge(edge)
     }
     seen_ids: dict[str, tuple[str, str]] = {}
     seen_names: dict[str, tuple[str, str]] = {}
 
     for obj in project.objects:
+        if is_arrangement_object(obj):
+            continue
         local_seen: set[str] = set()
         owned: list[tuple[str, str, str]] = []
         for item in obj.calculations:
@@ -239,55 +244,107 @@ def _validate_structure(project: ProjectDocument) -> list[EvalError]:
             continue
         source = next(obj for obj in project.objects if obj.id == edge.sourceObjectId)
         target = next(obj for obj in project.objects if obj.id == edge.targetObjectId)
-        if not any(item.id == edge.sourceVariableId for item in source.outputs):
+        if is_value_flow_edge(edge):
+            if is_arrangement_object(source) or is_arrangement_object(target):
+                errors.append(
+                    EvalError(
+                        objectId=source.id if is_arrangement_object(source) else target.id,
+                        variableId=edge.sourceVariableId
+                        if is_arrangement_object(source)
+                        else edge.targetVariableId,
+                        code="ARRANGEMENT_HAS_NO_VALUE",
+                        message=(
+                            f"Edge {edge.id} cannot use value_flow with an Arrangement Object. "
+                            "Arrangement does not calculate values; use association or reference."
+                        ),
+                    )
+                )
+                continue
+            if not any(item.id == edge.sourceVariableId for item in source.outputs):
+                errors.append(
+                    EvalError(
+                        objectId=edge.sourceObjectId,
+                        variableId=edge.sourceVariableId,
+                        code="UNKNOWN_OUTPUT_PORT",
+                        message=f"Edge {edge.id} source is not an output port",
+                    )
+                )
+            if not any(item.id == edge.targetVariableId for item in target.inputs):
+                errors.append(
+                    EvalError(
+                        objectId=edge.targetObjectId,
+                        variableId=edge.targetVariableId,
+                        code="UNKNOWN_INPUT_PORT",
+                        message=f"Edge {edge.id} target is not an input port",
+                    )
+                )
+            key = (edge.targetObjectId, edge.targetVariableId)
+            if key in occupied_targets:
+                errors.append(
+                    EvalError(
+                        objectId=edge.targetObjectId,
+                        variableId=edge.targetVariableId,
+                        code="FAN_IN_CONFLICT",
+                        message=f"Input {edge.targetVariableId} already has a mapping",
+                    )
+                )
+            occupied_targets[key] = edge.id
+            source_key = (edge.sourceObjectId, edge.sourceVariableId)
+            if source_key in occupied_sources:
+                errors.append(
+                    EvalError(
+                        objectId=edge.sourceObjectId,
+                        variableId=edge.sourceVariableId,
+                        code="FAN_OUT_CONFLICT",
+                        message=(
+                            f"Output {edge.sourceVariableId} is already mapped to another input"
+                        ),
+                    )
+                )
+            occupied_sources[source_key] = edge.id
+            continue
+
+        if not _has_source_endpoint(source, edge.sourceVariableId):
             errors.append(
                 EvalError(
                     objectId=edge.sourceObjectId,
                     variableId=edge.sourceVariableId,
-                    code="UNKNOWN_OUTPUT_PORT",
-                    message=f"Edge {edge.id} source is not an output port",
+                    code="UNKNOWN_POINT" if is_arrangement_object(source) else "UNKNOWN_OUTPUT_PORT",
+                    message=f"Edge {edge.id} source port/point does not exist",
                 )
             )
-        if not any(item.id == edge.targetVariableId for item in target.inputs):
+        if not _has_target_endpoint(target, edge.targetVariableId):
             errors.append(
                 EvalError(
                     objectId=edge.targetObjectId,
                     variableId=edge.targetVariableId,
-                    code="UNKNOWN_INPUT_PORT",
-                    message=f"Edge {edge.id} target is not an input port",
+                    code="UNKNOWN_POINT" if is_arrangement_object(target) else "UNKNOWN_INPUT_PORT",
+                    message=f"Edge {edge.id} target port/point does not exist",
                 )
             )
-        key = (edge.targetObjectId, edge.targetVariableId)
-        if key in occupied_targets:
-            errors.append(
-                EvalError(
-                    objectId=edge.targetObjectId,
-                    variableId=edge.targetVariableId,
-                    code="FAN_IN_CONFLICT",
-                    message=f"Input {edge.targetVariableId} already has a mapping",
-                )
-            )
-        occupied_targets[key] = edge.id
-        source_key = (edge.sourceObjectId, edge.sourceVariableId)
-        if source_key in occupied_sources:
-            errors.append(
-                EvalError(
-                    objectId=edge.sourceObjectId,
-                    variableId=edge.sourceVariableId,
-                    code="FAN_OUT_CONFLICT",
-                    message=(
-                        f"Output {edge.sourceVariableId} is already mapped to another input"
-                    ),
-                )
-            )
-        occupied_sources[source_key] = edge.id
 
     return errors
 
 
+def _has_source_endpoint(obj: CalculationObject | object, port_id: str) -> bool:
+    if is_arrangement_object(obj):
+        return any(point.id == port_id for point in obj.domain.points)
+    return any(item.id == port_id for item in obj.outputs)
+
+
+def _has_target_endpoint(obj: CalculationObject | object, port_id: str) -> bool:
+    if is_arrangement_object(obj):
+        return any(point.id == port_id for point in obj.domain.points)
+    return any(item.id == port_id for item in obj.inputs)
+
+
 def _object_adjacency(project: ProjectDocument) -> dict[str, set[str]]:
-    graph: dict[str, set[str]] = {obj.id: set() for obj in project.objects}
+    graph: dict[str, set[str]] = {
+        obj.id: set() for obj in project.objects if is_calculation_object(obj)
+    }
     for edge in project.edges:
+        if not is_value_flow_edge(edge):
+            continue
         if edge.sourceObjectId in graph and edge.targetObjectId in graph:
             if edge.sourceObjectId == edge.targetObjectId:
                 raise GraphError(
@@ -343,6 +400,8 @@ def _affected_object_ids(
 def _inbound_edges(edges: list[Edge]) -> dict[str, list[Edge]]:
     grouped: dict[str, list[Edge]] = defaultdict(list)
     for edge in edges:
+        if not is_value_flow_edge(edge):
+            continue
         grouped[edge.targetObjectId].append(edge)
     return grouped
 

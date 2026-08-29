@@ -11,7 +11,12 @@
     "name": { "type": "string" },
     "objects": {
       "type": "array",
-      "items": { "$ref": "#/$defs/calculationObject" }
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/calculationObject" },
+          { "$ref": "#/$defs/arrangementObject" }
+        ]
+      }
     },
     "edges": {
       "type": "array",
@@ -85,6 +90,7 @@
       "additionalProperties": false,
       "required": ["id", "name", "position", "inputs", "calculations", "outputs"],
       "properties": {
+        "kind": { "type": "string", "const": "calculation" },
         "id": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$" },
         "name": { "type": "string", "minLength": 1 },
         "position": { "$ref": "#/$defs/position" },
@@ -100,6 +106,118 @@
           "type": "array",
           "items": { "$ref": "#/$defs/outputBinding" }
         }
+      }
+    },
+    "elementView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" },
+        "rotation": { "type": "number" },
+        "zIndex": { "type": "integer" },
+        "visible": { "type": "boolean" }
+      }
+    },
+    "arrangementNamedSymbol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "$ref": "#/$defs/variableId" },
+        "name": { "type": "string" },
+        "symbolId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "arrangementPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "$ref": "#/$defs/variableId" },
+        "name": { "type": "string" },
+        "attachedToId": { "type": ["string", "null"] }
+      }
+    },
+    "arrangementConnector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sourceId", "targetId"],
+      "properties": {
+        "id": { "$ref": "#/$defs/variableId" },
+        "sourceId": { "$ref": "#/$defs/variableId" },
+        "targetId": { "$ref": "#/$defs/variableId" }
+      }
+    },
+    "arrangementAnnotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "$ref": "#/$defs/variableId" },
+        "text": { "type": "string" }
+      }
+    },
+    "arrangementDomain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["equipment", "valves", "points", "pipes", "signals", "annotations"],
+      "properties": {
+        "equipment": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/arrangementNamedSymbol" }
+        },
+        "valves": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/arrangementNamedSymbol" }
+        },
+        "points": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/arrangementPoint" }
+        },
+        "pipes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/arrangementConnector" }
+        },
+        "signals": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/arrangementConnector" }
+        },
+        "annotations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/arrangementAnnotation" }
+        }
+      }
+    },
+    "arrangementView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height", "elements"],
+      "properties": {
+        "width": { "type": "number" },
+        "height": { "type": "number" },
+        "rotation": { "type": "number" },
+        "zIndex": { "type": "integer" },
+        "elements": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/elementView" }
+        }
+      }
+    },
+    "arrangementObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "name", "position", "domain", "view"],
+      "properties": {
+        "kind": { "type": "string", "const": "arrangement" },
+        "id": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$" },
+        "name": { "type": "string", "minLength": 1 },
+        "position": { "$ref": "#/$defs/position" },
+        "domain": { "$ref": "#/$defs/arrangementDomain" },
+        "view": { "$ref": "#/$defs/arrangementView" }
       }
     },
     "edge": {
@@ -119,7 +237,11 @@
         "targetObjectId": { "type": "string" },
         "targetVariableId": { "$ref": "#/$defs/variableId" },
         "enabled": { "type": "boolean" },
-        "collapsed": { "type": "boolean" }
+        "collapsed": { "type": "boolean" },
+        "relationType": {
+          "type": "string",
+          "enum": ["value_flow", "reference", "association"]
+        }
       }
     }
   }

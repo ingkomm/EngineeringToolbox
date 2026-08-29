@@ -1,4 +1,12 @@
-import type { CalculationObject, FormulaVariable, InputVariable, OutputBinding, ProjectDocument } from "../types/contract";
+import type {
+  ArrangementObject,
+  CalculationObject,
+  FormulaVariable,
+  InputVariable,
+  OutputBinding,
+  ProjectDocument,
+  RelationType,
+} from "../types/contract";
 import { blankProject } from "../example/blankProject";
 import { prototypeProject } from "../example/prototypeProject";
 import { siUnitFor, type QuantitySpec } from "./quantities";
@@ -8,12 +16,22 @@ import {
   nextGlobalPrefixedId,
   sourceVariable,
 } from "./variables";
+import {
+  arrangementElementIds,
+  arrangementNodeIds,
+  defaultElementView,
+  emptyArrangementDomain,
+  isArrangementObject,
+  isCalculationObject,
+  isValueFlowEdge,
+} from "./worksheet";
 
 export const VARIABLE_ID_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 export const OBJECT_ID_RE = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 
 export type WorkspaceEdit =
   | { type: "addObject" }
+  | { type: "addArrangement" }
   | { type: "deleteObject"; objectId: string }
   | { type: "renameObject"; objectId: string; name: string }
   | { type: "updateObject"; objectId: string; patch: { id?: string; name?: string } }
@@ -32,6 +50,7 @@ export type WorkspaceEdit =
       sourceVariableId: string;
       targetObjectId: string;
       targetVariableId: string;
+      relationType?: RelationType;
     }
   | {
       type: "connectBySearch";
@@ -39,10 +58,21 @@ export type WorkspaceEdit =
       sourceVariableId: string;
       targetObjectId: string;
       targetVariableId?: string;
+      relationType?: RelationType;
     }
   | { type: "toggleEdge"; edgeId: string }
   | { type: "toggleEdgeCollapsed"; edgeId: string }
   | { type: "deleteEdges"; edgeIds: string[] }
+  | { type: "addEquipment"; objectId: string }
+  | { type: "addValve"; objectId: string }
+  | { type: "addPoint"; objectId: string; attachedToId?: string | null }
+  | { type: "updatePoint"; objectId: string; pointId: string; patch: { id?: string; name?: string } }
+  | { type: "addPipe"; objectId: string; sourceId: string; targetId: string }
+  | { type: "addSignal"; objectId: string; sourceId: string; targetId: string }
+  | { type: "addAnnotation"; objectId: string }
+  | { type: "updateAnnotation"; objectId: string; annotationId: string; text: string }
+  | { type: "moveElement"; objectId: string; elementId: string; x: number; y: number }
+  | { type: "loadProject"; project: ProjectDocument }
   | { type: "loadExample" }
   | { type: "newWorkspace" };
 
@@ -64,6 +94,13 @@ function nextObjectName(project: ProjectDocument): string {
   let n = 1;
   while (used.has(`Object ${n}`)) n += 1;
   return `Object ${n}`;
+}
+
+function nextArrangementName(project: ProjectDocument): string {
+  const used = new Set(project.objects.map((item) => item.name.trim()));
+  let n = 1;
+  while (used.has(`Arrangement ${n}`)) n += 1;
+  return `Arrangement ${n}`;
 }
 
 function objectIdentityTaken(
@@ -100,7 +137,24 @@ function patchObject(
 ): ProjectDocument {
   return {
     ...project,
-    objects: project.objects.map((object) => (object.id === objectId ? mutate(object) : object)),
+    objects: project.objects.map((object) => {
+      if (object.id !== objectId || !isCalculationObject(object)) return object;
+      return mutate(object);
+    }),
+  };
+}
+
+function patchArrangement(
+  project: ProjectDocument,
+  objectId: string,
+  mutate: (object: ArrangementObject) => ArrangementObject,
+): ProjectDocument {
+  return {
+    ...project,
+    objects: project.objects.map((object) => {
+      if (object.id !== objectId || !isArrangementObject(object)) return object;
+      return mutate(object);
+    }),
   };
 }
 
@@ -144,16 +198,22 @@ export function syncObjectOutputs(object: CalculationObject): CalculationObject 
 }
 
 function syncProjectObject(project: ProjectDocument, objectId: string): ProjectDocument {
+  const current = project.objects.find((item) => item.id === objectId);
+  if (!current || !isCalculationObject(current)) return project;
   const next = patchObject(project, objectId, syncObjectOutputs);
   const object = next.objects.find((item) => item.id === objectId);
-  if (!object) return next;
+  if (!object || !isCalculationObject(object)) return next;
   const outputIds = new Set(object.outputs.map((item) => item.id));
   const inputIds = new Set(object.inputs.map((item) => item.id));
   return {
     ...next,
     edges: next.edges.filter((edge) => {
-      if (edge.sourceObjectId === objectId && !outputIds.has(edge.sourceVariableId)) return false;
-      if (edge.targetObjectId === objectId && !inputIds.has(edge.targetVariableId)) return false;
+      if (edge.sourceObjectId === objectId && isValueFlowEdge(edge) && !outputIds.has(edge.sourceVariableId)) {
+        return false;
+      }
+      if (edge.targetObjectId === objectId && isValueFlowEdge(edge) && !inputIds.has(edge.targetVariableId)) {
+        return false;
+      }
       return true;
     }),
   };
@@ -162,23 +222,26 @@ function syncProjectObject(project: ProjectDocument, objectId: string): ProjectD
 function syncAllObjects(project: ProjectDocument): ProjectDocument {
   return {
     ...project,
-    objects: project.objects.map(syncObjectOutputs),
+    objects: project.objects.map((object) => (isCalculationObject(object) ? syncObjectOutputs(object) : object)),
   };
 }
 
 function rekeyGlobalVariable(project: ProjectDocument, fromId: string, toId: string, nextName: string): ProjectDocument {
   const renamed: ProjectDocument = {
     ...project,
-    objects: project.objects.map((object) => ({
-      ...object,
-      inputs: object.inputs.map((item) => (item.id === fromId ? { ...item, id: toId, name: nextName } : item)),
-      calculations: object.calculations.map((item) => ({
-        ...item,
-        id: item.id === fromId ? toId : item.id,
-        name: item.id === fromId ? nextName : item.name,
-        formula: rewriteIdentifier(item.formula, fromId, toId),
-      })),
-    })),
+    objects: project.objects.map((object) => {
+      if (!isCalculationObject(object)) return object;
+      return {
+        ...object,
+        inputs: object.inputs.map((item) => (item.id === fromId ? { ...item, id: toId, name: nextName } : item)),
+        calculations: object.calculations.map((item) => ({
+          ...item,
+          id: item.id === fromId ? toId : item.id,
+          name: item.id === fromId ? nextName : item.name,
+          formula: rewriteIdentifier(item.formula, fromId, toId),
+        })),
+      };
+    }),
     edges: project.edges.map((edge) => ({
       ...edge,
       sourceVariableId: edge.sourceVariableId === fromId ? toId : edge.sourceVariableId,
@@ -191,13 +254,16 @@ function rekeyGlobalVariable(project: ProjectDocument, fromId: string, toId: str
 function applyDisplayName(project: ProjectDocument, variableId: string, nextName: string): ProjectDocument {
   return syncAllObjects({
     ...project,
-    objects: project.objects.map((object) => ({
-      ...object,
-      inputs: object.inputs.map((item) => (item.id === variableId ? { ...item, name: nextName } : item)),
-      calculations: object.calculations.map((item) =>
-        item.id === variableId ? { ...item, name: nextName } : item,
-      ),
-    })),
+    objects: project.objects.map((object) => {
+      if (!isCalculationObject(object)) return object;
+      return {
+        ...object,
+        inputs: object.inputs.map((item) => (item.id === variableId ? { ...item, name: nextName } : item)),
+        calculations: object.calculations.map((item) =>
+          item.id === variableId ? { ...item, name: nextName } : item,
+        ),
+      };
+    }),
   });
 }
 
@@ -277,7 +343,10 @@ function sourcePortTaken(
   sourceVariableId: string,
 ): boolean {
   return project.edges.some(
-    (edge) => edge.sourceObjectId === sourceObjectId && edge.sourceVariableId === sourceVariableId,
+    (edge) =>
+      isValueFlowEdge(edge) &&
+      edge.sourceObjectId === sourceObjectId &&
+      edge.sourceVariableId === sourceVariableId,
   );
 }
 
@@ -287,7 +356,10 @@ function targetPortTaken(
   targetVariableId: string,
 ): boolean {
   return project.edges.some(
-    (edge) => edge.targetObjectId === targetObjectId && edge.targetVariableId === targetVariableId,
+    (edge) =>
+      isValueFlowEdge(edge) &&
+      edge.targetObjectId === targetObjectId &&
+      edge.targetVariableId === targetVariableId,
   );
 }
 
@@ -301,10 +373,17 @@ export function applyWorkspaceEdit(
       return { project: structuredClone(blankProject), dirtyObjectIds: [], shouldEvaluate: false };
     case "loadExample":
       return { project: syncAllObjects(structuredClone(prototypeProject)), dirtyObjectIds: [], shouldEvaluate: true };
+    case "loadProject":
+      return {
+        project: syncAllObjects(structuredClone(edit.project)),
+        dirtyObjectIds: [],
+        shouldEvaluate: edit.project.objects.some(isCalculationObject),
+      };
     case "addObject": {
       const id = nextObjectId(project);
       const index = project.objects.length;
       const object: CalculationObject = {
+        kind: "calculation",
         id,
         name: nextObjectName(project),
         position: { x: 80 + index * 980, y: 88 },
@@ -312,6 +391,15 @@ export function applyWorkspaceEdit(
         calculations: [],
         outputs: [],
       };
+      return { project: { ...project, objects: [...project.objects, object] }, dirtyObjectIds: [], shouldEvaluate: false };
+    }
+    case "addArrangement": {
+      const id = nextObjectId(project);
+      const index = project.objects.length;
+      const object = defaultArrangement(id, nextArrangementName(project), {
+        x: 80,
+        y: 88 + index * 40,
+      });
       return { project: { ...project, objects: [...project.objects, object] }, dirtyObjectIds: [], shouldEvaluate: false };
     }
     case "deleteObject":
@@ -354,6 +442,8 @@ export function applyWorkspaceEdit(
       };
     }
     case "addInput": {
+      const current = project.objects.find((item) => item.id === edit.objectId);
+      if (!current || !isCalculationObject(current)) return { project, dirtyObjectIds: [], shouldEvaluate: false };
       const id = nextGlobalPrefixedId(project, "IN");
       return {
         project: syncProjectObject(
@@ -380,10 +470,16 @@ export function applyWorkspaceEdit(
         shouldEvaluate: true,
       };
     case "updateInput": {
-      const current = project.objects.find((item) => item.id === edit.objectId)?.inputs[edit.index];
+      const host = project.objects.find((item) => item.id === edit.objectId);
+      if (!host || !isCalculationObject(host)) return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      const current = host.inputs[edit.index];
       if (!current) return { project, dirtyObjectIds: [], shouldEvaluate: false };
       const enabledMapped = project.edges.some(
-        (edge) => edge.enabled !== false && edge.targetObjectId === edit.objectId && edge.targetVariableId === current.id,
+        (edge) =>
+          edge.enabled !== false &&
+          isValueFlowEdge(edge) &&
+          edge.targetObjectId === edit.objectId &&
+          edge.targetVariableId === current.id,
       );
       if (enabledMapped && (edit.patch.id || edit.patch.name)) {
         return { project, dirtyObjectIds: [], shouldEvaluate: false };
@@ -420,6 +516,8 @@ export function applyWorkspaceEdit(
       };
     }
     case "addCalculation": {
+      const current = project.objects.find((item) => item.id === edit.objectId);
+      if (!current || !isCalculationObject(current)) return { project, dirtyObjectIds: [], shouldEvaluate: false };
       const id = nextGlobalPrefixedId(project, "CALC");
       return {
         project: syncProjectObject(
@@ -449,7 +547,9 @@ export function applyWorkspaceEdit(
         shouldEvaluate: true,
       };
     case "updateCalculation": {
-      const current = project.objects.find((item) => item.id === edit.objectId)?.calculations[edit.index];
+      const host = project.objects.find((item) => item.id === edit.objectId);
+      if (!host || !isCalculationObject(host)) return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      const current = host.calculations[edit.index];
       if (!current) return { project, dirtyObjectIds: [], shouldEvaluate: false };
       const patch = withSiUnit(withIdentityPatch(current, edit.patch as Partial<FormulaVariable>), catalog);
       if (patch.id !== current.id && identityTaken(project, { id: patch.id }, { objectId: edit.objectId, id: current.id })) {
@@ -496,6 +596,45 @@ export function applyWorkspaceEdit(
       if (!sourceObject || !targetObject || edit.sourceObjectId === edit.targetObjectId) {
         return { project, dirtyObjectIds: [], shouldEvaluate: false };
       }
+      const relationType: RelationType =
+        edit.relationType ??
+        (isArrangementObject(sourceObject) || isArrangementObject(targetObject) ? "association" : "value_flow");
+      if (relationType !== "value_flow") {
+        if (!_endpointExists(sourceObject, edit.sourceVariableId, "source") || !_endpointExists(targetObject, edit.targetVariableId, "target")) {
+          return { project, dirtyObjectIds: [], shouldEvaluate: false };
+        }
+        const duplicate = project.edges.some(
+          (edge) =>
+            edge.sourceObjectId === edit.sourceObjectId &&
+            edge.sourceVariableId === edit.sourceVariableId &&
+            edge.targetObjectId === edit.targetObjectId &&
+            edge.targetVariableId === edit.targetVariableId,
+        );
+        if (duplicate) return { project, dirtyObjectIds: [], shouldEvaluate: false };
+        return {
+          project: {
+            ...project,
+            edges: [
+              ...project.edges,
+              {
+                id: `edge-${edit.sourceObjectId}-${edit.sourceVariableId}-${edit.targetObjectId}-${edit.targetVariableId}`,
+                sourceObjectId: edit.sourceObjectId,
+                sourceVariableId: edit.sourceVariableId,
+                targetObjectId: edit.targetObjectId,
+                targetVariableId: edit.targetVariableId,
+                enabled: true,
+                collapsed: false,
+                relationType,
+              },
+            ],
+          },
+          dirtyObjectIds: [],
+          shouldEvaluate: false,
+        };
+      }
+      if (!isCalculationObject(sourceObject) || !isCalculationObject(targetObject)) {
+        return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      }
       const source = sourceVariable(sourceObject, edit.sourceVariableId);
       const target = targetObject.inputs.find((item) => item.id === edit.targetVariableId);
       if (!source || !target) return { project, dirtyObjectIds: [], shouldEvaluate: false };
@@ -539,6 +678,7 @@ export function applyWorkspaceEdit(
             targetVariableId: source.id,
             enabled: true,
             collapsed: false,
+            relationType: "value_flow",
           },
         ],
       };
@@ -552,14 +692,26 @@ export function applyWorkspaceEdit(
       if (edit.sourceObjectId === edit.targetObjectId) {
         return { project, dirtyObjectIds: [], shouldEvaluate: false };
       }
-      if (sourcePortTaken(project, edit.sourceObjectId, edit.sourceVariableId)) {
+      const targetObject = project.objects.find((item) => item.id === edit.targetObjectId);
+      const sourceObject = project.objects.find((item) => item.id === edit.sourceObjectId);
+      const relationType: RelationType =
+        edit.relationType ??
+        ((sourceObject && isArrangementObject(sourceObject)) ||
+        (targetObject && isArrangementObject(targetObject))
+          ? "association"
+          : "value_flow");
+      if (relationType === "value_flow" && sourcePortTaken(project, edit.sourceObjectId, edit.sourceVariableId)) {
         return { project, dirtyObjectIds: [], shouldEvaluate: false };
       }
       let next = project;
       let targetVariableId = edit.targetVariableId;
       if (!targetVariableId) {
+        if (!targetObject || isArrangementObject(targetObject)) {
+          return { project, dirtyObjectIds: [], shouldEvaluate: false };
+        }
         next = applyWorkspaceEdit(next, { type: "addInput", objectId: edit.targetObjectId }, catalog).project;
-        targetVariableId = next.objects.find((item) => item.id === edit.targetObjectId)?.inputs.at(-1)?.id;
+        const created = next.objects.find((item) => item.id === edit.targetObjectId);
+        targetVariableId = created && isCalculationObject(created) ? created.inputs.at(-1)?.id : undefined;
       }
       if (!targetVariableId) return { project, dirtyObjectIds: [], shouldEvaluate: false };
       return applyWorkspaceEdit(
@@ -570,6 +722,7 @@ export function applyWorkspaceEdit(
           sourceVariableId: edit.sourceVariableId,
           targetObjectId: edit.targetObjectId,
           targetVariableId,
+          relationType,
         },
         catalog,
       );
@@ -577,6 +730,18 @@ export function applyWorkspaceEdit(
     case "toggleEdge": {
       const edge = project.edges.find((item) => item.id === edit.edgeId);
       if (!edge) return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      if (!isValueFlowEdge(edge)) {
+        return {
+          project: {
+            ...project,
+            edges: project.edges.map((item) =>
+              item.id === edge.id ? { ...item, enabled: item.enabled === false } : item,
+            ),
+          },
+          dirtyObjectIds: [],
+          shouldEvaluate: false,
+        };
+      }
       if (edge.enabled !== false) {
         const detached = detachMappedInput(project, edge.targetObjectId, edge.targetVariableId);
         const next = {
@@ -592,7 +757,10 @@ export function applyWorkspaceEdit(
         };
       }
       const sourceObject = project.objects.find((item) => item.id === edge.sourceObjectId);
-      const source = sourceObject ? sourceVariable(sourceObject, edge.sourceVariableId) : null;
+      const source =
+        sourceObject && isCalculationObject(sourceObject)
+          ? sourceVariable(sourceObject, edge.sourceVariableId)
+          : null;
       if (!source) return { project, dirtyObjectIds: [], shouldEvaluate: false };
       const oldId = edge.targetVariableId;
       const inherited = sourceQuantityFields(source, catalog);
@@ -639,7 +807,7 @@ export function applyWorkspaceEdit(
       const dropping = project.edges.filter((edge) => removed.has(edge.id));
       let next = project;
       for (const edge of dropping) {
-        if (edge.enabled !== false) {
+        if (edge.enabled !== false && isValueFlowEdge(edge)) {
           next = detachMappedInput(next, edge.targetObjectId, edge.targetVariableId).project;
         }
       }
@@ -647,11 +815,300 @@ export function applyWorkspaceEdit(
       next = syncAllObjects(next);
       return {
         project: next,
-        dirtyObjectIds: dropping.map((edge) => edge.targetObjectId),
-        shouldEvaluate: true,
+        dirtyObjectIds: dropping.filter(isValueFlowEdge).map((edge) => edge.targetObjectId),
+        shouldEvaluate: dropping.some(isValueFlowEdge),
       };
     }
+    case "addEquipment":
+      return addArrangementSymbol(project, edit.objectId, "equipment");
+    case "addValve":
+      return addArrangementSymbol(project, edit.objectId, "valve");
+    case "addPoint":
+      return addArrangementPoint(project, edit.objectId, edit.attachedToId);
+    case "updatePoint":
+      return updateArrangementPoint(project, edit.objectId, edit.pointId, edit.patch);
+    case "addPipe":
+      return addArrangementConnector(project, edit.objectId, "pipes", edit.sourceId, edit.targetId);
+    case "addSignal":
+      return addArrangementConnector(project, edit.objectId, "signals", edit.sourceId, edit.targetId);
+    case "addAnnotation":
+      return addArrangementNote(project, edit.objectId);
+    case "updateAnnotation":
+      return {
+        project: patchArrangement(project, edit.objectId, (object) => ({
+          ...object,
+          domain: {
+            ...object.domain,
+            annotations: object.domain.annotations.map((item) =>
+              item.id === edit.annotationId ? { ...item, text: edit.text } : item,
+            ),
+          },
+        })),
+        dirtyObjectIds: [],
+        shouldEvaluate: false,
+      };
+    case "moveElement":
+      return moveArrangementElement(project, edit.objectId, edit.elementId, edit.x, edit.y);
   }
+}
+
+function _endpointExists(
+  object: ProjectDocument["objects"][number],
+  portId: string,
+  role: "source" | "target",
+): boolean {
+  if (isArrangementObject(object)) {
+    return object.domain.points.some((point) => point.id === portId);
+  }
+  if (role === "source") {
+    return object.outputs.some((item) => item.id === portId);
+  }
+  return object.inputs.some((item) => item.id === portId);
+}
+
+function nextArrangementElementId(object: ArrangementObject, prefix: string): string {
+  const used = arrangementElementIds(object);
+  let n = 1;
+  while (used.has(`${prefix}_${n}`)) n += 1;
+  return `${prefix}_${n}`;
+}
+
+function defaultArrangement(id: string, name: string, position: { x: number; y: number }): ArrangementObject {
+  const eq1 = defaultElementView(48, 80);
+  const eq2 = defaultElementView(320, 80);
+  return {
+    kind: "arrangement",
+    id,
+    name,
+    position,
+    domain: {
+      ...emptyArrangementDomain(),
+      equipment: [
+        { id: "EQ_1", name: "Equipment 1", symbolId: "generic-equipment" },
+        { id: "EQ_2", name: "Equipment 2", symbolId: "generic-equipment" },
+      ],
+    },
+    view: {
+      width: 720,
+      height: 400,
+      rotation: 0,
+      zIndex: 0,
+      elements: {
+        EQ_1: eq1,
+        EQ_2: eq2,
+      },
+    },
+  };
+}
+
+function noEval(project: ProjectDocument): EditResult {
+  return { project, dirtyObjectIds: [], shouldEvaluate: false };
+}
+
+function addArrangementSymbol(
+  project: ProjectDocument,
+  objectId: string,
+  kind: "equipment" | "valve",
+): EditResult {
+  const object = project.objects.find((item) => item.id === objectId);
+  if (!object || !isArrangementObject(object)) return noEval(project);
+  const prefix = kind === "equipment" ? "EQ" : "VL";
+  const id = nextArrangementElementId(object, prefix);
+  const count = kind === "equipment" ? object.domain.equipment.length : object.domain.valves.length;
+  const view = defaultElementView(48 + count * 140, kind === "equipment" ? 80 : 200, 96, kind === "valve" ? 48 : 64);
+  return {
+    project: patchArrangement(project, objectId, (current) => ({
+      ...current,
+      domain: {
+        ...current.domain,
+        equipment:
+          kind === "equipment"
+            ? [...current.domain.equipment, { id, name: id, symbolId: "generic-equipment" }]
+            : current.domain.equipment,
+        valves:
+          kind === "valve"
+            ? [...current.domain.valves, { id, name: id, symbolId: "generic-valve" }]
+            : current.domain.valves,
+      },
+      view: {
+        ...current.view,
+        elements: { ...current.view.elements, [id]: view },
+      },
+    })),
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
+function addArrangementPoint(
+  project: ProjectDocument,
+  objectId: string,
+  attachedToId?: string | null,
+): EditResult {
+  const object = project.objects.find((item) => item.id === objectId);
+  if (!object || !isArrangementObject(object)) return noEval(project);
+  if (attachedToId && !object.domain.equipment.some((item) => item.id === attachedToId)) {
+    return noEval(project);
+  }
+  const id = nextArrangementElementId(object, "PT");
+  const host = attachedToId ? object.view.elements[attachedToId] : undefined;
+  const view = defaultElementView(
+    host ? host.x + host.width / 2 - 10 : object.view.width / 2 - 10,
+    host ? host.y + host.height + 12 : object.view.height / 2 - 10,
+    20,
+    20,
+  );
+  return {
+    project: patchArrangement(project, objectId, (current) => ({
+      ...current,
+      domain: {
+        ...current.domain,
+        points: [...current.domain.points, { id, name: id, attachedToId: attachedToId ?? null }],
+      },
+      view: {
+        ...current.view,
+        elements: { ...current.view.elements, [id]: view },
+      },
+    })),
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
+function updateArrangementPoint(
+  project: ProjectDocument,
+  objectId: string,
+  pointId: string,
+  patch: { id?: string; name?: string },
+): EditResult {
+  const object = project.objects.find((item) => item.id === objectId);
+  if (!object || !isArrangementObject(object)) return noEval(project);
+  const current = object.domain.points.find((item) => item.id === pointId);
+  if (!current) return noEval(project);
+  const nextId = patch.id ?? current.id;
+  const nextName = (patch.name ?? current.name).trim() || nextId;
+  if (!VARIABLE_ID_RE.test(nextId)) return noEval(project);
+  if (nextId !== current.id && arrangementElementIds(object).has(nextId)) return noEval(project);
+  const next = patchArrangement(project, objectId, (item) => {
+    const elements = { ...item.view.elements };
+    if (nextId !== pointId && elements[pointId]) {
+      elements[nextId] = elements[pointId]!;
+      delete elements[pointId];
+    }
+    return {
+      ...item,
+      domain: {
+        ...item.domain,
+        points: item.domain.points.map((point) =>
+          point.id === pointId ? { ...point, id: nextId, name: nextName } : point,
+        ),
+        pipes: item.domain.pipes.map((pipe) => ({
+          ...pipe,
+          sourceId: pipe.sourceId === pointId ? nextId : pipe.sourceId,
+          targetId: pipe.targetId === pointId ? nextId : pipe.targetId,
+        })),
+        signals: item.domain.signals.map((signal) => ({
+          ...signal,
+          sourceId: signal.sourceId === pointId ? nextId : signal.sourceId,
+          targetId: signal.targetId === pointId ? nextId : signal.targetId,
+        })),
+      },
+      view: { ...item.view, elements },
+    };
+  });
+  return {
+    project: {
+      ...next,
+      edges: next.edges.map((edge) => ({
+        ...edge,
+        sourceVariableId:
+          edge.sourceObjectId === objectId && edge.sourceVariableId === pointId ? nextId : edge.sourceVariableId,
+        targetVariableId:
+          edge.targetObjectId === objectId && edge.targetVariableId === pointId ? nextId : edge.targetVariableId,
+      })),
+    },
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
+function addArrangementConnector(
+  project: ProjectDocument,
+  objectId: string,
+  collection: "pipes" | "signals",
+  sourceId: string,
+  targetId: string,
+): EditResult {
+  const object = project.objects.find((item) => item.id === objectId);
+  if (!object || !isArrangementObject(object)) return noEval(project);
+  const nodes = arrangementNodeIds(object);
+  if (sourceId === targetId || !nodes.has(sourceId) || !nodes.has(targetId)) return noEval(project);
+  const prefix = collection === "pipes" ? "PIPE" : "SIG";
+  const id = nextArrangementElementId(object, prefix);
+  return {
+    project: patchArrangement(project, objectId, (current) => ({
+      ...current,
+      domain: {
+        ...current.domain,
+        [collection]: [...current.domain[collection], { id, sourceId, targetId }],
+      },
+    })),
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
+function addArrangementNote(project: ProjectDocument, objectId: string): EditResult {
+  const object = project.objects.find((item) => item.id === objectId);
+  if (!object || !isArrangementObject(object)) return noEval(project);
+  const id = nextArrangementElementId(object, "NOTE");
+  return {
+    project: patchArrangement(project, objectId, (current) => ({
+      ...current,
+      domain: {
+        ...current.domain,
+        annotations: [...current.domain.annotations, { id, text: "Note" }],
+      },
+      view: {
+        ...current.view,
+        elements: {
+          ...current.view.elements,
+          [id]: defaultElementView(24, 24, 160, 36),
+        },
+      },
+    })),
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
+function moveArrangementElement(
+  project: ProjectDocument,
+  objectId: string,
+  elementId: string,
+  x: number,
+  y: number,
+): EditResult {
+  const object = project.objects.find((item) => item.id === objectId);
+  if (!object || !isArrangementObject(object)) return noEval(project);
+  const previous = object.view.elements[elementId];
+  if (!previous) return noEval(project);
+  const dx = x - previous.x;
+  const dy = y - previous.y;
+  return {
+    project: patchArrangement(project, objectId, (current) => {
+      const elements = { ...current.view.elements, [elementId]: { ...previous, x, y } };
+      for (const point of current.domain.points) {
+        if (point.attachedToId !== elementId) continue;
+        const pointView = elements[point.id];
+        if (!pointView) continue;
+        elements[point.id] = { ...pointView, x: pointView.x + dx, y: pointView.y + dy };
+      }
+      return { ...current, view: { ...current.view, elements } };
+    }),
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
 }
 
 function withSiUnit<T extends { quantity?: string | null; unit?: string | null }>(

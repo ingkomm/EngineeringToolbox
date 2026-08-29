@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { searchSourcePorts, searchTargetPorts } from "./objectSearch";
-import type { ProjectDocument } from "../types/contract";
+import type { CalculationObject, ProjectDocument } from "../types/contract";
+import { isCalculationObject } from "./worksheet";
+
+function calc(object: ProjectDocument["objects"][number]): CalculationObject {
+  if (!isCalculationObject(object)) throw new Error("expected calculation object");
+  return object;
+}
 
 const project: ProjectDocument = {
   id: "ws",
@@ -37,13 +43,13 @@ const project: ProjectDocument = {
 const linked: ProjectDocument = {
   ...project,
   objects: [
-    project.objects[0]!,
+    calc(project.objects[0]!),
     {
-      ...project.objects[1]!,
+      ...calc(project.objects[1]!),
       inputs: [{ id: "POWER", name: "POWER", value: null }],
       outputs: [{ id: "POWER", name: "POWER", sourceVariableId: "POWER" }],
     },
-    project.objects[2]!,
+    calc(project.objects[2]!),
   ],
   edges: [
     {

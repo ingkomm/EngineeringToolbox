@@ -7,6 +7,7 @@ import { blankProject } from "./example/blankProject";
 import { FALLBACK_QUANTITIES, type QuantitySpec } from "./lib/quantities";
 import { applyWorkspaceEdit, type WorkspaceEdit } from "./lib/projectEdits";
 import type { EvalError, ProjectDocument } from "./types/contract";
+import { isArrangementObject } from "./lib/worksheet";
 
 export function App() {
   const [project, setProject] = useState<ProjectDocument>(blankProject);
@@ -95,29 +96,70 @@ export function App() {
     () =>
       JSON.stringify(
         {
-          objects: project.objects.map((object) => ({
-            id: object.id,
-            name: object.name,
-            inputs: object.inputs.map((item) => ({
-              id: item.id,
-              name: item.name,
-              quantity: item.quantity ?? null,
-              unit: item.unit ?? null,
-            })),
-            calculations: object.calculations.map((item) => ({
-              id: item.id,
-              name: item.name,
-              formula: item.formula,
-              quantity: item.quantity ?? null,
-            })),
-            outputs: object.outputs.map((item) => ({ id: item.id, name: item.name, sourceVariableId: item.sourceVariableId })),
-          })),
+          objects: project.objects.map((object) => {
+            if (isArrangementObject(object)) {
+              return {
+                kind: "arrangement",
+                id: object.id,
+                name: object.name,
+                position: object.position,
+                domain: object.domain,
+                view: object.view,
+              };
+            }
+            return {
+              kind: "calculation",
+              id: object.id,
+              name: object.name,
+              inputs: object.inputs.map((item) => ({
+                id: item.id,
+                name: item.name,
+                quantity: item.quantity ?? null,
+                unit: item.unit ?? null,
+              })),
+              calculations: object.calculations.map((item) => ({
+                id: item.id,
+                name: item.name,
+                formula: item.formula,
+                quantity: item.quantity ?? null,
+              })),
+              outputs: object.outputs.map((item) => ({ id: item.id, name: item.name, sourceVariableId: item.sourceVariableId })),
+            };
+          }),
           edges: project.edges,
         },
         null,
         2,
       ),
     [project],
+  );
+
+  const onExport = useCallback(() => {
+    const blob = new Blob([JSON.stringify(project, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${project.id || "worksheet"}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [project]);
+
+  const onImportFile = useCallback(
+    (file: File) => {
+      void file.text().then((text) => {
+        try {
+          const parsed = JSON.parse(text) as ProjectDocument;
+          if (!parsed || !Array.isArray(parsed.objects) || !Array.isArray(parsed.edges)) {
+            setMessage("가져오기 실패: 프로젝트 JSON이 아닙니다");
+            return;
+          }
+          onEdit({ type: "loadProject", project: parsed });
+        } catch {
+          setMessage("가져오기 실패: JSON을 읽을 수 없습니다");
+        }
+      });
+    },
+    [onEdit],
   );
 
   return (
@@ -149,6 +191,22 @@ export function App() {
           >
             계산
           </button>
+          <button className="ghost-btn" type="button" data-testid="btn-export-project" onClick={onExport}>
+            저장
+          </button>
+          <label className="ghost-btn" data-testid="btn-import-project">
+            불러오기
+            <input
+              type="file"
+              accept="application/json"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (file) onImportFile(file);
+              }}
+            />
+          </label>
         </div>
       </header>
 
@@ -167,8 +225,8 @@ export function App() {
           <section>
             <h2>워크시트</h2>
             <p className="side-pane__hint">
-              Object와 변수의 ID/이름은 워크시트에서 유일합니다. 커넥터 ⌕ 검색으로 다른 객체를 찾아 연결하고,
-              검색창에서 기존 링크 상태를 보거나 끊을 수 있습니다. 한 Object의 한 Output은 하나의 Input에만 연결됩니다.
+              Calculation Object와 Arrangement Object를 같은 워크시트에 둘 수 있습니다. Arrangement는 계통 배치만
+              기록하며 계산하지 않습니다. Point와 Calculation Port는 association으로 연결합니다.
             </p>
             <button
               className="ghost-btn"

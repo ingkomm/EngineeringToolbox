@@ -125,6 +125,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
                       sourceVariableId: hit.variableId,
                       targetObjectId: id,
                       targetVariableId: item.id,
+                      relationType: hit.relationType,
                     })
                   }
                   onDisconnect={(hit) => {
@@ -308,6 +309,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
                     sourceVariableId: item.id,
                     targetObjectId: hit.objectId,
                     targetVariableId: hit.createInput ? undefined : hit.variableId,
+                    relationType: hit.relationType,
                   })
                 }
                 onDisconnect={(hit) => {

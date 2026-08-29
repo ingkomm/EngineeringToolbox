@@ -1,32 +1,46 @@
-import type { MappingEdge, ProjectDocument } from "../types/contract";
+import type { ProjectDocument } from "../types/contract";
 import type { WorkspaceEdit } from "../lib/projectEdits";
 import type { QuantitySpec } from "../lib/quantities";
 import { inputHandleId, outputHandleId } from "../lib/display";
+import { isArrangementObject, isValueFlowEdge } from "../lib/worksheet";
+import { mappedInputsForObject } from "./mappedInputs";
 
-export function mappedInputsForObject(objectId: string, edges: MappingEdge[]): string[] {
-  return edges
-    .filter((edge) => edge.targetObjectId === objectId && edge.enabled !== false)
-    .map((edge) => edge.targetVariableId);
-}
+export { mappedInputsForObject } from "./mappedInputs";
 
 export function toFlowNodeRecords(
   project: ProjectDocument,
   quantities: QuantitySpec[],
   onEdit: (edit: WorkspaceEdit) => void,
 ) {
-  return project.objects.map((object) => ({
-    id: object.id,
-    type: "calculationObject" as const,
-    position: object.position,
-    data: {
-      object,
-      project,
-      mappedInputIds: mappedInputsForObject(object.id, project.edges),
-      quantities,
-      onEdit,
-    },
-    draggable: true,
-  }));
+  return project.objects.map((object) => {
+    if (isArrangementObject(object)) {
+      return {
+        id: object.id,
+        type: "arrangementObject" as const,
+        position: object.position,
+        style: { width: object.view.width },
+        data: {
+          object,
+          project,
+          onEdit,
+        },
+        draggable: true,
+      };
+    }
+    return {
+      id: object.id,
+      type: "calculationObject" as const,
+      position: object.position,
+      data: {
+        object,
+        project,
+        mappedInputIds: mappedInputsForObject(object.id, project.edges),
+        quantities,
+        onEdit,
+      },
+      draggable: true,
+    };
+  });
 }
 
 export function toFlowEdges(
@@ -39,6 +53,7 @@ export function toFlowEdges(
     const source = objects.get(edge.sourceObjectId);
     const target = objects.get(edge.targetObjectId);
     const collapsed = edge.collapsed === true;
+    const association = !isValueFlowEdge(edge);
     return {
       id: edge.id,
       source: edge.sourceObjectId,
@@ -50,6 +65,7 @@ export function toFlowEdges(
         "mapping-edge",
         edge.enabled === false ? "mapping-edge--off" : "",
         collapsed ? "mapping-edge--collapsed" : "",
+        association ? "mapping-edge--association" : "",
       ]
         .filter(Boolean)
         .join(" "),
@@ -78,6 +94,7 @@ export function mergeFlowNodes<T extends { id: string; data: unknown; position: 
     if (!existing) return record;
     return {
       ...existing,
+      ...record,
       data: record.data,
       selected: existing.selected,
       position: existing.dragging ? existing.position : record.position,

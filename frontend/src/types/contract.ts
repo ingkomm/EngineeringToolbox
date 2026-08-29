@@ -4,6 +4,7 @@
  */
 
 export type VariableStatus = "idle" | "ok" | "mapped" | "error";
+export type RelationType = "value_flow" | "reference" | "association";
 
 export interface InputVariable {
   id: string;
@@ -38,6 +39,7 @@ export interface OutputBinding {
 }
 
 export interface CalculationObject {
+  kind?: "calculation";
   id: string;
   name: string;
   position: { x: number; y: number };
@@ -45,6 +47,67 @@ export interface CalculationObject {
   calculations: FormulaVariable[];
   outputs: OutputBinding[];
 }
+
+export interface ArrangementNamedSymbol {
+  id: string;
+  name: string;
+  symbolId: string;
+}
+
+export interface ArrangementPoint {
+  id: string;
+  name: string;
+  attachedToId?: string | null;
+}
+
+export interface ArrangementConnector {
+  id: string;
+  sourceId: string;
+  targetId: string;
+}
+
+export interface ArrangementAnnotation {
+  id: string;
+  text: string;
+}
+
+export interface ArrangementDomain {
+  equipment: ArrangementNamedSymbol[];
+  valves: ArrangementNamedSymbol[];
+  points: ArrangementPoint[];
+  pipes: ArrangementConnector[];
+  signals: ArrangementConnector[];
+  annotations: ArrangementAnnotation[];
+}
+
+export interface ElementView {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  zIndex: number;
+  visible: boolean;
+}
+
+export interface ArrangementView {
+  width: number;
+  height: number;
+  rotation: number;
+  zIndex: number;
+  elements: Record<string, ElementView>;
+}
+
+export interface ArrangementObject {
+  kind: "arrangement";
+  id: string;
+  name: string;
+  position: { x: number; y: number };
+  domain: ArrangementDomain;
+  view: ArrangementView;
+}
+
+export type WorksheetObject = CalculationObject | ArrangementObject;
 
 export interface MappingEdge {
   id: string;
@@ -54,12 +117,13 @@ export interface MappingEdge {
   targetVariableId: string;
   enabled: boolean;
   collapsed?: boolean;
+  relationType?: RelationType;
 }
 
 export interface ProjectDocument {
   id: string;
   name: string;
-  objects: CalculationObject[];
+  objects: WorksheetObject[];
   edges: MappingEdge[];
 }
 

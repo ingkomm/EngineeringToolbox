@@ -2,7 +2,7 @@
 
 Thermoflex raw data를 입력으로 하는 엔지니어링 계산 툴박스의 첫 프로토타입.
 
-React Flow Canvas의 **Calculation Object** 안에서 Input / Calculation / Output 테이블이 Excel처럼 의미 기반 Variable ID로 연동되고, 실제 계산은 Python이 수행한다.
+React Flow Canvas의 **Calculation Object**와 **Arrangement Object**를 같은 워크시트에 둔다. Calculation은 Input / Calculation / Output 테이블로 의미 기반 Variable ID를 연동하고, 실제 계산은 Python이 수행한다. Arrangement는 Equipment / Valve / Pipe / Signal / Point를 벡터로 배치하는 도면이며 계산하지 않는다.
 
 ## Architectural boundaries
 

@@ -2,7 +2,16 @@ import { describe, expect, it } from "vitest";
 import { applyWorkspaceEdit } from "./projectEdits";
 import { blankProject } from "../example/blankProject";
 import { FALLBACK_QUANTITIES } from "./quantities";
-import type { ProjectDocument } from "../types/contract";
+import type { CalculationObject, ProjectDocument } from "../types/contract";
+import { isArrangementObject, isCalculationObject } from "./worksheet";
+
+function calc(project: ProjectDocument, index = 0): CalculationObject {
+  const object = project.objects[index];
+  if (!object || !isCalculationObject(object)) {
+    throw new Error(`expected calculation object at ${index}`);
+  }
+  return object;
+}
 
 function applyAll(edits: Parameters<typeof applyWorkspaceEdit>[1][]): ProjectDocument {
   let project = structuredClone(blankProject);
@@ -15,10 +24,10 @@ function applyAll(edits: Parameters<typeof applyWorkspaceEdit>[1][]): ProjectDoc
 describe("blank workspace", () => {
   it("starts with one empty object and no edges", () => {
     expect(blankProject.objects).toHaveLength(1);
-    expect(blankProject.objects[0]?.id).toBe("obj_1");
-    expect(blankProject.objects[0]?.inputs).toEqual([]);
-    expect(blankProject.objects[0]?.calculations).toEqual([]);
-    expect(blankProject.objects[0]?.outputs).toEqual([]);
+    expect(calc(blankProject).id).toBe("obj_1");
+    expect(calc(blankProject).inputs).toEqual([]);
+    expect(calc(blankProject).calculations).toEqual([]);
+    expect(calc(blankProject).outputs).toEqual([]);
     expect(blankProject.edges).toEqual([]);
   });
 });
@@ -48,7 +57,7 @@ describe("user-authored tables", () => {
       },
     ]);
 
-    const object = project.objects[0];
+    const object = calc(project);
     expect(object?.inputs.map((item) => [item.id, item.value, item.unit])).toEqual([
       ["FLOW", 120, "kg/s"],
       ["PIN", 12, "Pa"],
@@ -70,8 +79,8 @@ describe("user-authored tables", () => {
   it("adds a second object without copying calculated results", () => {
     const project = applyAll([{ type: "addObject" }]);
     expect(project.objects.map((item) => item.id)).toEqual(["obj_1", "obj_2"]);
-    expect(project.objects[1]?.inputs).toEqual([]);
-    expect(project.objects[1]?.calculations).toEqual([]);
+    expect(calc(project, 1).inputs).toEqual([]);
+    expect(calc(project, 1).calculations).toEqual([]);
   });
 });
 
@@ -84,7 +93,7 @@ describe("auto-linked ports", () => {
       { type: "updateCalculation", objectId: "obj_1", index: 0, patch: { id: "POWER", formula: "FLOW * 2" } },
       { type: "updateInput", objectId: "obj_1", index: 0, patch: { id: "MASS" } },
     ]);
-    const object = project.objects[0];
+    const object = calc(project);
     expect(object?.calculations[0]?.formula).toBe("MASS * 2");
     expect(object?.outputs.map((item) => item.id)).toEqual(["MASS", "POWER"]);
   });
@@ -97,7 +106,7 @@ describe("auto-linked ports", () => {
       { type: "addInput", objectId: "obj_2" },
       { type: "updateInput", objectId: "obj_2", index: 0, patch: { id: "FLOW" } },
     ]);
-    expect(project.objects[1]?.inputs[0]?.id).toBe("IN_1");
+    expect(calc(project, 1).inputs[0]?.id).toBe("IN_1");
   });
 
   it("connects an input to the source variable identity and toggles Off/On", () => {
@@ -107,7 +116,7 @@ describe("auto-linked ports", () => {
       { type: "addObject" },
       { type: "addInput", objectId: "obj_2" },
     ]);
-    const localId = project.objects[1]?.inputs[0]?.id ?? "";
+    const localId = calc(project, 1).inputs[0]?.id ?? "";
     project = applyWorkspaceEdit(
       project,
       {
@@ -119,18 +128,18 @@ describe("auto-linked ports", () => {
       },
       FALLBACK_QUANTITIES,
     ).project;
-    expect(project.objects[1]?.inputs[0]?.id).toBe("POWER");
-    expect(project.objects[1]?.inputs[0]?.name).toBe("동력");
+    expect(calc(project, 1).inputs[0]?.id).toBe("POWER");
+    expect(calc(project, 1).inputs[0]?.name).toBe("동력");
     expect(project.edges[0]?.enabled).toBe(true);
 
     project = applyWorkspaceEdit(project, { type: "toggleEdge", edgeId: project.edges[0]!.id }, FALLBACK_QUANTITIES).project;
     expect(project.edges[0]?.enabled).toBe(false);
-    expect(project.objects[1]?.inputs[0]?.id).not.toBe("POWER");
+    expect(calc(project, 1).inputs[0]?.id).not.toBe("POWER");
 
     project = applyWorkspaceEdit(project, { type: "toggleEdge", edgeId: project.edges[0]!.id }, FALLBACK_QUANTITIES).project;
     expect(project.edges[0]?.enabled).toBe(true);
-    expect(project.objects[1]?.inputs[0]?.id).toBe("POWER");
-    expect(project.objects[1]?.inputs[0]?.name).toBe("동력");
+    expect(calc(project, 1).inputs[0]?.id).toBe("POWER");
+    expect(calc(project, 1).inputs[0]?.name).toBe("동력");
   });
 
   it("copies source quantity/unit onto a mapped input and follows later source changes", () => {
@@ -142,7 +151,7 @@ describe("auto-linked ports", () => {
       { type: "addObject" },
       { type: "addInput", objectId: "obj_3" },
     ]);
-    const midId = project.objects[1]?.inputs[0]?.id ?? "";
+    const midId = calc(project, 1).inputs[0]?.id ?? "";
     project = applyWorkspaceEdit(
       project,
       {
@@ -154,9 +163,9 @@ describe("auto-linked ports", () => {
       },
       FALLBACK_QUANTITIES,
     ).project;
-    expect(project.objects[1]?.inputs[0]).toMatchObject({ id: "P", quantity: "pressure", unit: "Pa" });
+    expect(calc(project, 1).inputs[0]).toMatchObject({ id: "P", quantity: "pressure", unit: "Pa" });
 
-    const dstId = project.objects[2]?.inputs[0]?.id ?? "";
+    const dstId = calc(project, 2).inputs[0]?.id ?? "";
     project = applyWorkspaceEdit(
       project,
       {
@@ -168,16 +177,16 @@ describe("auto-linked ports", () => {
       },
       FALLBACK_QUANTITIES,
     ).project;
-    expect(project.objects[2]?.inputs[0]).toMatchObject({ id: "P", quantity: "pressure", unit: "Pa" });
+    expect(calc(project, 2).inputs[0]).toMatchObject({ id: "P", quantity: "pressure", unit: "Pa" });
 
     project = applyWorkspaceEdit(
       project,
       { type: "updateInput", objectId: "obj_1", index: 0, patch: { quantity: "temperature" } },
       FALLBACK_QUANTITIES,
     ).project;
-    expect(project.objects[0]?.inputs[0]).toMatchObject({ quantity: "temperature", unit: "K" });
-    expect(project.objects[1]?.inputs[0]).toMatchObject({ quantity: "temperature", unit: "K" });
-    expect(project.objects[2]?.inputs[0]).toMatchObject({ quantity: "temperature", unit: "K" });
+    expect(calc(project).inputs[0]).toMatchObject({ quantity: "temperature", unit: "K" });
+    expect(calc(project, 1).inputs[0]).toMatchObject({ quantity: "temperature", unit: "K" });
+    expect(calc(project, 2).inputs[0]).toMatchObject({ quantity: "temperature", unit: "K" });
 
     project = applyWorkspaceEdit(project, { type: "toggleEdge", edgeId: project.edges[1]!.id }, FALLBACK_QUANTITIES).project;
     project = applyWorkspaceEdit(
@@ -185,8 +194,8 @@ describe("auto-linked ports", () => {
       { type: "updateInput", objectId: "obj_1", index: 0, patch: { quantity: "length" } },
       FALLBACK_QUANTITIES,
     ).project;
-    expect(project.objects[1]?.inputs[0]).toMatchObject({ quantity: "length", unit: "m" });
-    expect(project.objects[2]?.inputs[0]?.quantity).not.toBe("length");
+    expect(calc(project, 1).inputs[0]).toMatchObject({ quantity: "length", unit: "m" });
+    expect(calc(project, 2).inputs[0]?.quantity).not.toBe("length");
   });
 
   it("drops mapping edges when the source variable is removed", () => {
@@ -211,7 +220,7 @@ describe("auto-linked ports", () => {
     };
     project = applyWorkspaceEdit(project, { type: "removeInput", objectId: "obj_1", index: 0 }, FALLBACK_QUANTITIES).project;
     expect(project.edges).toEqual([]);
-    expect(project.objects[0]?.outputs).toEqual([]);
+    expect(calc(project).outputs).toEqual([]);
   });
 });
 
@@ -227,13 +236,13 @@ describe("unique objects and search connectors", () => {
       { type: "updateObject", objectId: "obj_2", patch: { name: "Object 1" } },
       FALLBACK_QUANTITIES,
     ).project;
-    expect(project.objects[1]?.name).toBe("Object 2");
+    expect(calc(project, 1).name).toBe("Object 2");
     project = applyWorkspaceEdit(
       project,
       { type: "updateObject", objectId: "obj_2", patch: { id: "obj_1" } },
       FALLBACK_QUANTITIES,
     ).project;
-    expect(project.objects[1]?.id).toBe("obj_2");
+    expect(calc(project, 1).id).toBe("obj_2");
 
     project = applyAll([
       { type: "addInput", objectId: "obj_1" },
@@ -241,7 +250,7 @@ describe("unique objects and search connectors", () => {
       { type: "addObject" },
       { type: "addInput", objectId: "obj_2" },
     ]);
-    const localId = project.objects[1]?.inputs[0]?.id ?? "";
+    const localId = calc(project, 1).inputs[0]?.id ?? "";
     project = applyWorkspaceEdit(
       project,
       {
@@ -258,7 +267,7 @@ describe("unique objects and search connectors", () => {
       { type: "updateObject", objectId: "obj_2", patch: { id: "sink", name: "Sink" } },
       FALLBACK_QUANTITIES,
     ).project;
-    expect(project.objects[1]?.id).toBe("sink");
+    expect(calc(project, 1).id).toBe("sink");
     expect(project.edges[0]?.targetObjectId).toBe("sink");
   });
 
@@ -278,7 +287,7 @@ describe("unique objects and search connectors", () => {
       },
       FALLBACK_QUANTITIES,
     ).project;
-    expect(project.objects[1]?.inputs[0]?.id).toBe("POWER");
+    expect(calc(project, 1).inputs[0]?.id).toBe("POWER");
     expect(project.edges[0]?.collapsed).toBe(false);
     project = applyWorkspaceEdit(
       project,
@@ -306,14 +315,14 @@ describe("unique objects and search connectors", () => {
     ).project;
     const edgeId = project.edges[0]?.id;
     expect(edgeId).toBeDefined();
-    expect(project.objects[1]?.inputs[0]?.id).toBe("POWER");
+    expect(calc(project, 1).inputs[0]?.id).toBe("POWER");
     project = applyWorkspaceEdit(
       project,
       { type: "deleteEdges", edgeIds: [edgeId!] },
       FALLBACK_QUANTITIES,
     ).project;
     expect(project.edges).toHaveLength(0);
-    expect(project.objects[1]?.inputs[0]?.id).toMatch(/^IN_/);
+    expect(calc(project, 1).inputs[0]?.id).toMatch(/^IN_/);
   });
 
   it("rejects a second mapping from the same object output", () => {
@@ -334,7 +343,7 @@ describe("unique objects and search connectors", () => {
       FALLBACK_QUANTITIES,
     ).project;
     expect(project.edges).toHaveLength(1);
-    const before = project.objects[2]?.inputs.length ?? 0;
+    const before = calc(project, 2).inputs.length ?? 0;
     project = applyWorkspaceEdit(
       project,
       {
@@ -347,6 +356,161 @@ describe("unique objects and search connectors", () => {
     ).project;
     expect(project.edges).toHaveLength(1);
     expect(project.edges[0]?.targetObjectId).toBe("obj_2");
-    expect(project.objects[2]?.inputs.length).toBe(before);
+    expect(calc(project, 2).inputs.length).toBe(before);
+  });
+});
+
+describe("arrangement object", () => {
+  it("adds an arrangement with two generic equipment and no calculation", () => {
+    const project = applyAll([{ type: "addArrangement" }]);
+    const arrangement = project.objects[1];
+    expect(arrangement && isArrangementObject(arrangement)).toBe(true);
+    if (!arrangement || !isArrangementObject(arrangement)) return;
+    expect(arrangement.domain.equipment.map((item) => item.id)).toEqual(["EQ_1", "EQ_2"]);
+    expect(arrangement.domain.pipes).toEqual([]);
+    expect(arrangement.view.elements.EQ_1?.x).toBe(48);
+    expect(arrangement.view.elements.EQ_2?.x).toBe(320);
+    expect(applyWorkspaceEdit(project, { type: "addInput", objectId: arrangement.id }, FALLBACK_QUANTITIES).shouldEvaluate).toBe(false);
+  });
+
+  it("connects equipment with pipe or signal and adds editable points", () => {
+    let project = applyAll([{ type: "addArrangement" }]);
+    const arrangementId = project.objects[1]!.id;
+    project = applyWorkspaceEdit(
+      project,
+      { type: "addPipe", objectId: arrangementId, sourceId: "EQ_1", targetId: "EQ_2" },
+      FALLBACK_QUANTITIES,
+    ).project;
+    project = applyWorkspaceEdit(
+      project,
+      { type: "addSignal", objectId: arrangementId, sourceId: "EQ_1", targetId: "EQ_2" },
+      FALLBACK_QUANTITIES,
+    ).project;
+    project = applyWorkspaceEdit(
+      project,
+      { type: "addPoint", objectId: arrangementId, attachedToId: "EQ_1" },
+      FALLBACK_QUANTITIES,
+    ).project;
+    project = applyWorkspaceEdit(project, { type: "addPoint", objectId: arrangementId }, FALLBACK_QUANTITIES).project;
+    const arrangement = project.objects[1];
+    expect(arrangement && isArrangementObject(arrangement)).toBe(true);
+    if (!arrangement || !isArrangementObject(arrangement)) return;
+    expect(arrangement.domain.pipes[0]).toMatchObject({ sourceId: "EQ_1", targetId: "EQ_2" });
+    expect(arrangement.domain.signals[0]).toMatchObject({ sourceId: "EQ_1", targetId: "EQ_2" });
+    expect(arrangement.domain.points.map((item) => item.id)).toEqual(["PT_1", "PT_2"]);
+    expect(arrangement.domain.points[0]?.attachedToId).toBe("EQ_1");
+    expect(arrangement.domain.points[1]?.attachedToId).toBeNull();
+
+    project = applyWorkspaceEdit(
+      project,
+      { type: "updatePoint", objectId: arrangementId, pointId: "PT_1", patch: { id: "SUCTION", name: "흡입" } },
+      FALLBACK_QUANTITIES,
+    ).project;
+    const renamed = project.objects[1];
+    expect(renamed && isArrangementObject(renamed) && renamed.domain.points[0]).toMatchObject({
+      id: "SUCTION",
+      name: "흡입",
+    });
+  });
+
+  it("rejects duplicate point ids and unknown pipe endpoints", () => {
+    let project = applyAll([{ type: "addArrangement" }]);
+    const arrangementId = project.objects[1]!.id;
+    project = applyWorkspaceEdit(project, { type: "addPoint", objectId: arrangementId }, FALLBACK_QUANTITIES).project;
+    const afterDup = applyWorkspaceEdit(
+      project,
+      { type: "updatePoint", objectId: arrangementId, pointId: "PT_1", patch: { id: "EQ_1" } },
+      FALLBACK_QUANTITIES,
+    ).project;
+    const arrangement = afterDup.objects[1];
+    expect(arrangement && isArrangementObject(arrangement) && arrangement.domain.points[0]?.id).toBe("PT_1");
+
+    const beforePipes = isArrangementObject(arrangement) ? arrangement.domain.pipes.length : -1;
+    const afterBadPipe = applyWorkspaceEdit(
+      afterDup,
+      { type: "addPipe", objectId: arrangementId, sourceId: "EQ_1", targetId: "NOPE" },
+      FALLBACK_QUANTITIES,
+    ).project;
+    const still = afterBadPipe.objects[1];
+    expect(still && isArrangementObject(still) && still.domain.pipes.length).toBe(beforePipes);
+  });
+
+  it("keeps domain unchanged when moving the node or an inner element", () => {
+    let project = applyAll([{ type: "addArrangement" }]);
+    const arrangementId = project.objects[1]!.id;
+    const original = project.objects[1];
+    if (!original || !isArrangementObject(original)) throw new Error("missing arrangement");
+    const domain = structuredClone(original.domain);
+
+    project = {
+      ...project,
+      objects: project.objects.map((object) =>
+        object.id === arrangementId ? { ...object, position: { x: 400, y: 20 } } : object,
+      ),
+    };
+    const movedNode = project.objects[1];
+    expect(movedNode && isArrangementObject(movedNode) && movedNode.domain).toEqual(domain);
+    expect(movedNode && isArrangementObject(movedNode) && movedNode.position).toEqual({ x: 400, y: 20 });
+
+    project = applyWorkspaceEdit(
+      project,
+      { type: "moveElement", objectId: arrangementId, elementId: "EQ_1", x: 180, y: 40 },
+      FALLBACK_QUANTITIES,
+    ).project;
+    const movedInner = project.objects[1];
+    expect(movedInner && isArrangementObject(movedInner) && movedInner.domain).toEqual(domain);
+    expect(movedInner && isArrangementObject(movedInner) && movedInner.view.elements.EQ_1).toMatchObject({
+      x: 180,
+      y: 40,
+    });
+  });
+
+  it("connects an arrangement point to a calculation port without evaluating", () => {
+    let project = applyAll([
+      { type: "addInput", objectId: "obj_1" },
+      { type: "addArrangement" },
+    ]);
+    const arrangementId = project.objects[1]!.id;
+    project = applyWorkspaceEdit(project, { type: "addPoint", objectId: arrangementId }, FALLBACK_QUANTITIES).project;
+    const result = applyWorkspaceEdit(
+      project,
+      {
+        type: "connectMapping",
+        sourceObjectId: arrangementId,
+        sourceVariableId: "PT_1",
+        targetObjectId: "obj_1",
+        targetVariableId: "IN_1",
+        relationType: "association",
+      },
+      FALLBACK_QUANTITIES,
+    );
+    expect(result.shouldEvaluate).toBe(false);
+    expect(result.project.edges[0]).toMatchObject({
+      sourceObjectId: arrangementId,
+      sourceVariableId: "PT_1",
+      targetObjectId: "obj_1",
+      targetVariableId: "IN_1",
+      relationType: "association",
+    });
+    expect(calc(result.project).inputs[0]?.id).toBe("IN_1");
+  });
+
+  it("round-trips arrangement JSON through loadProject", () => {
+    let project = applyAll([{ type: "addArrangement" }]);
+    const arrangementId = project.objects[1]!.id;
+    project = applyWorkspaceEdit(
+      project,
+      { type: "addPipe", objectId: arrangementId, sourceId: "EQ_1", targetId: "EQ_2" },
+      FALLBACK_QUANTITIES,
+    ).project;
+    project = applyWorkspaceEdit(project, { type: "addPoint", objectId: arrangementId }, FALLBACK_QUANTITIES).project;
+    const snapshot = structuredClone(project);
+    const restored = applyWorkspaceEdit(
+      blankProject,
+      { type: "loadProject", project: snapshot },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(restored.objects[1]).toEqual(snapshot.objects[1]);
+    expect(restored.edges).toEqual(snapshot.edges);
   });
 });
