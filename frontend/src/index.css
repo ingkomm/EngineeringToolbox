@@ -883,6 +883,8 @@ label.ghost-btn {
   stroke: #6cb6ff;
   stroke-width: 2;
   fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
 }
 
 .arr-point-link--preview {
@@ -896,11 +898,6 @@ label.ghost-btn {
 }
 
 .arr-point--bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-  padding: 0 4px;
   background: #122033;
   border: 1px solid var(--line-strong);
   border-radius: 14px;
@@ -911,17 +908,21 @@ label.ghost-btn {
 }
 
 .arr-point__id {
-  flex: 1;
-  min-width: 0;
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 3px;
   font-size: 10px;
   font-weight: 700;
   text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  pointer-events: none;
 }
 
 .arr-point-end {
+  position: absolute;
   width: 14px;
   height: 14px;
   border-radius: 50%;
@@ -929,29 +930,12 @@ label.ghost-btn {
   background: #0b1220;
   cursor: crosshair;
   padding: 0;
-  flex-shrink: 0;
+  transform: translate(-50%, -50%);
 }
 
 .arr-point-end--on {
   border-color: var(--accent);
   background: var(--accent);
-}
-
-.arr-point-handle {
-  width: 8px !important;
-  height: 8px !important;
-  background: var(--accent) !important;
-  border: 1px solid #0b1220 !important;
-}
-
-.arr-point-handle--in {
-  top: -4px !important;
-  left: 50% !important;
-}
-
-.arr-point-handle--out {
-  bottom: -4px !important;
-  left: 50% !important;
 }
 
 .arr-inspector {
@@ -987,6 +971,12 @@ label.ghost-btn {
 .arr-inspector__row {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+.arr-inspector__row label {
+  display: flex;
+  gap: 6px;
   align-items: center;
 }
 

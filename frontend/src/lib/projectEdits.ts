@@ -18,12 +18,16 @@ import {
 } from "./variables";
 import {
   arrangementElementIds,
+  clampConnectionCount,
   defaultElementView,
   emptyArrangementDomain,
   hasEquipmentPort,
   isArrangementObject,
   isCalculationObject,
   isValueFlowEdge,
+  normalizeArrangementPoint,
+  parsePointConnectionEnd,
+  pointViewSize,
 } from "./worksheet";
 
 export const VARIABLE_ID_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -65,13 +69,18 @@ export type WorkspaceEdit =
   | { type: "deleteEdges"; edgeIds: string[] }
   | { type: "addEquipment"; objectId: string }
   | { type: "addPoint"; objectId: string }
-  | { type: "updatePoint"; objectId: string; pointId: string; patch: { id?: string; name?: string } }
+  | {
+      type: "updatePoint";
+      objectId: string;
+      pointId: string;
+      patch: { id?: string; name?: string; connectionCount?: number };
+    }
   | { type: "setEquipmentPorts"; objectId: string; equipmentId: string; inCount?: number; outCount?: number }
   | {
       type: "connectPointEnd";
       objectId: string;
       pointId: string;
-      end: "a" | "b";
+      end: string;
       equipmentId: string | null;
       portId: string | null;
     }
@@ -379,7 +388,7 @@ export function applyWorkspaceEdit(
       return { project: syncAllObjects(structuredClone(prototypeProject)), dirtyObjectIds: [], shouldEvaluate: true };
     case "loadProject":
       return {
-        project: syncAllObjects(structuredClone(edit.project)),
+        project: syncAllObjects(normalizeLoadedProject(structuredClone(edit.project))),
         dirtyObjectIds: [],
         shouldEvaluate: edit.project.objects.some(isCalculationObject),
       };
@@ -923,15 +932,16 @@ function addArrangementPoint(project: ProjectDocument, objectId: string): EditRe
   const id = nextArrangementElementId(object, "PT");
   const first = object.domain.equipment[0] ? object.view.elements[object.domain.equipment[0].id] : undefined;
   const second = object.domain.equipment[1] ? object.view.elements[object.domain.equipment[1].id] : undefined;
-  const midX = first && second ? (first.x + first.width + second.x) / 2 - 44 : object.view.width / 2 - 44;
-  const midY = first ? first.y + first.height / 2 - 14 : object.view.height / 2 - 14;
-  const view = defaultElementView(midX, midY, 88, 28);
+  const size = pointViewSize(2);
+  const midX = first && second ? (first.x + first.width + second.x) / 2 - size.width / 2 : object.view.width / 2 - size.width / 2;
+  const midY = first ? first.y + first.height / 2 - size.height / 2 : object.view.height / 2 - size.height / 2;
+  const view = defaultElementView(midX, midY, size.width, size.height);
   return {
     project: patchArrangement(project, objectId, (current) => ({
       ...current,
       domain: {
         ...current.domain,
-        points: [...current.domain.points, { id, name: id, a: null, b: null }],
+        points: [...current.domain.points, normalizeArrangementPoint({ id, name: id, connectionCount: 2 })],
       },
       view: {
         ...current.view,
@@ -947,7 +957,7 @@ function updateArrangementPoint(
   project: ProjectDocument,
   objectId: string,
   pointId: string,
-  patch: { id?: string; name?: string },
+  patch: { id?: string; name?: string; connectionCount?: number },
 ): EditResult {
   const object = project.objects.find((item) => item.id === objectId);
   if (!object || !isArrangementObject(object)) return noEval(project);
@@ -957,19 +967,29 @@ function updateArrangementPoint(
   const nextName = (patch.name ?? current.name).trim() || nextId;
   if (!VARIABLE_ID_RE.test(nextId)) return noEval(project);
   if (nextId !== current.id && arrangementElementIds(object).has(nextId)) return noEval(project);
+  const nextCount = clampConnectionCount(patch.connectionCount, current.connectionCount);
+  const nextPoint = normalizeArrangementPoint({
+    ...current,
+    id: nextId,
+    name: nextName,
+    connectionCount: nextCount,
+  });
+  const nextSize = pointViewSize(nextCount);
   const next = patchArrangement(project, objectId, (item) => {
     const elements = { ...item.view.elements };
     if (nextId !== pointId && elements[pointId]) {
       elements[nextId] = elements[pointId]!;
       delete elements[pointId];
     }
+    const previous = elements[nextId];
+    if (previous && patch.connectionCount != null) {
+      elements[nextId] = { ...previous, width: nextSize.width, height: nextSize.height };
+    }
     return {
       ...item,
       domain: {
         ...item.domain,
-        points: item.domain.points.map((point) =>
-          point.id === pointId ? { ...point, id: nextId, name: nextName } : point,
-        ),
+        points: item.domain.points.map((point) => (point.id === pointId ? nextPoint : point)),
       },
       view: { ...item.view, elements },
     };
@@ -1018,19 +1038,17 @@ function setEquipmentPorts(
         ...current,
         domain: {
           equipment: updated,
-          points: current.domain.points.map((point) => ({
-            ...point,
-            a: point.a && byId.get(point.a.equipmentId) && hasEquipmentPort(byId.get(point.a.equipmentId)!, point.a.portId)
-              ? point.a
-              : point.a && point.a.equipmentId === equipmentId
-                ? null
-                : point.a,
-            b: point.b && byId.get(point.b.equipmentId) && hasEquipmentPort(byId.get(point.b.equipmentId)!, point.b.portId)
-              ? point.b
-              : point.b && point.b.equipmentId === equipmentId
-                ? null
-                : point.b,
-          })),
+          points: current.domain.points.map((point) =>
+            normalizeArrangementPoint({
+              ...point,
+              connections: point.connections.map((end) => {
+                if (!end) return null;
+                const host = byId.get(end.equipmentId);
+                if (host && hasEquipmentPort(host, end.portId)) return end;
+                return end.equipmentId === equipmentId ? null : end;
+              }),
+            }),
+          ),
         },
       };
     }),
@@ -1043,7 +1061,7 @@ function connectPointEnd(
   project: ProjectDocument,
   objectId: string,
   pointId: string,
-  end: "a" | "b",
+  end: string,
   equipmentId: string | null,
   portId: string | null,
 ): EditResult {
@@ -1051,6 +1069,8 @@ function connectPointEnd(
   if (!object || !isArrangementObject(object)) return noEval(project);
   const point = object.domain.points.find((item) => item.id === pointId);
   if (!point) return noEval(project);
+  const index = parsePointConnectionEnd(end);
+  if (index == null || index >= point.connectionCount) return noEval(project);
   let nextEnd: { equipmentId: string; portId: string } | null = null;
   if (equipmentId && portId) {
     const host = object.domain.equipment.find((item) => item.id === equipmentId);
@@ -1062,13 +1082,32 @@ function connectPointEnd(
       ...current,
       domain: {
         ...current.domain,
-        points: current.domain.points.map((item) =>
-          item.id === pointId ? { ...item, [end]: nextEnd } : item,
-        ),
+        points: current.domain.points.map((item) => {
+          if (item.id !== pointId) return item;
+          const connections = [...item.connections];
+          connections[index] = nextEnd;
+          return normalizeArrangementPoint({ ...item, connections });
+        }),
       },
     })),
     dirtyObjectIds: [],
     shouldEvaluate: false,
+  };
+}
+
+function normalizeLoadedProject(project: ProjectDocument): ProjectDocument {
+  return {
+    ...project,
+    objects: project.objects.map((object) => {
+      if (!isArrangementObject(object)) return object;
+      return {
+        ...object,
+        domain: {
+          ...object.domain,
+          points: object.domain.points.map((point) => normalizeArrangementPoint(point)),
+        },
+      };
+    }),
   };
 }
 

@@ -1,8 +1,10 @@
 import type {
   ArrangementEquipment,
   ArrangementObject,
+  ArrangementPoint,
   CalculationObject,
   MappingEdge,
+  PointEnd,
   WorksheetObject,
 } from "../types/contract";
 
@@ -50,4 +52,45 @@ export function arrangementElementIds(object: ArrangementObject): Set<string> {
     ...object.domain.equipment.map((item) => item.id),
     ...object.domain.points.map((item) => item.id),
   ]);
+}
+
+export function clampConnectionCount(value: number | undefined, fallback = 2): number {
+  if (value == null || Number.isNaN(value)) return fallback;
+  return Math.max(1, Math.min(8, Math.floor(value)));
+}
+
+export function pointConnectionIds(count: number): string[] {
+  return Array.from({ length: clampConnectionCount(count) }, (_, index) => `C_${index + 1}`);
+}
+
+export function parsePointConnectionEnd(end: string): number | null {
+  if (end === "a") return 0;
+  if (end === "b") return 1;
+  const match = /^C_(\d+)$/.exec(end);
+  if (!match) return null;
+  const index = Number(match[1]) - 1;
+  return index >= 0 ? index : null;
+}
+
+export function pointViewSize(count: number): { width: number; height: number } {
+  const connectionCount = clampConnectionCount(count);
+  return { width: Math.max(96, 28 + connectionCount * 22), height: 36 };
+}
+
+export function normalizeArrangementPoint(point: {
+  id: string;
+  name?: string;
+  connectionCount?: number;
+  connections?: Array<PointEnd | null>;
+  a?: PointEnd | null;
+  b?: PointEnd | null;
+}): ArrangementPoint {
+  const fromLegacy = point.connections ?? [point.a ?? null, point.b ?? null];
+  const count = clampConnectionCount(point.connectionCount, Math.max(2, fromLegacy.length));
+  return {
+    id: point.id,
+    name: (point.name ?? "").trim() || point.id,
+    connectionCount: count,
+    connections: Array.from({ length: count }, (_, index) => fromLegacy[index] ?? null),
+  };
 }

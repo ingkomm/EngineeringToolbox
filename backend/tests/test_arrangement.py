@@ -88,8 +88,9 @@ def test_arrangement_roundtrip_preserves_point_ends() -> None:
     restored = ProjectDocument.model_validate(project.model_dump())
     loaded = restored.objects[0]
     assert loaded.kind == "arrangement"
-    assert loaded.domain.points[0].a.portId == "OUT_1"  # type: ignore[union-attr]
-    assert loaded.domain.points[0].b.equipmentId == "EQ_2"  # type: ignore[union-attr]
+    assert loaded.domain.points[0].connections[0].portId == "OUT_1"  # type: ignore[union-attr]
+    assert loaded.domain.points[0].connections[1].equipmentId == "EQ_2"  # type: ignore[union-attr]
+    assert loaded.domain.points[0].connectionCount == 2
     assert loaded.view.elements["EQ_2"].x == 320
 
 
@@ -114,6 +115,27 @@ def test_unknown_point_end_port_is_rejected() -> None:
                 ],
             ),
         )
+
+
+def test_point_keeps_multiple_connections() -> None:
+    point = ArrangementPoint(
+        id="PT_1",
+        connectionCount=4,
+        connections=[
+            PointEnd(equipmentId="EQ_1", portId="OUT_1"),
+            None,
+            None,
+            PointEnd(equipmentId="EQ_2", portId="IN_1"),
+        ],
+    )
+    loaded = _arrangement(extra_points=[]).model_copy(
+        update={
+            "domain": _arrangement().domain.model_copy(update={"points": [point]}),
+        }
+    )
+    restored = ArrangementObject.model_validate(loaded.model_dump())
+    assert restored.domain.points[0].connectionCount == 4
+    assert restored.domain.points[0].connections[3].portId == "IN_1"  # type: ignore[union-attr]
 
 
 def test_arrangement_does_not_call_formula_evaluation(monkeypatch: pytest.MonkeyPatch) -> None:

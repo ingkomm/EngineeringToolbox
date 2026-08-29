@@ -150,8 +150,11 @@
       "properties": {
         "id": { "$ref": "#/$defs/variableId" },
         "name": { "type": "string" },
-        "a": { "anyOf": [{ "$ref": "#/$defs/pointEnd" }, { "type": "null" }] },
-        "b": { "anyOf": [{ "$ref": "#/$defs/pointEnd" }, { "type": "null" }] }
+        "connectionCount": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "connections": {
+          "type": "array",
+          "items": { "anyOf": [{ "$ref": "#/$defs/pointEnd" }, { "type": "null" }] }
+        }
       }
     },
     "arrangementDomain": {

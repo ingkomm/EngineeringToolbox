@@ -384,7 +384,7 @@ describe("arrangement object", () => {
         type: "connectPointEnd",
         objectId: arrangementId,
         pointId: "PT_1",
-        end: "a",
+        end: "C_1",
         equipmentId: "EQ_1",
         portId: "OUT_1",
       },
@@ -396,7 +396,7 @@ describe("arrangement object", () => {
         type: "connectPointEnd",
         objectId: arrangementId,
         pointId: "PT_1",
-        end: "b",
+        end: "C_2",
         equipmentId: "EQ_2",
         portId: "IN_1",
       },
@@ -404,8 +404,11 @@ describe("arrangement object", () => {
     ).project;
     let arrangement = project.objects[1];
     expect(arrangement && isArrangementObject(arrangement) && arrangement.domain.points[0]).toMatchObject({
-      a: { equipmentId: "EQ_1", portId: "OUT_1" },
-      b: { equipmentId: "EQ_2", portId: "IN_1" },
+      connectionCount: 2,
+      connections: [
+        { equipmentId: "EQ_1", portId: "OUT_1" },
+        { equipmentId: "EQ_2", portId: "IN_1" },
+      ],
     });
 
     project = applyWorkspaceEdit(
@@ -415,7 +418,7 @@ describe("arrangement object", () => {
     ).project;
     arrangement = project.objects[1];
     expect(arrangement && isArrangementObject(arrangement) && arrangement.domain.equipment[0]?.outCount).toBe(2);
-    expect(arrangement && isArrangementObject(arrangement) && arrangement.domain.points[0]?.a).toEqual({
+    expect(arrangement && isArrangementObject(arrangement) && arrangement.domain.points[0]?.connections[0]).toEqual({
       equipmentId: "EQ_1",
       portId: "OUT_1",
     });
@@ -426,7 +429,48 @@ describe("arrangement object", () => {
       FALLBACK_QUANTITIES,
     ).project;
     arrangement = project.objects[1];
-    expect(arrangement && isArrangementObject(arrangement) && arrangement.domain.points[0]?.a).toBeNull();
+    expect(arrangement && isArrangementObject(arrangement) && arrangement.domain.points[0]?.connections[0]).toBeNull();
+  });
+
+  it("lets a point host multiple connection dots and drops extras when the count shrinks", () => {
+    let project = applyAll([{ type: "addArrangement" }]);
+    const arrangementId = project.objects[1]!.id;
+    project = applyWorkspaceEdit(project, { type: "addPoint", objectId: arrangementId }, FALLBACK_QUANTITIES).project;
+    project = applyWorkspaceEdit(
+      project,
+      { type: "updatePoint", objectId: arrangementId, pointId: "PT_1", patch: { connectionCount: 4 } },
+      FALLBACK_QUANTITIES,
+    ).project;
+    project = applyWorkspaceEdit(
+      project,
+      {
+        type: "connectPointEnd",
+        objectId: arrangementId,
+        pointId: "PT_1",
+        end: "C_4",
+        equipmentId: "EQ_1",
+        portId: "OUT_1",
+      },
+      FALLBACK_QUANTITIES,
+    ).project;
+    let arrangement = project.objects[1];
+    expect(arrangement && isArrangementObject(arrangement) && arrangement.domain.points[0]).toMatchObject({
+      connectionCount: 4,
+    });
+    expect(arrangement && isArrangementObject(arrangement) && arrangement.domain.points[0]?.connections).toHaveLength(4);
+    expect(arrangement && isArrangementObject(arrangement) && arrangement.domain.points[0]?.connections[3]).toEqual({
+      equipmentId: "EQ_1",
+      portId: "OUT_1",
+    });
+
+    project = applyWorkspaceEdit(
+      project,
+      { type: "updatePoint", objectId: arrangementId, pointId: "PT_1", patch: { connectionCount: 2 } },
+      FALLBACK_QUANTITIES,
+    ).project;
+    arrangement = project.objects[1];
+    expect(arrangement && isArrangementObject(arrangement) && arrangement.domain.points[0]?.connectionCount).toBe(2);
+    expect(arrangement && isArrangementObject(arrangement) && arrangement.domain.points[0]?.connections).toHaveLength(2);
   });
 
   it("rejects duplicate point ids and unknown equipment ports", () => {
@@ -447,14 +491,14 @@ describe("arrangement object", () => {
         type: "connectPointEnd",
         objectId: arrangementId,
         pointId: "PT_1",
-        end: "a",
+        end: "C_1",
         equipmentId: "EQ_1",
         portId: "OUT_9",
       },
       FALLBACK_QUANTITIES,
     ).project;
     const still = afterBad.objects[1];
-    expect(still && isArrangementObject(still) && still.domain.points[0]?.a).toBeNull();
+    expect(still && isArrangementObject(still) && still.domain.points[0]?.connections[0]).toBeNull();
   });
 
   it("keeps domain unchanged when moving the node or an inner element", () => {
@@ -483,6 +527,31 @@ describe("arrangement object", () => {
     expect(movedInner && isArrangementObject(movedInner) && movedInner.view.elements.EQ_1).toMatchObject({
       x: 180,
       y: 40,
+    });
+  });
+
+  it("migrates legacy point a/b ends when a project is loaded", () => {
+    let project = applyAll([{ type: "addArrangement" }]);
+    const arrangementId = project.objects[1]!.id;
+    const raw = structuredClone(project);
+    const arrangement = raw.objects[1];
+    if (!arrangement || !isArrangementObject(arrangement)) throw new Error("missing arrangement");
+    arrangement.domain.points = [
+      {
+        id: "PT_1",
+        name: "PT_1",
+        a: { equipmentId: "EQ_1", portId: "OUT_1" },
+        b: { equipmentId: "EQ_2", portId: "IN_1" },
+      } as never,
+    ];
+    project = applyWorkspaceEdit(project, { type: "loadProject", project: raw }, FALLBACK_QUANTITIES).project;
+    const loaded = project.objects.find((item) => item.id === arrangementId);
+    expect(loaded && isArrangementObject(loaded) && loaded.domain.points[0]).toMatchObject({
+      connectionCount: 2,
+      connections: [
+        { equipmentId: "EQ_1", portId: "OUT_1" },
+        { equipmentId: "EQ_2", portId: "IN_1" },
+      ],
     });
   });
 

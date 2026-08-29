@@ -1,9 +1,8 @@
-import { Handle, Position, type Node, type NodeProps, useUpdateNodeInternals } from "@xyflow/react";
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { type Node, type NodeProps, useViewport } from "@xyflow/react";
+import { useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import type { ArrangementEquipment, ArrangementObject, ElementView, PointEnd } from "../types/contract";
-import { inputHandleId, outputHandleId } from "../lib/display";
 import { OBJECT_ID_RE, VARIABLE_ID_RE, type WorkspaceEdit } from "../lib/projectEdits";
-import { equipmentPortIds } from "../lib/worksheet";
+import { equipmentPortIds, parsePointConnectionEnd, pointConnectionIds, pointViewSize } from "../lib/worksheet";
 import { ArrangementSymbol } from "./arrangementSymbols";
 
 export type ArrangementObjectNodeType = Node<
@@ -15,7 +14,7 @@ export type ArrangementObjectNodeType = Node<
 >;
 
 type LinkDrag =
-  | { kind: "from-point"; pointId: string; end: "a" | "b"; x: number; y: number }
+  | { kind: "from-point"; pointId: string; end: string; x: number; y: number }
   | { kind: "from-port"; equipmentId: string; portId: string; x: number; y: number };
 
 function stopKeys(event: KeyboardEvent) {
@@ -36,6 +35,10 @@ function viewOf(object: ArrangementObject, id: string, fallback?: Partial<Elemen
   );
 }
 
+function portSide(portId: string): "left" | "right" {
+  return portId.startsWith("IN_") ? "left" : "right";
+}
+
 function portAnchor(view: ElementView, equipment: ArrangementEquipment, portId: string): { x: number; y: number } {
   const { ins, outs } = equipmentPortIds(equipment);
   const isIn = ins.includes(portId);
@@ -48,20 +51,53 @@ function portAnchor(view: ElementView, equipment: ArrangementEquipment, portId: 
   };
 }
 
-function pointEndAnchor(view: ElementView, end: "a" | "b"): { x: number; y: number } {
+function pointEndAnchor(view: ElementView, end: string, count: number): { x: number; y: number } {
+  const index = parsePointConnectionEnd(end) ?? 0;
+  const safeCount = Math.max(1, count);
+  const slot = safeCount <= 1 ? 0.5 : (index + 1) / (safeCount + 1);
   return {
-    x: end === "a" ? view.x : view.x + view.width,
-    y: view.y + view.height / 2,
+    x: view.x + view.width * slot,
+    y: view.y + view.height * 0.7,
   };
 }
 
-function canvasCoords(canvas: HTMLElement, event: { clientX: number; clientY: number }): { x: number; y: number } {
+function pointEndSide(end: string, count: number): "left" | "right" {
+  const index = parsePointConnectionEnd(end) ?? 0;
+  return index < count / 2 ? "left" : "right";
+}
+
+function canvasCoords(
+  canvas: HTMLElement,
+  event: { clientX: number; clientY: number },
+  zoom: number,
+): { x: number; y: number } {
   const box = canvas.getBoundingClientRect();
-  return { x: event.clientX - box.left, y: event.clientY - box.top };
+  const scale = zoom || 1;
+  return { x: (event.clientX - box.left) / scale, y: (event.clientY - box.top) / scale };
+}
+
+function orthogonalPath(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  fromSide: "left" | "right",
+  toSide: "left" | "right",
+): string {
+  const stub = 16;
+  const start = x1 + (fromSide === "right" ? stub : -stub);
+  const end = x2 + (toSide === "right" ? stub : -stub);
+  if (fromSide === toSide) {
+    const outer = fromSide === "right" ? Math.max(start, end) : Math.min(start, end);
+    return `M ${x1} ${y1} L ${outer} ${y1} L ${outer} ${y2} L ${x2} ${y2}`;
+  }
+  const mid = (start + end) / 2;
+  return `M ${x1} ${y1} L ${start} ${y1} L ${mid} ${y1} L ${mid} ${y2} L ${end} ${y2} L ${x2} ${y2}`;
 }
 
 export function ArrangementObjectNode({ id, data }: NodeProps<ArrangementObjectNodeType>) {
   const { object, onEdit } = data;
+  const { zoom } = useViewport();
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dragPreview, setDragPreview] = useState<Record<string, { x: number; y: number }>>({});
@@ -72,19 +108,28 @@ export function ArrangementObjectNode({ id, data }: NodeProps<ArrangementObjectN
     startY: number;
     origX: number;
     origY: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
   } | null>(null);
-  const updateNodeInternals = useUpdateNodeInternals();
-  const pointSignature = object.domain.points.map((item) => item.id).join("|");
   const selectedEquipment = object.domain.equipment.find((item) => item.id === selectedId);
-
-  useLayoutEffect(() => {
-    updateNodeInternals(id);
-  }, [id, pointSignature, object.view.elements, updateNodeInternals]);
 
   const resolvedView = (elementId: string, fallback?: Partial<ElementView>) => {
     const view = viewOf(object, elementId, fallback);
     const preview = dragPreview[elementId];
     return preview ? { ...view, ...preview } : view;
+  };
+
+  const moveByPointer = (event: { clientX: number; clientY: number }) => {
+    const drag = dragRef.current;
+    if (!drag) return null;
+    const scale = zoom || 1;
+    const x = Math.max(0, Math.min(object.view.width - drag.width, drag.origX + (event.clientX - drag.startX) / scale));
+    const y = Math.max(0, Math.min(object.view.height - drag.height, drag.origY + (event.clientY - drag.startY) / scale));
+    drag.x = x;
+    drag.y = y;
+    return { x, y };
   };
 
   const startMove = (event: ReactPointerEvent, elementId: string) => {
@@ -98,28 +143,32 @@ export function ArrangementObjectNode({ id, data }: NodeProps<ArrangementObjectN
       startY: event.clientY,
       origX: view.x,
       origY: view.y,
+      x: view.x,
+      y: view.y,
+      width: view.width,
+      height: view.height,
     };
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   };
 
   const onCanvasPointerMove = (event: ReactPointerEvent) => {
     if (linkDrag && canvasRef.current) {
-      const point = canvasCoords(canvasRef.current, event);
+      const point = canvasCoords(canvasRef.current, event, zoom);
       setLinkDrag({ ...linkDrag, x: point.x, y: point.y });
     }
-    const drag = dragRef.current;
-    if (!drag) return;
-    setDragPreview({ [drag.id]: { x: drag.origX + event.clientX - drag.startX, y: drag.origY + event.clientY - drag.startY } });
+    const next = moveByPointer(event);
+    if (!next || !dragRef.current) return;
+    setDragPreview({ [dragRef.current.id]: next });
   };
 
-  const finishMove = () => {
+  const finishMove = (event?: ReactPointerEvent) => {
     const drag = dragRef.current;
     if (!drag) return;
-    const preview = dragPreview[drag.id];
+    const next = event ? moveByPointer(event) : { x: drag.x, y: drag.y };
     dragRef.current = null;
     setDragPreview({});
-    if (!preview) return;
-    onEdit({ type: "moveElement", objectId: id, elementId: drag.id, x: preview.x, y: preview.y });
+    if (!next) return;
+    onEdit({ type: "moveElement", objectId: id, elementId: drag.id, x: next.x, y: next.y });
   };
 
   const finishLink = (event: ReactPointerEvent) => {
@@ -150,7 +199,7 @@ export function ArrangementObjectNode({ id, data }: NodeProps<ArrangementObjectN
       }
     } else if (pointHost?.dataset.arrPointEnd) {
       const [pointId, end] = pointHost.dataset.arrPointEnd.split(":");
-      if (pointId && (end === "a" || end === "b")) {
+      if (pointId && end) {
         onEdit({
           type: "connectPointEnd",
           objectId: id,
@@ -164,11 +213,11 @@ export function ArrangementObjectNode({ id, data }: NodeProps<ArrangementObjectN
     setLinkDrag(null);
   };
 
-  const startLinkFromPoint = (event: ReactPointerEvent, pointId: string, end: "a" | "b") => {
+  const startLinkFromPoint = (event: ReactPointerEvent, pointId: string, end: string) => {
     event.stopPropagation();
     event.preventDefault();
     if (!canvasRef.current) return;
-    const point = canvasCoords(canvasRef.current, event);
+    const point = canvasCoords(canvasRef.current, event, zoom);
     setSelectedId(pointId);
     setLinkDrag({ kind: "from-point", pointId, end, x: point.x, y: point.y });
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
@@ -178,31 +227,53 @@ export function ArrangementObjectNode({ id, data }: NodeProps<ArrangementObjectN
     event.stopPropagation();
     event.preventDefault();
     if (!canvasRef.current) return;
-    const point = canvasCoords(canvasRef.current, event);
+    const point = canvasCoords(canvasRef.current, event, zoom);
     setSelectedId(equipmentId);
     setLinkDrag({ kind: "from-port", equipmentId, portId, x: point.x, y: point.y });
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   };
 
-  const wireFrom = (end: PointEnd | null, pointView: ElementView, which: "a" | "b") => {
+  const wireFrom = (end: PointEnd | null, pointView: ElementView, which: string, count: number) => {
     if (!end) return null;
     const host = object.domain.equipment.find((item) => item.id === end.equipmentId);
     if (!host) return null;
     const eqView = resolvedView(host.id);
-    return { from: pointEndAnchor(pointView, which), to: portAnchor(eqView, host, end.portId) };
+    return {
+      from: pointEndAnchor(pointView, which, count),
+      to: portAnchor(eqView, host, end.portId),
+      fromSide: pointEndSide(which, count),
+      toSide: portSide(end.portId),
+    };
   };
 
-  let rubber: { x1: number; y1: number; x2: number; y2: number } | null = null;
+  let rubber: { x1: number; y1: number; x2: number; y2: number; fromSide: "left" | "right"; toSide: "left" | "right" } | null =
+    null;
   if (linkDrag) {
     if (linkDrag.kind === "from-point") {
-      const view = resolvedView(linkDrag.pointId, { width: 88, height: 28 });
-      const from = pointEndAnchor(view, linkDrag.end);
-      rubber = { x1: from.x, y1: from.y, x2: linkDrag.x, y2: linkDrag.y };
+      const host = object.domain.points.find((item) => item.id === linkDrag.pointId);
+      const count = host?.connectionCount ?? 2;
+      const view = resolvedView(linkDrag.pointId, pointViewSize(count));
+      const from = pointEndAnchor(view, linkDrag.end, count);
+      rubber = {
+        x1: from.x,
+        y1: from.y,
+        x2: linkDrag.x,
+        y2: linkDrag.y,
+        fromSide: pointEndSide(linkDrag.end, count),
+        toSide: linkDrag.x >= from.x ? "left" : "right",
+      };
     } else {
       const host = object.domain.equipment.find((item) => item.id === linkDrag.equipmentId);
       if (host) {
         const from = portAnchor(resolvedView(host.id), host, linkDrag.portId);
-        rubber = { x1: from.x, y1: from.y, x2: linkDrag.x, y2: linkDrag.y };
+        rubber = {
+          x1: from.x,
+          y1: from.y,
+          x2: linkDrag.x,
+          y2: linkDrag.y,
+          fromSide: portSide(linkDrag.portId),
+          toSide: linkDrag.x >= from.x ? "left" : "right",
+        };
       }
     }
   }
@@ -258,7 +329,7 @@ export function ArrangementObjectNode({ id, data }: NodeProps<ArrangementObjectN
           + Point
         </button>
       </div>
-      <p className="arr-hint nodrag">Point 양끝을 Equipment In/Out에 끌어다 놓으세요. 계산은 하지 않습니다.</p>
+      <p className="arr-hint nodrag">Point 연결 점을 Equipment In/Out에 끌어다 놓으세요. 계산은 하지 않습니다.</p>
 
       <div
         ref={canvasRef}
@@ -268,7 +339,7 @@ export function ArrangementObjectNode({ id, data }: NodeProps<ArrangementObjectN
         onPointerMove={onCanvasPointerMove}
         onPointerUp={(event) => {
           if (linkDrag) finishLink(event);
-          else finishMove();
+          else finishMove(event);
         }}
         onPointerDown={(event) => {
           if (event.target === event.currentTarget) setSelectedId(null);
@@ -276,27 +347,24 @@ export function ArrangementObjectNode({ id, data }: NodeProps<ArrangementObjectN
       >
         <svg className="arr-wires" width={object.view.width} height={object.view.height}>
           {object.domain.points.flatMap((point) => {
-            const view = resolvedView(point.id, { width: 88, height: 28 });
-            const lines = [
-              wireFrom(point.a, view, "a"),
-              wireFrom(point.b, view, "b"),
-            ];
-            return lines.map((line, index) =>
-              line ? (
-                <line
-                  key={`${point.id}-${index}`}
-                  x1={line.from.x}
-                  y1={line.from.y}
-                  x2={line.to.x}
-                  y2={line.to.y}
+            const view = resolvedView(point.id, pointViewSize(point.connectionCount));
+            return pointConnectionIds(point.connectionCount).map((endId, index) => {
+              const line = wireFrom(point.connections[index] ?? null, view, endId, point.connectionCount);
+              return line ? (
+                <path
+                  key={`${point.id}-${endId}`}
+                  d={orthogonalPath(line.from.x, line.from.y, line.to.x, line.to.y, line.fromSide, line.toSide)}
                   className="arr-point-link"
-                  data-testid={`object-${id}-point-${point.id}-link-${index === 0 ? "a" : "b"}`}
+                  data-testid={`object-${id}-point-${point.id}-link-${endId}`}
                 />
-              ) : null,
-            );
+              ) : null;
+            });
           })}
           {rubber ? (
-            <line x1={rubber.x1} y1={rubber.y1} x2={rubber.x2} y2={rubber.y2} className="arr-point-link arr-point-link--preview" />
+            <path
+              d={orthogonalPath(rubber.x1, rubber.y1, rubber.x2, rubber.y2, rubber.fromSide, rubber.toSide)}
+              className="arr-point-link arr-point-link--preview"
+            />
           ) : null}
         </svg>
 
@@ -358,7 +426,7 @@ export function ArrangementObjectNode({ id, data }: NodeProps<ArrangementObjectN
         })}
 
         {object.domain.points.map((point) => {
-          const view = resolvedView(point.id, { width: 88, height: 28 });
+          const view = resolvedView(point.id, pointViewSize(point.connectionCount));
           return (
             <div
               key={point.id}
@@ -369,39 +437,24 @@ export function ArrangementObjectNode({ id, data }: NodeProps<ArrangementObjectN
               onPointerMove={onCanvasPointerMove}
               onPointerUp={finishMove}
             >
-              <Handle
-                type="target"
-                position={Position.Top}
-                id={inputHandleId(point.id)}
-                className="arr-point-handle arr-point-handle--in"
-                data-testid={`handle-in-${point.id}`}
-              />
-              <Handle
-                type="source"
-                position={Position.Bottom}
-                id={outputHandleId(point.id)}
-                className="arr-point-handle arr-point-handle--out"
-                data-testid={`handle-out-${point.id}`}
-              />
-              <button
-                type="button"
-                className={`arr-point-end arr-point-end--a nodrag ${point.a ? "arr-point-end--on" : ""}`}
-                data-arr-point-end={`${point.id}:a`}
-                data-testid={`object-${id}-point-${point.id}-a`}
-                onPointerDown={(event) => startLinkFromPoint(event, point.id, "a")}
-                onPointerMove={onCanvasPointerMove}
-                onPointerUp={finishLink}
-              />
               <span className="arr-point__id">{point.id}</span>
-              <button
-                type="button"
-                className={`arr-point-end arr-point-end--b nodrag ${point.b ? "arr-point-end--on" : ""}`}
-                data-arr-point-end={`${point.id}:b`}
-                data-testid={`object-${id}-point-${point.id}-b`}
-                onPointerDown={(event) => startLinkFromPoint(event, point.id, "b")}
-                onPointerMove={onCanvasPointerMove}
-                onPointerUp={finishLink}
-              />
+              {pointConnectionIds(point.connectionCount).map((endId, index) => {
+                const anchor = pointEndAnchor(view, endId, point.connectionCount);
+                return (
+                  <button
+                    key={endId}
+                    type="button"
+                    className={`arr-point-end nodrag ${point.connections[index] ? "arr-point-end--on" : ""}`}
+                    data-arr-point-end={`${point.id}:${endId}`}
+                    data-testid={`object-${id}-point-${point.id}-${endId}`}
+                    style={{ left: anchor.x - view.x, top: anchor.y - view.y }}
+                    title={`${point.id}.${endId}`}
+                    onPointerDown={(event) => startLinkFromPoint(event, point.id, endId)}
+                    onPointerMove={onCanvasPointerMove}
+                    onPointerUp={finishLink}
+                  />
+                );
+              })}
             </div>
           );
         })}
@@ -489,11 +542,32 @@ export function ArrangementObjectNode({ id, data }: NodeProps<ArrangementObjectN
                   onEdit({ type: "updatePoint", objectId: id, pointId: point.id, patch: { name } });
                 }}
               />
+              <label>
+                연결
+                <input
+                  className="arr-count nodrag"
+                  type="number"
+                  min={1}
+                  max={8}
+                  value={point.connectionCount}
+                  data-testid={`object-${id}-point-${point.id}-count`}
+                  onKeyDown={stopKeys}
+                  onFocus={() => setSelectedId(point.id)}
+                  onChange={(event) =>
+                    onEdit({
+                      type: "updatePoint",
+                      objectId: id,
+                      pointId: point.id,
+                      patch: { connectionCount: Number(event.target.value) },
+                    })
+                  }
+                />
+              </label>
             </div>
           ))}
         </div>
       ) : (
-        <p className="arr-inspector arr-inspector--hint nodrag">+ Point를 추가한 뒤 양끝을 Equipment 포트에 연결하세요.</p>
+        <p className="arr-inspector arr-inspector--hint nodrag">+ Point를 추가한 뒤 연결 점을 Equipment 포트에 연결하세요.</p>
       )}
     </article>
   );

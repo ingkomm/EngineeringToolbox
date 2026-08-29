@@ -122,13 +122,30 @@ class ArrangementPoint(BaseModel):
 
     id: str
     name: str = ""
-    a: PointEnd | None = None
-    b: PointEnd | None = None
+    connectionCount: int = Field(default=2, ge=1, le=8)
+    connections: list[PointEnd | None] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_legacy_ends(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        payload = dict(data)
+        legacy_a = payload.pop("a", None)
+        legacy_b = payload.pop("b", None)
+        if "connections" not in payload and (legacy_a is not None or legacy_b is not None):
+            payload["connections"] = [legacy_a, legacy_b]
+            payload.setdefault("connectionCount", 2)
+        return payload
 
     @model_validator(mode="after")
-    def default_name(self) -> ArrangementPoint:
+    def default_name_and_pad(self) -> ArrangementPoint:
         if not self.name.strip():
             self.name = self.id
+        padded = list(self.connections)
+        while len(padded) < self.connectionCount:
+            padded.append(None)
+        self.connections = padded[: self.connectionCount]
         return self
 
 
@@ -201,7 +218,7 @@ class ArrangementObject(BaseModel):
 
         equipment_by_id = {item.id: item for item in self.domain.equipment}
         for point in self.domain.points:
-            for end in (point.a, point.b):
+            for end in point.connections:
                 if end is None:
                     continue
                 host = equipment_by_id.get(end.equipmentId)

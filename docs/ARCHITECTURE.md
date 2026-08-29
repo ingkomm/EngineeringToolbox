@@ -312,13 +312,14 @@ Arrangement:
 | testid | 위치 | 동작 |
 |---|---|---|
 | `object-{id}-add-equipment` | Arrangement 툴바 | Equipment 추가 |
-| `object-{id}-add-point` | Arrangement 툴바 | Point 추가 (양끝 연결 전) |
+| `object-{id}-add-point` | Arrangement 툴바 | Point 추가 |
 | `object-{id}-equipment-{eqId}` | 캔버스 | Equipment 선택/이동 |
-| `object-{id}-equipment-{eqId}-IN_n` / `OUT_n` | Equipment 포트 | Point 끝을 끌어다 놓음 |
+| `object-{id}-equipment-{eqId}-IN_n` / `OUT_n` | Equipment 포트 | Point 연결 점을 끌어다 놓음 |
 | `object-{id}-equipment-{eqId}-in-count` | Inspector | In 포트 개수 |
 | `object-{id}-equipment-{eqId}-out-count` | Inspector | Out 포트 개수 |
 | `object-{id}-point-{ptId}` | 캔버스 | Point 본체 이동 |
-| `object-{id}-point-{ptId}-a` / `-b` | Point 양끝 | Equipment 포트로 드래그 |
+| `object-{id}-point-{ptId}-C_n` | Point 연결 점 | Equipment 포트로 드래그 |
+| `object-{id}-point-{ptId}-count` | Inspector | Point 연결 점 개수 |
 | `object-{id}-point-{ptId}-id` | Inspector | Point ID |
 | `object-{id}-point-{ptId}-name` | Inspector | Point 이름 |
 
@@ -329,7 +330,7 @@ Arrangement는 Equipment와 Point로 계통 배치를 그리는 도면 객체다
 이 프로토타입 범위:
 
 - Equipment: 범용 심볼. In/Out 포트 개수를 지정한다. 포트 ID는 `IN_1`… / `OUT_1`…
-- Point: 양끝을 가진 연결 요소. 각 끝을 Equipment In/Out에 드래그 앤 드롭으로 붙인다
+- Point: 연결 점 개수를 지정하는 막대. 각 점(`C_1`…)을 Equipment In/Out에 드래그 앤 드롭으로 붙인다. 연결선은 꺾은선이다.
 - Valve, Pipe, Signal, Annotation은 이 단계에 없다
 
 역할 분리:
@@ -341,7 +342,7 @@ Arrangement는 Equipment와 Point로 계통 배치를 그리는 도면 객체다
 
 Arrangement 저장 모델은 Domain과 View를 분리한다.
 
-- Domain: Equipment ID/이름/`inCount`/`outCount`, Point ID/이름, Point 끝 `a`/`b`의 `{ equipmentId, portId }`
+- Domain: Equipment ID/이름/`inCount`/`outCount`, Point ID/이름/`connectionCount`, 각 연결 점 `connections[]`의 `{ equipmentId, portId }`
 - View: 워크시트 `position`, 캔버스 크기, `elements[id]` 좌표
 
 Point를 Equipment에 연결하는 것은 Domain이다. Equipment/Point를 화면에서 옮기는 것은 View다.

@@ -64,8 +64,8 @@ export interface PointEnd {
 export interface ArrangementPoint {
   id: string;
   name: string;
-  a: PointEnd | null;
-  b: PointEnd | null;
+  connectionCount: number;
+  connections: Array<PointEnd | null>;
 }
 
 export interface ArrangementDomain {
