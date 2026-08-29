@@ -3,7 +3,7 @@ import { applyWorkspaceEdit } from "./projectEdits";
 import { blankProject } from "../example/blankProject";
 import { FALLBACK_QUANTITIES } from "./quantities";
 import type { CalculationObject, ProjectDocument } from "../types/contract";
-import { isCalculationObject, isEquipmentObject, isPointObject } from "./worksheet";
+import { isCalculationObject, isEquipmentObject, isPointObject, isValueFlowEdge } from "./worksheet";
 
 function calc(project: ProjectDocument, index = 0): CalculationObject {
   const object = project.objects[index];
@@ -367,7 +367,7 @@ describe("worksheet equipment and points", () => {
       ["EQ_1", 1, 1],
       ["EQ_2", 1, 1],
     ]);
-    expect(project.objects.filter(isPointObject).map((item) => [item.id, item.connectionCount])).toEqual([["PT_1", 3]]);
+    expect(project.objects.filter(isPointObject).map((item) => [item.id, item.connectionCount])).toEqual([["PT_1", 4]]);
     expect(applyWorkspaceEdit(project, { type: "addInput", objectId: "EQ_1" }, FALLBACK_QUANTITIES).shouldEvaluate).toBe(false);
   });
 
@@ -385,10 +385,11 @@ describe("worksheet equipment and points", () => {
     ).project;
     const point = project.objects.find(isPointObject);
     expect(point).toMatchObject({
-      connectionCount: 3,
+      connectionCount: 4,
       connections: [
         { objectId: "EQ_1", portId: "OUT_1", reversed: false },
         { objectId: "EQ_2", portId: "IN_1", reversed: false },
+        null,
         null,
       ],
     });
@@ -413,11 +414,11 @@ describe("worksheet equipment and points", () => {
     expect(project.objects.find(isPointObject)?.connections[0]).toBeNull();
   });
 
-  it("keeps a point at left, right, and bottom ends only", () => {
+  it("keeps a point at west, east, south, and north ends", () => {
     let project = applyAll([{ type: "addEquipment" }, { type: "addPoint" }]);
     project = applyWorkspaceEdit(
       project,
-      { type: "updatePoint", objectId: "PT_1", patch: { connectionCount: 4 } },
+      { type: "updatePoint", objectId: "PT_1", patch: { connectionCount: 2 } },
       FALLBACK_QUANTITIES,
     ).project;
     project = applyWorkspaceEdit(
@@ -426,16 +427,19 @@ describe("worksheet equipment and points", () => {
       FALLBACK_QUANTITIES,
     ).project;
     const point = project.objects.find(isPointObject);
-    expect(point?.connectionCount).toBe(3);
-    expect(point?.connections).toHaveLength(3);
+    expect(point?.connectionCount).toBe(4);
+    expect(point?.connections).toHaveLength(4);
     expect(point?.connections[2]).toEqual({ objectId: "EQ_1", portId: "OUT_1", reversed: false });
-    expect(
-      applyWorkspaceEdit(
-        project,
-        { type: "connectPointEnd", pointId: "PT_1", end: "C_4", targetObjectId: "EQ_1", targetPortId: "OUT_1" },
-        FALLBACK_QUANTITIES,
-      ).project.objects.find(isPointObject)?.connections[2],
-    ).toEqual({ objectId: "EQ_1", portId: "OUT_1", reversed: false });
+    project = applyWorkspaceEdit(
+      project,
+      { type: "connectPointEnd", pointId: "PT_1", end: "C_4", targetObjectId: "EQ_1", targetPortId: "OUT_1" },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(project.objects.find(isPointObject)?.connections[3]).toEqual({
+      objectId: "EQ_1",
+      portId: "OUT_1",
+      reversed: false,
+    });
   });
 
   it("rejects duplicate point ids and unknown equipment ports", () => {
@@ -512,8 +516,8 @@ describe("worksheet equipment and points", () => {
     });
     expect(project.objects.find((item) => item.id === "PT_1")).toMatchObject({
       kind: "point",
-      connectionCount: 3,
-      connections: [{ objectId: "EQ_1", portId: "OUT_1", reversed: false }, null, null],
+      connectionCount: 4,
+      connections: [{ objectId: "EQ_1", portId: "OUT_1", reversed: false }, null, null, null],
       position: { x: 190, y: 122 },
     });
   });
@@ -557,7 +561,7 @@ describe("worksheet equipment and points", () => {
       FALLBACK_QUANTITIES,
     ).project;
     expect(project.objects.find((item) => item.id === "PT_1")).toMatchObject({
-      connections: [{ objectId: "PT_2", portId: "C_2", reversed: false }, null, null],
+      connections: [{ objectId: "PT_2", portId: "C_2", reversed: false }, null, null, null],
     });
 
     project = applyWorkspaceEdit(project, { type: "togglePointLink", pointId: "PT_1", end: "C_1" }, FALLBACK_QUANTITIES)
@@ -580,7 +584,7 @@ describe("worksheet equipment and points", () => {
         targetPortId: "C_2",
       },
     ]);
-    expect(project.objects.find(isPointObject)?.connections).toEqual([null, null, null]);
+    expect(project.objects.find(isPointObject)?.connections).toEqual([null, null, null, null]);
   });
 
   it("adds a dashed calculation link to a point or equipment object", () => {
@@ -615,8 +619,8 @@ describe("worksheet equipment and points", () => {
     expect(project.edges[0]?.targetVariableId).toBe("OBJ");
   });
 
-  it("does not create a second yellow object link while one already exists", () => {
-    let project = applyAll([{ type: "addPoint" }, { type: "addEquipment" }, { type: "addObject" }]);
+  it("lets one calculation yellow-link many equipment but keeps one link per layout object", () => {
+    let project = applyAll([{ type: "addPoint" }, { type: "addEquipment" }, { type: "addEquipment" }, { type: "addObject" }]);
     project = applyWorkspaceEdit(
       project,
       { type: "connectLink", objectId: "obj_1", targetObjectId: "PT_1" },
@@ -629,18 +633,26 @@ describe("worksheet equipment and points", () => {
       { type: "connectLink", objectId: "obj_1", targetObjectId: "EQ_1" },
       FALLBACK_QUANTITIES,
     ).project;
-    expect(calc(afterSecond).links).toHaveLength(1);
-    expect(calc(afterSecond).links?.[0]?.targetObjectId).toBe("PT_1");
-    expect(afterSecond.edges).toHaveLength(1);
+    expect(calc(afterSecond).links).toHaveLength(2);
+    expect(calc(afterSecond).links?.map((link) => link.targetObjectId)).toEqual(["PT_1", "EQ_1"]);
+    expect(afterSecond.edges).toHaveLength(2);
+
+    const afterSameLayout = applyWorkspaceEdit(
+      afterSecond,
+      { type: "connectLink", objectId: "obj_1", targetObjectId: "EQ_1" },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(calc(afterSameLayout).links).toHaveLength(2);
+    expect(afterSameLayout.edges).toHaveLength(2);
 
     const afterOtherCalc = applyWorkspaceEdit(
-      afterSecond,
+      afterSameLayout,
       { type: "connectLink", objectId: "obj_2", targetObjectId: "PT_1" },
       FALLBACK_QUANTITIES,
     ).project;
     const other = afterOtherCalc.objects.find((item) => item.id === "obj_2");
     expect(other && isCalculationObject(other) ? other.links ?? [] : undefined).toEqual([]);
-    expect(afterOtherCalc.edges).toHaveLength(1);
+    expect(afterOtherCalc.edges).toHaveLength(2);
   });
 
   it("moves the yellow object-link handle between top and bottom", () => {
@@ -724,6 +736,65 @@ describe("worksheet equipment and points", () => {
       portId: "OUT_1",
       linkKind: "signal",
     });
+  });
+
+  it("copies calculation objects with unique variables and cloned edges", () => {
+    let project = applyAll([
+      { type: "addInput", objectId: "obj_1" },
+      { type: "updateInput", objectId: "obj_1", index: 0, patch: { id: "FLOW", value: 10 } },
+      { type: "addCalculation", objectId: "obj_1" },
+      { type: "updateCalculation", objectId: "obj_1", index: 0, patch: { id: "POWER", formula: "FLOW * 2" } },
+      { type: "addObject" },
+      { type: "addInput", objectId: "obj_2" },
+      {
+        type: "connectMapping",
+        sourceObjectId: "obj_1",
+        sourceVariableId: "POWER",
+        targetObjectId: "obj_2",
+        targetVariableId: "IN_1",
+      },
+      { type: "addEquipment" },
+      { type: "connectLink", objectId: "obj_1", targetObjectId: "EQ_1" },
+    ]);
+    project = applyWorkspaceEdit(
+      project,
+      { type: "duplicateObjects", objectIds: ["obj_1", "obj_2", "EQ_1"] },
+      FALLBACK_QUANTITIES,
+    ).project;
+    const calcs = project.objects.filter(isCalculationObject);
+    expect(calcs.map((item) => item.id)).toEqual(["obj_1", "obj_2", "obj_3", "obj_4"]);
+    const original = calcs.find((item) => item.id === "obj_1");
+    const cloned = calcs.find((item) => item.id === "obj_3");
+    expect(cloned?.inputs[0]?.id).toBe("FLOW_1");
+    expect(cloned?.calculations[0]).toMatchObject({ id: "POWER_1", formula: "FLOW_1 * 2" });
+    expect(cloned?.inputs[0]?.id).not.toBe(original?.inputs[0]?.id);
+    expect(project.objects.filter(isEquipmentObject).map((item) => item.id)).toEqual(["EQ_1", "EQ_2"]);
+    expect(cloned?.links?.[0]).toMatchObject({ targetObjectId: "EQ_2", targetPortId: "OBJ" });
+    expect(
+      project.edges.some(
+        (edge) =>
+          edge.relationType === "association" &&
+          edge.sourceObjectId === "obj_3" &&
+          edge.targetObjectId === "EQ_2",
+      ),
+    ).toBe(true);
+    expect(
+      project.edges.some(
+        (edge) =>
+          edge.sourceObjectId === "obj_1" &&
+          edge.targetObjectId === "EQ_1" &&
+          edge.relationType === "association",
+      ),
+    ).toBe(true);
+    expect(
+      project.edges.some(
+        (edge) =>
+          isValueFlowEdge(edge) &&
+          edge.sourceObjectId === "obj_3" &&
+          edge.sourceVariableId === "POWER_1" &&
+          edge.targetObjectId === "obj_4",
+      ),
+    ).toBe(true);
   });
 
   it("deletes a yellow object link", () => {

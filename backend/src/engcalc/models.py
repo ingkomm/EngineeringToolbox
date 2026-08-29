@@ -165,7 +165,7 @@ class PointObject(BaseModel):
     id: str
     name: str = ""
     position: Position
-    connectionCount: int = Field(default=3, ge=2, le=4)
+    connectionCount: int = Field(default=4, ge=2, le=4)
     connections: list[PointEnd | None] = Field(default_factory=list)
     objectLinkSide: Literal["top", "bottom"] = "top"
 
@@ -179,23 +179,23 @@ class PointObject(BaseModel):
         legacy_b = payload.pop("b", None)
         if "connections" not in payload and (legacy_a is not None or legacy_b is not None):
             payload["connections"] = [legacy_a, legacy_b]
-            payload.setdefault("connectionCount", 3)
+            payload.setdefault("connectionCount", 4)
         return payload
 
     @model_validator(mode="after")
     def default_name_and_pad(self) -> PointObject:
         if not self.name.strip():
             self.name = self.id
-        self.connectionCount = 3
+        self.connectionCount = 4
         padded = list(self.connections)
-        while len(padded) < 3:
+        while len(padded) < 4:
             padded.append(None)
-        self.connections = padded[:3]
+        self.connections = padded[:4]
         return self
 
 
 OBJECT_LINK_HANDLE = "OBJ"
-POINT_CONNECTION_IDS = ("C_1", "C_2", "C_3")
+POINT_CONNECTION_IDS = ("C_1", "C_2", "C_3", "C_4")
 
 
 def equipment_port_ids(equipment: EquipmentObject) -> set[str]:

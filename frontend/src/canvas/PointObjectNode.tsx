@@ -14,10 +14,11 @@ export type PointObjectNodeType = Node<
   "pointObject"
 >;
 
-const SIDE_POSITION: Record<"left" | "right" | "bottom", Position> = {
+const SIDE_POSITION: Record<"left" | "right" | "bottom" | "top", Position> = {
   left: Position.Left,
   right: Position.Right,
   bottom: Position.Bottom,
+  top: Position.Top,
 };
 
 export function PointObjectNode({ id, selected, data }: NodeProps<PointObjectNodeType>) {

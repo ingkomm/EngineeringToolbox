@@ -91,7 +91,7 @@ export function connectedObjectLinks(project: ProjectDocument): Array<{
   return links;
 }
 
-/** One yellow object-link per calculation and per layout object. */
+/** One yellow object-link per layout object. One Calculation may link to many Equipment/Points. */
 export function canConnectObjectLink(
   project: ProjectDocument,
   calcId: string,
@@ -103,16 +103,16 @@ export function canConnectObjectLink(
   if (!layout || !isLayoutObject(layout)) return false;
   for (const item of connectedObjectLinks(project)) {
     if (linkId && item.calcId === calcId && item.linkId === linkId) continue;
-    if (item.calcId === calcId || item.layoutId === layoutId) return false;
+    if (item.layoutId === layoutId) return false;
   }
   return true;
 }
 
-/** Fixed Point piping ends: left, right, bottom. */
-export const POINT_CONNECTION_IDS = ["C_1", "C_2", "C_3"] as const;
+/** Fixed Point piping ends: west, east, south, north. */
+export const POINT_CONNECTION_IDS = ["C_1", "C_2", "C_3", "C_4"] as const;
 export const POINT_CONNECTION_COUNT = POINT_CONNECTION_IDS.length;
 
-export type PointConnectionSide = "left" | "right" | "bottom";
+export type PointConnectionSide = "left" | "right" | "bottom" | "top";
 
 export function clampConnectionCount(_value?: number): number {
   return POINT_CONNECTION_COUNT;
@@ -125,6 +125,7 @@ export function pointConnectionIds(_count?: number): string[] {
 export function pointConnectionSide(end: string): PointConnectionSide {
   if (end === "C_2" || end === "b") return "right";
   if (end === "C_3") return "bottom";
+  if (end === "C_4") return "top";
   return "left";
 }
 
@@ -207,7 +208,7 @@ export function arrangementLinkId(pointId: string, end: string): string {
 }
 
 export function parseArrangementLinkId(edgeId: string): { pointId: string; end: string } | null {
-  const match = /^arrlink:([^:]+):(C_[123]|a|b)$/.exec(edgeId);
+  const match = /^arrlink:([^:]+):(C_[1-4]|a|b)$/.exec(edgeId);
   if (!match) return null;
   return { pointId: match[1]!, end: match[2]! };
 }

@@ -203,6 +203,31 @@ label.ghost-btn {
   gap: 8px;
 }
 
+.ws-zoom-controls.react-flow__controls,
+.react-flow__controls {
+  border: 1px solid #3d4f66;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  background: #101826;
+}
+
+.react-flow__controls-button {
+  background: #121c2b !important;
+  border-bottom: 1px solid #2c3d52 !important;
+  fill: #e8eef6 !important;
+  color: #e8eef6 !important;
+}
+
+.react-flow__controls-button:hover {
+  background: #1c2d44 !important;
+}
+
+.react-flow__controls-button svg,
+.react-flow__controls-button path {
+  fill: #e8eef6 !important;
+}
+
 .react-flow__node {
   overflow: visible;
 }
@@ -1433,12 +1458,38 @@ label.ghost-btn {
 }
 
 .pid-pt {
-  width: 22px;
-  height: 22px;
+  width: 36px;
+  height: 36px;
   position: relative;
   background: transparent;
   border: 0;
   overflow: visible;
+}
+
+.pid-pt .obj-link-cluster--top {
+  top: 10px;
+}
+
+.pid-pt .obj-link-cluster--bottom {
+  bottom: 10px;
+}
+
+.pid-pt .pid-port--left {
+  left: -10px !important;
+}
+
+.pid-pt .pid-port--right {
+  right: -10px !important;
+  left: auto !important;
+}
+
+.pid-pt .pid-port--bottom {
+  bottom: -12px !important;
+  top: auto !important;
+}
+
+.pid-pt .pid-port--top {
+  top: -12px !important;
 }
 
 .pid-pt__dot {
@@ -1612,6 +1663,16 @@ label.ghost-btn {
 .pid-selection-bar,
 .canvas-panel--pid {
   flex-wrap: wrap;
+}
+
+.pid-selection-bar {
+  max-width: 280px;
+  margin: 0 12px 12px 0;
+  padding: 6px;
+  background: #101826;
+  border: 1px solid #3d4f66;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 .pid-menu {

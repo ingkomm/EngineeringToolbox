@@ -327,7 +327,7 @@ Arrangement:
 | `object-{id}-IN_n` / `OUT_n` | Equipment 포트 | Point 연결 점과 드래그 연결 |
 | `object-{id}-in-count` | Equipment | In 포트 개수 |
 | `object-{id}-out-count` | Equipment | Out 포트 개수 |
-| `object-{id}-C_1` / `C_2` / `C_3` | Point 좌·우·아래 | Equipment 포트 또는 다른 Point로 드래그 |
+| `object-{id}-C_1` / `C_2` / `C_3` / `C_4` | Point 서·동·남·북 | Equipment 포트 또는 다른 Point로 드래그 |
 
 ## 10. Equipment and Point
 
@@ -342,8 +342,8 @@ Arrangement 기본 화면은 P&ID 도면이다. Equipment는 SVG 심볼과 Tag�
 이 프로토타입 범위:
 
 - Equipment: 범용 심볼. In/Out 포트 개수를 지정한다. 포트 ID는 `IN_1`… / `OUT_1`…
-- Point: 원형 노드. 배관 연결 점은 좌·우·아래 3개(`C_1`/`C_2`/`C_3`)로 고정한다. Equipment In/Out 또는 다른 Point에 드래그로 붙인다. 연결선은 꺾은선이며 화살표 방향은 토글한다.
-- Calculation Object Link: 각 객체의 노란 `OBJ` 점에만 붙는 점선 association. 위치는 상단/하단을 고른다. 객체당 하나이며 더블클릭으로 지운다. 값은 흐르지 않는다.
+- Point: 원형 노드. 배관 연결 점은 서·동·남·북 4개(`C_1`/`C_2`/`C_3`/`C_4`)로 고정한다. Equipment In/Out 또는 다른 Point에 드래그로 붙인다. 연결선은 꺾은선이며 화살표 방향은 토글한다.
+- Calculation Object Link: 각 객체의 노란 `OBJ` 점에만 붙는 점선 association. 위치는 상단/하단을 고른다. Calculation 하나는 여러 Equipment/Point에 연결할 수 있고, layout 객체당 노란 링크는 하나다. 더블클릭으로 지운다. 값은 흐르지 않는다.
 - Valve, Pipe, Signal, Annotation은 이 단계에 없다
 
 역할 분리:

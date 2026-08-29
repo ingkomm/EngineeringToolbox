@@ -10,6 +10,7 @@ import {
   SelectionMode,
   useEdgesState,
   useNodesState,
+  useReactFlow,
   type Connection,
   type Edge,
   type Node,
@@ -63,6 +64,27 @@ function isTypingTarget(target: EventTarget | null) {
   return target instanceof HTMLElement && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable);
 }
 
+function CanvasZoomHotkeys() {
+  const { zoomIn, zoomOut } = useReactFlow();
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) return;
+      if (event.key === "PageUp" || event.code === "PageUp") {
+        event.preventDefault();
+        void zoomIn();
+        return;
+      }
+      if (event.key === "PageDown" || event.code === "PageDown") {
+        event.preventDefault();
+        void zoomOut();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [zoomIn, zoomOut]);
+  return null;
+}
+
 export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUndo, onRedo }: FlowCanvasProps) {
   const onToggle = useCallback((edgeId: string) => {
     onEdit({ type: "toggleEdge", edgeId });
@@ -81,7 +103,7 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
   const [snap, setSnap] = useState(true);
   const [selectMode, setSelectMode] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number; ids: string[] } | null>(null);
-  const clipboard = useRef<string[]>([]);
+  const [clipboard, setClipboard] = useState<string[]>([]);
   const didFit = useRef(false);
 
   useEffect(() => {
@@ -204,16 +226,23 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
     [project],
   );
 
+  const copySelected = useCallback(() => {
+    if (selectedIds.length) setClipboard(selectedIds);
+  }, [selectedIds]);
+  const pasteClipboard = useCallback(() => {
+    if (clipboard.length) onEdit({ type: "duplicateObjects", objectIds: clipboard });
+  }, [clipboard, onEdit]);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) return;
       const meta = event.metaKey || event.ctrlKey;
       if (meta && event.key.toLowerCase() === "c") {
-        clipboard.current = selectedIds;
+        copySelected();
         return;
       }
       if (meta && event.key.toLowerCase() === "v") {
-        if (clipboard.current.length) onEdit({ type: "duplicateObjects", objectIds: clipboard.current });
+        pasteClipboard();
         return;
       }
       if (meta && event.key.toLowerCase() === "z" && !event.shiftKey) {
@@ -228,7 +257,7 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onEdit, onRedo, onUndo, selectedIds]);
+  }, [copySelected, onRedo, onUndo, pasteClipboard]);
 
   return (
     <ReactFlow
@@ -277,7 +306,8 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
       proOptions={{ hideAttribution: true }}
     >
       <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} color="#243044" />
-      <Controls />
+      <Controls className="ws-zoom-controls" />
+      <CanvasZoomHotkeys />
       <Panel position="top-left" className="canvas-panel canvas-panel--pid">
         <button
           type="button"
@@ -334,20 +364,33 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
           Grid snap
         </button>
       </Panel>
-      {selectedLayoutIds.length > 0 ? (
-        <Panel position="top-center" className="canvas-panel pid-selection-bar">
-          <button type="button" className="ghost-btn" onClick={() => onEdit({ type: "duplicateObjects", objectIds: selectedIds })}>
-            복제
+      {selectedIds.length > 0 ? (
+        <Panel position="bottom-right" className="canvas-panel pid-selection-bar">
+          <button type="button" className="ghost-btn" data-testid="btn-copy-objects" onClick={copySelected}>
+            복사
           </button>
-          <button type="button" className="ghost-btn" onClick={() => onEdit({ type: "rotateEquipment", objectIds: selectedLayoutIds, delta: 90 })}>
-            회전
+          <button
+            type="button"
+            className="ghost-btn"
+            data-testid="btn-paste-objects"
+            disabled={!clipboard.length}
+            onClick={pasteClipboard}
+          >
+            붙여넣기
           </button>
-          <button type="button" className="ghost-btn" onClick={() => onEdit({ type: "alignObjects", objectIds: selectedLayoutIds, mode: "left" })}>
-            정렬
-          </button>
-          <button type="button" className="ghost-btn" onClick={() => onEdit({ type: "alignObjects", objectIds: selectedLayoutIds, mode: "h-gap" })}>
-            간격
-          </button>
+          {selectedLayoutIds.length > 0 ? (
+            <>
+              <button type="button" className="ghost-btn" onClick={() => onEdit({ type: "rotateEquipment", objectIds: selectedLayoutIds, delta: 90 })}>
+                회전
+              </button>
+              <button type="button" className="ghost-btn" onClick={() => onEdit({ type: "alignObjects", objectIds: selectedLayoutIds, mode: "left" })}>
+                정렬
+              </button>
+              <button type="button" className="ghost-btn" onClick={() => onEdit({ type: "alignObjects", objectIds: selectedLayoutIds, mode: "h-gap" })}>
+                간격
+              </button>
+            </>
+          ) : null}
           <button
             type="button"
             className="ghost-btn"
@@ -359,12 +402,17 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
       ) : null}
       {menu ? (
         <div className="pid-menu" style={{ left: menu.x, top: menu.y }}>
-          <button type="button" onClick={() => { onEdit({ type: "duplicateObjects", objectIds: menu.ids }); setMenu(null); }}>
-            복제
+          <button type="button" onClick={() => { setClipboard(menu.ids); setMenu(null); }}>
+            복사
           </button>
-          <button type="button" onClick={() => { onEdit({ type: "rotateEquipment", objectIds: menu.ids, delta: 90 }); setMenu(null); }}>
-            90° 회전
+          <button type="button" onClick={() => { pasteClipboard(); setMenu(null); }}>
+            붙여넣기
           </button>
+          {menu.ids.some((id) => project.objects.some((item) => item.id === id && isLayoutObject(item))) ? (
+            <button type="button" onClick={() => { onEdit({ type: "rotateEquipment", objectIds: menu.ids, delta: 90 }); setMenu(null); }}>
+              90° 회전
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => {
