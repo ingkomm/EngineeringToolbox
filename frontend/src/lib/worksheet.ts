@@ -57,6 +57,33 @@ export function hasEquipmentPort(equipment: Pick<EquipmentObject, "inCount" | "o
   return ports.ins.includes(portId) || ports.outs.includes(portId);
 }
 
+export function isLayoutPortId(portId: string | null | undefined): boolean {
+  return Boolean(portId && (/^(IN|OUT|C)_\d+$/.test(portId) || portId === "a" || portId === "b"));
+}
+
+export function normalizePointEnd(end: {
+  objectId?: string;
+  equipmentId?: string;
+  portId?: string;
+  reversed?: boolean;
+} | null | undefined): PointEnd | null {
+  if (!end) return null;
+  const objectId = end.objectId ?? end.equipmentId;
+  if (!objectId || !end.portId) return null;
+  return { objectId, portId: end.portId, reversed: end.reversed === true };
+}
+
+export function layoutPortExists(object: WorksheetObject, portId: string): boolean {
+  if (isEquipmentObject(object)) {
+    return portId === object.id || hasEquipmentPort(object, portId);
+  }
+  if (isPointObject(object)) {
+    const index = parsePointConnectionEnd(portId);
+    return portId === object.id || (index != null && index < object.connectionCount);
+  }
+  return false;
+}
+
 export function normalizePointObject(point: {
   id: string;
   name?: string;
@@ -74,7 +101,7 @@ export function normalizePointObject(point: {
     name: (point.name ?? "").trim() || point.id,
     position: point.position ?? { x: 80, y: 420 },
     connectionCount: count,
-    connections: Array.from({ length: count }, (_, index) => fromLegacy[index] ?? null),
+    connections: Array.from({ length: count }, (_, index) => normalizePointEnd(fromLegacy[index] ?? null)),
   };
 }
 

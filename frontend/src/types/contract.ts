@@ -38,6 +38,13 @@ export interface OutputBinding {
   error?: string | null;
 }
 
+export interface CalculationLink {
+  id: string;
+  name: string;
+  targetObjectId?: string | null;
+  targetPortId?: string | null;
+}
+
 export interface CalculationObject {
   kind?: "calculation";
   id: string;
@@ -46,11 +53,14 @@ export interface CalculationObject {
   inputs: InputVariable[];
   calculations: FormulaVariable[];
   outputs: OutputBinding[];
+  links?: CalculationLink[];
 }
 
 export interface PointEnd {
-  equipmentId: string;
+  objectId: string;
   portId: string;
+  reversed?: boolean;
+  equipmentId?: string;
 }
 
 export interface EquipmentObject {

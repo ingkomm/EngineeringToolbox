@@ -18,6 +18,7 @@ from engcalc.models import (
     is_layout_object,
     is_point_object,
     is_value_flow_edge,
+    layout_port_ids,
 )
 from engcalc.quantities import QuantityError, infer_formula_quantity, is_known_quantity, si_unit_for
 
@@ -331,15 +332,13 @@ def _has_source_endpoint(obj: CalculationObject | object, port_id: str) -> bool:
     if is_point_object(obj):
         return port_id == obj.id or port_id in {f"C_{index}" for index in range(1, obj.connectionCount + 1)}
     if is_layout_object(obj):
-        return False
-    return any(item.id == port_id for item in obj.outputs)
+        return port_id in layout_port_ids(obj)
+    return any(item.id == port_id for item in obj.outputs) or any(item.id == port_id for item in obj.links)
 
 
 def _has_target_endpoint(obj: CalculationObject | object, port_id: str) -> bool:
-    if is_point_object(obj):
-        return port_id == obj.id or port_id in {f"C_{index}" for index in range(1, obj.connectionCount + 1)}
     if is_layout_object(obj):
-        return False
+        return port_id in layout_port_ids(obj)
     return any(item.id == port_id for item in obj.inputs)
 
 

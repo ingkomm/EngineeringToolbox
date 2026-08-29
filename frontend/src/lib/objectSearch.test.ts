@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { searchSourcePorts, searchTargetPorts } from "./objectSearch";
+import { searchLayoutTargets, searchSourcePorts, searchTargetPorts } from "./objectSearch";
 import type { CalculationObject, ProjectDocument } from "../types/contract";
 import { isCalculationObject } from "./worksheet";
 
@@ -145,5 +145,59 @@ describe("connector object search", () => {
     expect(fromOtherInput).toEqual([
       expect.objectContaining({ objectId: "obj_a", variableId: "POWER", status: "occupied" }),
     ]);
+  });
+
+  it("lists point and equipment ports for a calculation link", () => {
+    const withLayout: ProjectDocument = {
+      ...project,
+      objects: [
+        {
+          ...calc(project.objects[0]!),
+          links: [{ id: "LINK_1", name: "LINK_1", targetObjectId: "PT_1", targetPortId: "C_1" }],
+        },
+        {
+          kind: "point",
+          id: "PT_1",
+          name: "Suction",
+          position: { x: 0, y: 1 },
+          connectionCount: 2,
+          connections: [null, null],
+        },
+        {
+          kind: "equipment",
+          id: "EQ_1",
+          name: "Pump A",
+          position: { x: 1, y: 1 },
+          symbolId: "generic-equipment",
+          inCount: 1,
+          outCount: 1,
+        },
+      ],
+      edges: [
+        {
+          id: "edge-obj_a-LINK_1-PT_1-C_1",
+          sourceObjectId: "obj_a",
+          sourceVariableId: "LINK_1",
+          targetObjectId: "PT_1",
+          targetVariableId: "C_1",
+          enabled: true,
+          relationType: "association",
+        },
+      ],
+    };
+    const hits = searchLayoutTargets(withLayout, "suction", "obj_a", "LINK_1");
+    expect(hits).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ objectId: "PT_1", variableId: "C_1", status: "connected", kind: "point" }),
+        expect.objectContaining({ objectId: "PT_1", variableId: "PT_1", status: "available", kind: "point" }),
+      ]),
+    );
+    const equipmentHits = searchLayoutTargets(withLayout, "EQ_1", "obj_a", "LINK_1");
+    expect(equipmentHits).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ objectId: "EQ_1", variableId: "IN_1", kind: "equipment", status: "available" }),
+        expect.objectContaining({ objectId: "EQ_1", variableId: "OUT_1", kind: "equipment" }),
+      ]),
+    );
   });
 });

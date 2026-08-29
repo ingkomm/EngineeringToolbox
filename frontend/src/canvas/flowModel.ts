@@ -1,8 +1,17 @@
+import { MarkerType } from "@xyflow/react";
 import type { ProjectDocument } from "../types/contract";
 import type { WorkspaceEdit } from "../lib/projectEdits";
 import type { QuantitySpec } from "../lib/quantities";
-import { inputHandleId, outputHandleId } from "../lib/display";
-import { arrangementLinkId, isEquipmentObject, isPointObject, isValueFlowEdge, pointConnectionIds } from "../lib/worksheet";
+import { inputHandleId, linkHandleId, outputHandleId } from "../lib/display";
+import {
+  arrangementLinkId,
+  isCalculationObject,
+  isLayoutObject,
+  isLayoutPortId,
+  isPointObject,
+  isValueFlowEdge,
+  pointConnectionIds,
+} from "../lib/worksheet";
 import { mappedInputsForObject } from "./mappedInputs";
 
 export { mappedInputsForObject } from "./mappedInputs";
@@ -13,19 +22,10 @@ export function toFlowNodeRecords(
   onEdit: (edit: WorkspaceEdit) => void,
 ) {
   return project.objects.map((object) => {
-    if (isEquipmentObject(object)) {
+    if (isLayoutObject(object) && !isCalculationObject(object)) {
       return {
         id: object.id,
-        type: "equipmentObject" as const,
-        position: object.position,
-        data: { object, onEdit },
-        draggable: true,
-      };
-    }
-    if (isPointObject(object)) {
-      return {
-        id: object.id,
-        type: "pointObject" as const,
+        type: object.kind === "equipment" ? ("equipmentObject" as const) : ("pointObject" as const),
         position: object.position,
         data: { object, onEdit },
         draggable: true,
@@ -47,10 +47,34 @@ export function toFlowNodeRecords(
   });
 }
 
+function mappingSourceHandle(
+  source: ProjectDocument["objects"][number] | undefined,
+  variableId: string,
+): string | undefined {
+  if (source && isCalculationObject(source) && (source.links ?? []).some((item) => item.id === variableId)) {
+    return linkHandleId(variableId);
+  }
+  if (source && isLayoutObject(source)) {
+    return isLayoutPortId(variableId) ? variableId : undefined;
+  }
+  return outputHandleId(variableId);
+}
+
+function mappingTargetHandle(
+  target: ProjectDocument["objects"][number] | undefined,
+  variableId: string,
+): string | undefined {
+  if (target && isLayoutObject(target)) {
+    return isLayoutPortId(variableId) ? variableId : undefined;
+  }
+  return inputHandleId(variableId);
+}
+
 export function toFlowEdges(
   project: ProjectDocument,
   onToggle: (edgeId: string) => void,
   onToggleCollapsed: (edgeId: string) => void,
+  onToggleDirection?: (pointId: string, end: string) => void,
 ) {
   const objects = new Map(project.objects.map((item) => [item.id, item]));
   const mapping = project.edges.map((edge) => {
@@ -58,14 +82,12 @@ export function toFlowEdges(
     const target = objects.get(edge.targetObjectId);
     const collapsed = edge.collapsed === true;
     const association = !isValueFlowEdge(edge);
-    const sourceHandle = source && isPointObject(source) ? undefined : outputHandleId(edge.sourceVariableId);
-    const targetHandle = target && isPointObject(target) ? undefined : inputHandleId(edge.targetVariableId);
     return {
       id: edge.id,
       source: edge.sourceObjectId,
       target: edge.targetObjectId,
-      sourceHandle,
-      targetHandle,
+      sourceHandle: mappingSourceHandle(source, edge.sourceVariableId),
+      targetHandle: mappingTargetHandle(target, edge.targetVariableId),
       type: "mapping" as const,
       className: [
         "mapping-edge",
@@ -94,19 +116,43 @@ export function toFlowEdges(
     return pointConnectionIds(object.connectionCount).flatMap((endId, index) => {
       const end = object.connections[index];
       if (!end) return [];
-      const host = objects.get(end.equipmentId);
-      if (!host || !isEquipmentObject(host)) return [];
+      const host = objects.get(end.objectId);
+      if (!host) return [];
+      const reversed = end.reversed === true;
+      const source = reversed ? end.objectId : object.id;
+      const target = reversed ? object.id : end.objectId;
+      const sourceHandle = reversed
+        ? isLayoutPortId(end.portId)
+          ? end.portId
+          : undefined
+        : endId;
+      const targetHandle = reversed
+        ? endId
+        : isLayoutPortId(end.portId)
+          ? end.portId
+          : undefined;
       return [
         {
           id: arrangementLinkId(object.id, endId),
-          source: object.id,
-          target: end.equipmentId,
-          sourceHandle: endId,
-          targetHandle: end.portId,
+          source,
+          target,
+          sourceHandle,
+          targetHandle,
           type: "arrangementLink" as const,
           className: "arr-point-link-edge",
           interactionWidth: 20,
-          data: { pointId: object.id, end: endId },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            width: 16,
+            height: 16,
+            color: "#6cb6ff",
+          },
+          data: {
+            pointId: object.id,
+            end: endId,
+            reversed,
+            onToggleDirection,
+          },
         },
       ];
     });

@@ -61,7 +61,9 @@ def test_layout_roundtrip_preserves_point_connections() -> None:
     point = next(obj for obj in restored.objects if obj.id == "PT_1")
     assert point.kind == "point"
     assert point.connections[0].portId == "OUT_1"  # type: ignore[union-attr]
-    assert point.connections[1].equipmentId == "EQ_2"  # type: ignore[union-attr]
+    assert point.connections[0].objectId == "EQ_1"  # type: ignore[union-attr]
+    assert point.connections[1].objectId == "EQ_2"  # type: ignore[union-attr]
+    assert not hasattr(point.connections[1], "equipmentId") or getattr(point.connections[1], "equipmentId", None) is None
     equipment = next(obj for obj in restored.objects if obj.id == "EQ_2")
     assert equipment.position.x == 400
 
@@ -181,3 +183,81 @@ def test_layout_objects_do_not_call_formula_evaluation(monkeypatch: pytest.Monke
     result = evaluate_project(ProjectDocument(id="ws", name="ws", objects=_layout(), edges=[]))
     assert calls == []
     assert result.evaluatedObjectIds == []
+
+
+def test_point_can_connect_to_another_point() -> None:
+    project = ProjectDocument(
+        id="ws",
+        name="ws",
+        objects=[
+            PointObject(id="PT_1", position=Position(x=0, y=0), connectionCount=2),
+            PointObject(
+                id="PT_2",
+                position=Position(x=1, y=0),
+                connectionCount=2,
+                connections=[PointEnd(objectId="PT_1", portId="C_1"), None],
+            ),
+        ],
+        edges=[],
+    )
+    restored = ProjectDocument.model_validate(project.model_dump())
+    point = next(obj for obj in restored.objects if obj.id == "PT_2")
+    assert point.connections[0].objectId == "PT_1"  # type: ignore[union-attr]
+    assert point.connections[0].portId == "C_1"  # type: ignore[union-attr]
+    assert point.connections[0].reversed is False  # type: ignore[union-attr]
+
+
+def test_legacy_equipment_id_migrates_to_object_id() -> None:
+    project = ProjectDocument.model_validate(
+        {
+            "id": "ws",
+            "name": "ws",
+            "objects": [
+                {"kind": "equipment", "id": "EQ_1", "name": "Pump", "position": {"x": 0, "y": 0}, "inCount": 1, "outCount": 1},
+                {
+                    "kind": "point",
+                    "id": "PT_1",
+                    "name": "PT_1",
+                    "position": {"x": 1, "y": 0},
+                    "connections": [{"equipmentId": "EQ_1", "portId": "OUT_1"}],
+                },
+            ],
+            "edges": [],
+        }
+    )
+    point = next(obj for obj in project.objects if obj.id == "PT_1")
+    assert point.connections[0].objectId == "EQ_1"  # type: ignore[union-attr]
+    dumped = point.connections[0].model_dump()  # type: ignore[union-attr]
+    assert "equipmentId" not in dumped
+    assert dumped["reversed"] is False
+
+
+def test_calculation_link_association_is_not_evaluated() -> None:
+    from engcalc.models import CalculationObject, Edge
+
+    project = ProjectDocument(
+        id="ws",
+        name="ws",
+        objects=[
+            CalculationObject(
+                id="obj_1",
+                name="Calc",
+                position=Position(x=0, y=0),
+                links=[{"id": "LINK_1", "name": "LINK_1", "targetObjectId": "PT_1", "targetPortId": "C_1"}],
+            ),
+            PointObject(id="PT_1", position=Position(x=1, y=0)),
+        ],
+        edges=[
+            Edge(
+                id="edge-obj_1-LINK_1-PT_1-C_1",
+                sourceObjectId="obj_1",
+                sourceVariableId="LINK_1",
+                targetObjectId="PT_1",
+                targetVariableId="C_1",
+                relationType="association",
+            )
+        ],
+    )
+    result = evaluate_project(project)
+    assert result.evaluatedObjectIds == []
+    assert result.errors == []

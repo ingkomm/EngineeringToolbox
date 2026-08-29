@@ -106,16 +106,33 @@
         "outputs": {
           "type": "array",
           "items": { "$ref": "#/$defs/outputBinding" }
+        },
+        "links": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/calculationLink" }
         }
+      }
+    },
+    "calculationLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "$ref": "#/$defs/variableId" },
+        "name": { "type": "string" },
+        "targetObjectId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+        "targetPortId": { "anyOf": [{ "$ref": "#/$defs/variableId" }, { "type": "null" }] }
       }
     },
     "pointEnd": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["equipmentId", "portId"],
+      "required": ["objectId", "portId"],
       "properties": {
-        "equipmentId": { "$ref": "#/$defs/variableId" },
-        "portId": { "$ref": "#/$defs/variableId" }
+        "objectId": { "$ref": "#/$defs/variableId" },
+        "portId": { "$ref": "#/$defs/variableId" },
+        "reversed": { "type": "boolean" },
+        "equipmentId": { "$ref": "#/$defs/variableId" }
       }
     },
     "equipmentObject": {

@@ -1,7 +1,7 @@
 import { Position, type Node, type NodeProps, useUpdateNodeInternals } from "@xyflow/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import type { CalculationObject, ProjectDocument } from "../types/contract";
-import { formatValue, inputHandleId, outputHandleId } from "../lib/display";
+import { formatValue, inputHandleId, linkHandleId, outputHandleId } from "../lib/display";
 import {
   applyCandidate,
   identifierAt,
@@ -38,6 +38,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
   const handleSignature = [
     ...object.inputs.map((item) => item.id),
     ...object.outputs.map((item) => item.id),
+    ...(object.links ?? []).map((item) => item.id),
   ].join("|");
 
   useLayoutEffect(() => {
@@ -333,6 +334,82 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
               className="calc-handle calc-handle--out"
             />
           </div>
+          );
+        })}
+      </section>
+
+      <section className="calc-table calc-table--link">
+        <div className="calc-table__title">
+          <span>Link</span>
+          <button
+            type="button"
+            className="link-btn nodrag"
+            data-testid={`object-${id}-add-link`}
+            onClick={() => onEdit({ type: "addLink", objectId: id })}
+          >
+            + 링크
+          </button>
+        </div>
+        {(object.links ?? []).length === 0 ? <p className="calc-empty">Point / Equipment에 점선으로 연결합니다</p> : null}
+        {(object.links ?? []).map((item, index) => {
+          return (
+            <div className="calc-row calc-row--link" key={item.id} data-testid={`object-${id}-link-row-${item.id}`}>
+              <input
+                className="calc-node__id nodrag"
+                defaultValue={item.id}
+                data-testid={`object-${id}-link-${item.id}-id`}
+                onKeyDown={stopKeys}
+                onBlur={(event) => {
+                  const nextId = event.target.value.trim();
+                  if (!VARIABLE_ID_RE.test(nextId) || nextId === item.id) {
+                    event.target.value = item.id;
+                    return;
+                  }
+                  onEdit({ type: "updateLink", objectId: id, index, patch: { id: nextId } });
+                }}
+              />
+              <span className="calc-row__target" data-testid={`object-${id}-link-${item.id}-target`}>
+                {item.targetObjectId ? `${item.targetObjectId}${item.targetPortId && item.targetPortId !== item.targetObjectId ? `.${item.targetPortId}` : ""}` : "—"}
+              </span>
+              <div className="port-tools">
+                <PortSearch
+                  project={project}
+                  selfObjectId={id}
+                  selfVariableId={item.id}
+                  direction="to-layout"
+                  testId={`object-${id}-link-${item.id}-search`}
+                  onPick={(hit) =>
+                    onEdit({
+                      type: "connectLink",
+                      objectId: id,
+                      linkId: item.id,
+                      targetObjectId: hit.objectId,
+                      targetPortId: hit.variableId,
+                    })
+                  }
+                  onDisconnect={(hit) => {
+                    if (hit.edgeId) onEdit({ type: "deleteEdges", edgeIds: [hit.edgeId] });
+                    else onEdit({ type: "connectLink", objectId: id, linkId: item.id, targetObjectId: null });
+                  }}
+                />
+                <button
+                  type="button"
+                  className="icon-btn nodrag"
+                  title="링크 삭제"
+                  data-testid={`object-${id}-link-${item.id}-delete`}
+                  onClick={() => onEdit({ type: "removeLink", objectId: id, index })}
+                >
+                  ×
+                </button>
+              </div>
+              <RowHandle
+                nodeId={id}
+                handleId={linkHandleId(item.id)}
+                type="source"
+                position={Position.Right}
+                className="calc-handle calc-handle--link"
+              />
+            </div>
           );
         })}
       </section>

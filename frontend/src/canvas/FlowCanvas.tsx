@@ -24,7 +24,7 @@ import { parseHandleId } from "../lib/display";
 import type { WorkspaceEdit } from "../lib/projectEdits";
 import type { QuantitySpec } from "../lib/quantities";
 import type { ProjectDocument } from "../types/contract";
-import { isCalculationObject, isEquipmentObject, isPointObject, isValueFlowEdge } from "../lib/worksheet";
+import { isCalculationObject, isLayoutObject, isPointObject, isValueFlowEdge } from "../lib/worksheet";
 
 const nodeTypes = {
   calculationObject: CalculationObjectNode,
@@ -65,16 +65,21 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
   const onToggleCollapsed = useCallback((edgeId: string) => {
     onEdit({ type: "toggleEdgeCollapsed", edgeId });
   }, [onEdit]);
+  const onToggleDirection = useCallback((pointId: string, end: string) => {
+    onEdit({ type: "togglePointLink", pointId, end });
+  }, [onEdit]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(toFlowNodes(project, quantities, onEdit));
-  const [edges, setEdges, onEdgesChange] = useEdgesState(toFlowEdges(project, onToggle, onToggleCollapsed));
+  const [edges, setEdges, onEdgesChange] = useEdgesState(
+    toFlowEdges(project, onToggle, onToggleCollapsed, onToggleDirection),
+  );
   const didFit = useRef(false);
 
   useEffect(() => {
     const nextNodes = toFlowNodes(project, quantities, onEdit);
     setNodes((current) => mergeFlowNodes(current, nextNodes));
-    setEdges(toFlowEdges(project, onToggle, onToggleCollapsed));
-  }, [onEdit, onToggle, onToggleCollapsed, project, quantities, setEdges, setNodes]);
+    setEdges(toFlowEdges(project, onToggle, onToggleCollapsed, onToggleDirection));
+  }, [onEdit, onToggle, onToggleCollapsed, onToggleDirection, project, quantities, setEdges, setNodes]);
 
   const onInit = useCallback((instance: { fitView: (options?: { padding?: number }) => void }) => {
     if (didFit.current) return;
@@ -84,30 +89,49 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      if (!connection.source || !connection.target || connection.source === connection.target) return;
+      if (!connection.source || !connection.target) return;
+      if (connection.source === connection.target && connection.sourceHandle === connection.targetHandle) return;
       const sourceObject = project.objects.find((item) => item.id === connection.source);
       const targetObject = project.objects.find((item) => item.id === connection.target);
       if (!sourceObject || !targetObject) return;
 
-      const pointToEquipment =
-        isPointObject(sourceObject) && isEquipmentObject(targetObject)
-          ? { point: sourceObject, equipment: targetObject, end: connection.sourceHandle, port: connection.targetHandle }
-          : isEquipmentObject(sourceObject) && isPointObject(targetObject)
-            ? { point: targetObject, equipment: sourceObject, end: connection.targetHandle, port: connection.sourceHandle }
-            : null;
-      if (pointToEquipment && isLayoutPortHandle(pointToEquipment.end) && isLayoutPortHandle(pointToEquipment.port)) {
+      if (isPointObject(sourceObject) && isLayoutObject(targetObject) && isLayoutPortHandle(connection.sourceHandle)) {
+        const port = isLayoutPortHandle(connection.targetHandle) ? connection.targetHandle : targetObject.id;
         onEdit({
           type: "connectPointEnd",
-          pointId: pointToEquipment.point.id,
-          end: pointToEquipment.end!,
-          equipmentId: pointToEquipment.equipment.id,
-          portId: pointToEquipment.port!,
+          pointId: sourceObject.id,
+          end: connection.sourceHandle!,
+          targetObjectId: targetObject.id,
+          targetPortId: port!,
+          reversed: false,
+        });
+        return;
+      }
+      if (isLayoutObject(sourceObject) && isPointObject(targetObject) && isLayoutPortHandle(connection.targetHandle)) {
+        const port = isLayoutPortHandle(connection.sourceHandle) ? connection.sourceHandle : sourceObject.id;
+        onEdit({
+          type: "connectPointEnd",
+          pointId: targetObject.id,
+          end: connection.targetHandle!,
+          targetObjectId: sourceObject.id,
+          targetPortId: port!,
+          reversed: true,
         });
         return;
       }
 
       const source = parseHandleId(connection.sourceHandle);
       const target = parseHandleId(connection.targetHandle);
+      if (source?.kind === "link" && isCalculationObject(sourceObject) && isLayoutObject(targetObject)) {
+        onEdit({
+          type: "connectLink",
+          objectId: sourceObject.id,
+          linkId: source.variableId,
+          targetObjectId: targetObject.id,
+          targetPortId: isLayoutPortHandle(connection.targetHandle) ? connection.targetHandle : targetObject.id,
+        });
+        return;
+      }
       if (source?.kind !== "out" || target?.kind !== "in") return;
       if (!isCalculationObject(sourceObject) || !isCalculationObject(targetObject)) return;
       onEdit({
@@ -123,20 +147,24 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
 
   const isValidConnection = useCallback(
     (connection: Connection | Edge) => {
-      if (!connection.source || !connection.target || connection.source === connection.target) return false;
+      if (!connection.source || !connection.target) return false;
+      if (connection.source === connection.target && connection.sourceHandle === connection.targetHandle) return false;
       const sourceObject = project.objects.find((item) => item.id === connection.source);
       const targetObject = project.objects.find((item) => item.id === connection.target);
       if (!sourceObject || !targetObject) return false;
 
-      const pointEquip =
-        (isPointObject(sourceObject) && isEquipmentObject(targetObject)) ||
-        (isEquipmentObject(sourceObject) && isPointObject(targetObject));
-      if (pointEquip) {
-        return isLayoutPortHandle(connection.sourceHandle) && isLayoutPortHandle(connection.targetHandle);
+      if (isPointObject(sourceObject) && isLayoutObject(targetObject)) {
+        return isLayoutPortHandle(connection.sourceHandle);
+      }
+      if (isLayoutObject(sourceObject) && isPointObject(targetObject)) {
+        return isLayoutPortHandle(connection.targetHandle);
       }
 
       const source = parseHandleId(connection.sourceHandle);
       const target = parseHandleId(connection.targetHandle);
+      if (source?.kind === "link" && isCalculationObject(sourceObject) && isLayoutObject(targetObject)) {
+        return true;
+      }
       if (source?.kind !== "out" || target?.kind !== "in") return false;
       if (!isCalculationObject(sourceObject) || !isCalculationObject(targetObject)) return false;
       if (targetObject.calculations.some((item) => item.id === source.variableId)) return false;

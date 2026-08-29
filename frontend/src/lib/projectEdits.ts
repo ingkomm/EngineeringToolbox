@@ -1,9 +1,11 @@
 import type {
+  CalculationLink,
   CalculationObject,
   EquipmentObject,
   FormulaVariable,
   InputVariable,
   OutputBinding,
+  PointEnd,
   PointObject,
   ProjectDocument,
   RelationType,
@@ -19,13 +21,13 @@ import {
 } from "./variables";
 import {
   clampConnectionCount,
-  hasEquipmentPort,
   isCalculationObject,
   isEquipmentObject,
   isLayoutObject,
   isPointObject,
-  isValueFlowEdge,
+  layoutPortExists,
   normalizeLoadedProject,
+  normalizePointEnd,
   normalizePointObject,
   parseArrangementLinkId,
   parsePointConnectionEnd,
@@ -48,6 +50,16 @@ export type WorkspaceEdit =
   | { type: "addOutput"; objectId: string }
   | { type: "removeOutput"; objectId: string; index: number }
   | { type: "updateOutput"; objectId: string; index: number; patch: Partial<OutputBinding> }
+  | { type: "addLink"; objectId: string }
+  | { type: "removeLink"; objectId: string; index: number }
+  | { type: "updateLink"; objectId: string; index: number; patch: Partial<CalculationLink> }
+  | {
+      type: "connectLink";
+      objectId: string;
+      linkId: string;
+      targetObjectId: string | null;
+      targetPortId?: string | null;
+    }
   | {
       type: "connectMapping";
       sourceObjectId: string;
@@ -79,9 +91,11 @@ export type WorkspaceEdit =
       type: "connectPointEnd";
       pointId: string;
       end: string;
-      equipmentId: string | null;
-      portId: string | null;
+      targetObjectId: string | null;
+      targetPortId: string | null;
+      reversed?: boolean;
     }
+  | { type: "togglePointLink"; pointId: string; end: string }
   | { type: "loadProject"; project: ProjectDocument }
   | { type: "loadExample" }
   | { type: "newWorkspace" };
@@ -132,14 +146,25 @@ function rekeyObject(project: ProjectDocument, fromId: string, toId: string): Pr
   return {
     ...project,
     objects: project.objects.map((object) => {
-      const next = object.id === fromId ? { ...object, id: toId } : object;
-      if (!isPointObject(next)) return next;
-      return {
-        ...next,
-        connections: next.connections.map((end) =>
-          end && end.equipmentId === fromId ? { ...end, equipmentId: toId } : end,
-        ),
-      };
+      let next = object.id === fromId ? { ...object, id: toId } : object;
+      if (isPointObject(next)) {
+        next = {
+          ...next,
+          connections: next.connections.map((end) =>
+            end && end.objectId === fromId ? { ...end, objectId: toId } : end,
+          ),
+        };
+      }
+      if (isCalculationObject(next)) {
+        next = {
+          ...next,
+          links: (next.links ?? []).map((link) => ({
+            ...link,
+            targetObjectId: link.targetObjectId === fromId ? toId : link.targetObjectId,
+          })),
+        };
+      }
+      return next;
     }),
     edges: project.edges.map((edge) => ({
       ...edge,
@@ -203,6 +228,7 @@ export function syncObjectOutputs(object: CalculationObject): CalculationObject 
   const previousById = new Map(object.outputs.map((item) => [item.id, item]));
   return {
     ...object,
+    links: object.links ?? [],
     outputs: sources.map((item) => {
       const prev = previousBySource.get(item.id) ?? previousById.get(item.id);
       return {
@@ -412,6 +438,7 @@ export function applyWorkspaceEdit(
         inputs: [],
         calculations: [],
         outputs: [],
+        links: [],
       };
       return { project: { ...project, objects: [...project.objects, object] }, dirtyObjectIds: [], shouldEvaluate: false };
     }
@@ -427,7 +454,18 @@ export function applyWorkspaceEdit(
               return {
                 ...object,
                 connections: object.connections.map((end) =>
-                  end && end.equipmentId === edit.objectId ? null : end,
+                  end && end.objectId === edit.objectId ? null : end,
+                ),
+              };
+            })
+            .map((object) => {
+              if (!isCalculationObject(object)) return object;
+              return {
+                ...object,
+                links: (object.links ?? []).map((link) =>
+                  link.targetObjectId === edit.objectId
+                    ? { ...link, targetObjectId: null, targetPortId: null }
+                    : link,
                 ),
               };
             }),
@@ -619,6 +657,14 @@ export function applyWorkspaceEdit(
         dirtyObjectIds: [edit.objectId],
         shouldEvaluate: true,
       };
+    case "addLink":
+      return addCalculationLink(project, edit.objectId);
+    case "removeLink":
+      return removeCalculationLink(project, edit.objectId, edit.index);
+    case "updateLink":
+      return updateCalculationLink(project, edit.objectId, edit.index, edit.patch);
+    case "connectLink":
+      return connectCalculationLink(project, edit.objectId, edit.linkId, edit.targetObjectId, edit.targetPortId ?? null);
     case "connectMapping": {
       const sourceObject = project.objects.find((item) => item.id === edit.sourceObjectId);
       const targetObject = project.objects.find((item) => item.id === edit.targetObjectId);
@@ -627,7 +673,7 @@ export function applyWorkspaceEdit(
       }
       const relationType: RelationType =
         edit.relationType ??
-        (isPointObject(sourceObject) || isPointObject(targetObject) ? "association" : "value_flow");
+        (isLayoutObject(sourceObject) || isLayoutObject(targetObject) ? "association" : "value_flow");
       if (relationType !== "value_flow") {
         if (!_endpointExists(sourceObject, edit.sourceVariableId, "source") || !_endpointExists(targetObject, edit.targetVariableId, "target")) {
           return { project, dirtyObjectIds: [], shouldEvaluate: false };
@@ -725,8 +771,8 @@ export function applyWorkspaceEdit(
       const sourceObject = project.objects.find((item) => item.id === edit.sourceObjectId);
       const relationType: RelationType =
         edit.relationType ??
-        ((sourceObject && isPointObject(sourceObject)) ||
-        (targetObject && isPointObject(targetObject))
+        ((sourceObject && isLayoutObject(sourceObject)) ||
+        (targetObject && isLayoutObject(targetObject))
           ? "association"
           : "value_flow");
       if (relationType === "value_flow" && sourcePortTaken(project, edit.sourceObjectId, edit.sourceVariableId)) {
@@ -847,6 +893,24 @@ export function applyWorkspaceEdit(
         }
       }
       next = { ...next, edges: next.edges.filter((edge) => !removed.has(edge.id)) };
+      next = {
+        ...next,
+        objects: next.objects.map((object) => {
+          if (!isCalculationObject(object)) return object;
+          return {
+            ...object,
+            links: (object.links ?? []).map((link) => {
+              const dropped = dropping.some(
+                (edge) =>
+                  !isValueFlowEdge(edge) &&
+                  edge.sourceObjectId === object.id &&
+                  edge.sourceVariableId === link.id,
+              );
+              return dropped ? { ...link, targetObjectId: null, targetPortId: null } : link;
+            }),
+          };
+        }),
+      };
       next = syncAllObjects(next);
       return {
         project: next,
@@ -863,7 +927,16 @@ export function applyWorkspaceEdit(
     case "setEquipmentPorts":
       return setEquipmentPorts(project, edit.objectId, edit.inCount, edit.outCount);
     case "connectPointEnd":
-      return connectPointEnd(project, edit.pointId, edit.end, edit.equipmentId, edit.portId);
+      return connectPointEnd(
+        project,
+        edit.pointId,
+        edit.end,
+        edit.targetObjectId,
+        edit.targetPortId,
+        edit.reversed,
+      );
+    case "togglePointLink":
+      return togglePointLink(project, edit.pointId, edit.end);
   }
 }
 
@@ -872,14 +945,14 @@ function _endpointExists(
   portId: string,
   role: "source" | "target",
 ): boolean {
-  if (isPointObject(object)) {
-    return portId === object.id || parsePointConnectionEnd(portId) != null;
-  }
-  if (isEquipmentObject(object)) {
-    return hasEquipmentPort(object, portId);
+  if (isLayoutObject(object)) {
+    return layoutPortExists(object, portId);
   }
   if (role === "source") {
-    return object.outputs.some((item) => item.id === portId);
+    return (
+      object.outputs.some((item) => item.id === portId) ||
+      (object.links ?? []).some((item) => item.id === portId)
+    );
   }
   return object.inputs.some((item) => item.id === portId);
 }
@@ -964,8 +1037,8 @@ function setEquipmentPorts(
           ...item,
           connections: item.connections.map((end) => {
             if (!end) return null;
-            if (end.equipmentId !== objectId) return end;
-            return hasEquipmentPort(updated, end.portId) ? end : null;
+            if (end.objectId !== objectId) return end;
+            return layoutPortExists(updated, end.portId) ? end : null;
           }),
         };
       }),
@@ -979,26 +1052,191 @@ function connectPointEnd(
   project: ProjectDocument,
   pointId: string,
   end: string,
-  equipmentId: string | null,
-  portId: string | null,
+  targetObjectId: string | null,
+  targetPortId: string | null,
+  reversed?: boolean,
 ): EditResult {
   const point = project.objects.find((item) => item.id === pointId);
   if (!point || !isPointObject(point)) return noEval(project);
   const index = parsePointConnectionEnd(end);
   if (index == null || index >= point.connectionCount) return noEval(project);
-  let nextEnd: { equipmentId: string; portId: string } | null = null;
-  if (equipmentId && portId) {
-    const host = project.objects.find((item) => item.id === equipmentId);
-    if (!host || !isEquipmentObject(host) || !hasEquipmentPort(host, portId)) return noEval(project);
-    nextEnd = { equipmentId, portId };
+  let nextEnd: PointEnd | null = null;
+  if (targetObjectId && targetPortId) {
+    if (targetObjectId === pointId && targetPortId === `C_${index + 1}`) return noEval(project);
+    const host = project.objects.find((item) => item.id === targetObjectId);
+    if (!host || !isLayoutObject(host) || !layoutPortExists(host, targetPortId)) return noEval(project);
+    nextEnd = { objectId: targetObjectId, portId: targetPortId, reversed: reversed === true };
   }
   const connections = [...point.connections];
   connections[index] = nextEnd;
+  if (targetObjectId === pointId && targetPortId) {
+    const targetIndex = parsePointConnectionEnd(targetPortId);
+    if (targetIndex != null && targetIndex !== index) connections[targetIndex] = null;
+  }
   const nextPoint: PointObject = normalizePointObject({ ...point, connections });
   return {
     project: {
       ...project,
-      objects: project.objects.map((item) => (item.id === pointId ? nextPoint : item)),
+      objects: project.objects.map((item) => {
+        if (item.id === pointId) return nextPoint;
+        if (!isPointObject(item) || !targetObjectId || !targetPortId) return item;
+        return {
+          ...item,
+          connections: item.connections.map((existing, existingIndex) => {
+            if (!existing) return existing;
+            if (existing.objectId === pointId && existing.portId === `C_${index + 1}`) return null;
+            if (item.id === targetObjectId && existingIndex === parsePointConnectionEnd(targetPortId)) return null;
+            return existing;
+          }),
+        };
+      }),
+    },
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
+function togglePointLink(project: ProjectDocument, pointId: string, end: string): EditResult {
+  const point = project.objects.find((item) => item.id === pointId);
+  if (!point || !isPointObject(point)) return noEval(project);
+  const index = parsePointConnectionEnd(end);
+  if (index == null || index >= point.connectionCount) return noEval(project);
+  const current = point.connections[index];
+  if (!current) return noEval(project);
+  const connections = [...point.connections];
+  connections[index] = { ...current, reversed: current.reversed !== true };
+  return {
+    project: {
+      ...project,
+      objects: project.objects.map((item) =>
+        item.id === pointId ? normalizePointObject({ ...point, connections }) : item,
+      ),
+    },
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
+function addCalculationLink(project: ProjectDocument, objectId: string): EditResult {
+  const object = project.objects.find((item) => item.id === objectId);
+  if (!object || !isCalculationObject(object)) return noEval(project);
+  const id = nextGlobalPrefixedId(project, "LINK");
+  const link: CalculationLink = { id, name: id, targetObjectId: null, targetPortId: null };
+  return {
+    project: patchObject(project, objectId, (current) => ({
+      ...current,
+      links: [...(current.links ?? []), link],
+    })),
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
+function removeCalculationLink(project: ProjectDocument, objectId: string, index: number): EditResult {
+  const object = project.objects.find((item) => item.id === objectId);
+  if (!object || !isCalculationObject(object)) return noEval(project);
+  const removed = (object.links ?? [])[index];
+  const next = patchObject(project, objectId, (current) => ({
+    ...current,
+    links: (current.links ?? []).filter((_, itemIndex) => itemIndex !== index),
+  }));
+  return {
+    project: {
+      ...next,
+      edges: next.edges.filter(
+        (edge) =>
+          !(
+            edge.sourceObjectId === objectId &&
+            removed &&
+            edge.sourceVariableId === removed.id &&
+            !isValueFlowEdge(edge)
+          ),
+      ),
+    },
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
+function updateCalculationLink(
+  project: ProjectDocument,
+  objectId: string,
+  index: number,
+  patch: Partial<CalculationLink>,
+): EditResult {
+  const object = project.objects.find((item) => item.id === objectId);
+  if (!object || !isCalculationObject(object)) return noEval(project);
+  const current = (object.links ?? [])[index];
+  if (!current) return noEval(project);
+  const nextId = patch.id ?? current.id;
+  const nextName = (patch.name ?? current.name).trim() || nextId;
+  if (!VARIABLE_ID_RE.test(nextId)) return noEval(project);
+  if (nextId !== current.id && (object.links ?? []).some((item) => item.id === nextId)) return noEval(project);
+  const next = patchObject(project, objectId, (item) => ({
+    ...item,
+    links: (item.links ?? []).map((link, itemIndex) =>
+      itemIndex === index ? { ...link, id: nextId, name: nextName } : link,
+    ),
+  }));
+  return {
+    project: {
+      ...next,
+      edges: next.edges.map((edge) =>
+        edge.sourceObjectId === objectId && edge.sourceVariableId === current.id
+          ? { ...edge, sourceVariableId: nextId }
+          : edge,
+      ),
+    },
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
+function connectCalculationLink(
+  project: ProjectDocument,
+  objectId: string,
+  linkId: string,
+  targetObjectId: string | null,
+  targetPortId: string | null,
+): EditResult {
+  const object = project.objects.find((item) => item.id === objectId);
+  if (!object || !isCalculationObject(object)) return noEval(project);
+  const link = (object.links ?? []).find((item) => item.id === linkId);
+  if (!link) return noEval(project);
+  if (targetObjectId) {
+    const host = project.objects.find((item) => item.id === targetObjectId);
+    if (!host || !isLayoutObject(host)) return noEval(project);
+    if (targetPortId && !layoutPortExists(host, targetPortId)) return noEval(project);
+  }
+  const nextPort = targetObjectId ? targetPortId ?? targetObjectId : null;
+  const next = patchObject(project, objectId, (item) => ({
+    ...item,
+    links: (item.links ?? []).map((itemLink) =>
+      itemLink.id === linkId ? { ...itemLink, targetObjectId, targetPortId: nextPort } : itemLink,
+    ),
+  }));
+  const without = next.edges.filter(
+    (edge) => !(edge.sourceObjectId === objectId && edge.sourceVariableId === linkId && !isValueFlowEdge(edge)),
+  );
+  if (!targetObjectId) {
+    return { project: { ...next, edges: without }, dirtyObjectIds: [], shouldEvaluate: false };
+  }
+  return {
+    project: {
+      ...next,
+      edges: [
+        ...without,
+        {
+          id: `edge-${objectId}-${linkId}-${targetObjectId}-${nextPort}`,
+          sourceObjectId: objectId,
+          sourceVariableId: linkId,
+          targetObjectId,
+          targetVariableId: nextPort ?? targetObjectId,
+          enabled: true,
+          collapsed: false,
+          relationType: "association",
+        },
+      ],
     },
     dirtyObjectIds: [],
     shouldEvaluate: false,

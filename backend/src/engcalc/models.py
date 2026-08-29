@@ -88,15 +88,45 @@ class CalculationObject(BaseModel):
     inputs: list[InputVariable] = Field(default_factory=list)
     calculations: list[FormulaVariable] = Field(default_factory=list)
     outputs: list[OutputBinding] = Field(default_factory=list)
+    links: list[CalculationLink] = Field(default_factory=list)
 
 
-class PointEnd(BaseModel):
-    """One Point connection, attached to an equipment In or Out port."""
+class CalculationLink(BaseModel):
+    """Dashed association from a Calculation Object to a Point or Equipment."""
 
     model_config = ConfigDict(extra="forbid")
 
-    equipmentId: str
+    id: str
+    name: str = ""
+    targetObjectId: str | None = None
+    targetPortId: str | None = None
+
+    @model_validator(mode="after")
+    def default_name(self) -> CalculationLink:
+        if not self.name.strip():
+            self.name = self.id
+        return self
+
+
+class PointEnd(BaseModel):
+    """A Point connection to an Equipment port or another Point connection."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    objectId: str
     portId: str
+    reversed: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_equipment_id(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        payload = dict(data)
+        if "objectId" not in payload and payload.get("equipmentId"):
+            payload["objectId"] = payload["equipmentId"]
+        payload.pop("equipmentId", None)
+        return payload
 
 
 class EquipmentObject(BaseModel):
@@ -157,6 +187,16 @@ def equipment_port_ids(equipment: EquipmentObject) -> set[str]:
     ins = {f"IN_{index}" for index in range(1, equipment.inCount + 1)}
     outs = {f"OUT_{index}" for index in range(1, equipment.outCount + 1)}
     return ins | outs
+
+
+def point_port_ids(point: PointObject) -> set[str]:
+    return {point.id, *(f"C_{index}" for index in range(1, point.connectionCount + 1))}
+
+
+def layout_port_ids(obj: EquipmentObject | PointObject) -> set[str]:
+    if is_equipment_object(obj):
+        return {obj.id, *equipment_port_ids(obj)}
+    return point_port_ids(obj)
 
 
 def _explode_legacy_arrangement(item: dict) -> list[dict]:
@@ -273,18 +313,20 @@ class ProjectDocument(BaseModel):
             if item.id in seen:
                 raise ValueError(f"DUPLICATE_OBJECT_ID: {item.id}")
             seen.add(item.id)
-        equipment_by_id = {item.id: item for item in self.objects if is_equipment_object(item)}
+        hosts = {item.id: item for item in self.objects if is_layout_object(item)}
         for item in self.objects:
             if not is_point_object(item):
                 continue
-            for end in item.connections:
+            for index, end in enumerate(item.connections):
                 if end is None:
                     continue
-                host = equipment_by_id.get(end.equipmentId)
+                host = hosts.get(end.objectId)
                 if host is None:
-                    raise ValueError(f"UNKNOWN_ELEMENT: point {item.id} end {end.equipmentId}")
-                if end.portId not in equipment_port_ids(host):
+                    raise ValueError(f"UNKNOWN_ELEMENT: point {item.id} end {end.objectId}")
+                if end.portId not in layout_port_ids(host):
                     raise ValueError(f"UNKNOWN_POINT: point {item.id} port {end.portId}")
+                if end.objectId == item.id and end.portId == f"C_{index + 1}":
+                    raise ValueError(f"SELF_POINT_LINK: point {item.id} {end.portId}")
         return self
 
 

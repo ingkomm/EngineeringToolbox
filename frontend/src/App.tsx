@@ -67,14 +67,29 @@ export function App() {
   );
 
   useEffect(() => {
-    void (async () => {
+    let cancelled = false;
+    let lastOk: boolean | null = null;
+    const poll = async () => {
       const ok = await checkHealth();
+      if (cancelled) return;
       setBackendUp(ok);
-      setQuantities(await fetchQuantities());
-      if (!ok) {
+      if (ok) {
+        if (lastOk !== true) {
+          setQuantities(await fetchQuantities());
+        }
+      } else if (lastOk !== false) {
         setMessage("Python API가 실행 중이 아닙니다. backend를 먼저 시작하세요.");
       }
-    })();
+      lastOk = ok;
+    };
+    void poll();
+    const timer = window.setInterval(() => {
+      void poll();
+    }, 4000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
   }, []);
 
   const onEdit = useCallback(
@@ -134,6 +149,12 @@ export function App() {
                 quantity: item.quantity ?? null,
               })),
               outputs: object.outputs.map((item) => ({ id: item.id, name: item.name, sourceVariableId: item.sourceVariableId })),
+              links: (object.links ?? []).map((item) => ({
+                id: item.id,
+                name: item.name,
+                targetObjectId: item.targetObjectId ?? null,
+                targetPortId: item.targetPortId ?? null,
+              })),
             };
           }),
           edges: project.edges,
@@ -180,8 +201,11 @@ export function App() {
           <h1>Calculation Object Canvas</h1>
         </div>
         <div className="topbar__meta">
-          <span className={`pill ${backendUp ? "pill--ok" : "pill--bad"}`} data-testid="api-status">
-            {backendUp ? "Python API" : "API offline"}
+          <span
+            className={`pill ${backendUp ? "pill--ok" : backendUp === false ? "pill--bad" : ""}`}
+            data-testid="api-status"
+          >
+            {backendUp == null ? "API…" : backendUp ? "Python API" : "API offline"}
           </span>
           <span className="pill" data-testid="eval-status">{busy ? "계산 중" : message}</span>
           <button
@@ -236,7 +260,8 @@ export function App() {
             <h2>워크시트</h2>
             <p className="side-pane__hint">
               Calculation Object, Equipment, Point를 같은 워크시트에 둡니다. Equipment와 Point는 계통 배치만
-              기록하며 계산하지 않습니다. Point 연결 점을 Equipment In/Out에 끌어 연결합니다.
+              기록하며 계산하지 않습니다. Point는 Equipment 또는 다른 Point에 끌어 연결하고, 선 위의 방향으로
+              화살표를 뒤집습니다. Calculation Object의 Link는 Point/Equipment에 점선으로 붙습니다.
             </p>
             <button
               className="ghost-btn"

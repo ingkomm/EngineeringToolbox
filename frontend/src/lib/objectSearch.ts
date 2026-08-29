@@ -1,6 +1,14 @@
 import type { MappingEdge, ProjectDocument, WorksheetObject } from "../types/contract";
 import { displayName } from "./variables";
-import { isCalculationObject, isPointObject, isValueFlowEdge } from "./worksheet";
+import {
+  equipmentPortIds,
+  isCalculationObject,
+  isEquipmentObject,
+  isLayoutObject,
+  isPointObject,
+  isValueFlowEdge,
+  pointConnectionIds,
+} from "./worksheet";
 
 export type PortLinkStatus = "connected" | "occupied" | "available" | "create";
 
@@ -9,7 +17,7 @@ export interface PortSearchHit {
   objectName: string;
   variableId: string;
   variableName: string;
-  kind: "input" | "output" | "point";
+  kind: "input" | "output" | "point" | "equipment";
   status: PortLinkStatus;
   createInput?: boolean;
   edgeId?: string;
@@ -49,18 +57,17 @@ export function searchTargetPorts(
   const hits: PortSearchHit[] = [];
   for (const object of project.objects) {
     if (object.id === selfObjectId || !matchesObjectQuery(object, query)) continue;
-    if (isPointObject(object)) {
-      const edge = inboundEdge(project.edges, object.id, object.id);
-      const connected =
-        edge != null &&
-        edge.sourceObjectId === selfObjectId &&
-        edge.sourceVariableId === selfVariableId;
+    if (isLayoutObject(object)) {
+      const edge =
+        inboundEdge(project.edges, object.id, object.id) ??
+        project.edges.find((item) => item.targetObjectId === object.id && item.sourceObjectId === selfObjectId && item.sourceVariableId === selfVariableId);
+      const connected = edge != null && edge.sourceObjectId === selfObjectId && edge.sourceVariableId === selfVariableId;
       hits.push({
         objectId: object.id,
         objectName: object.name,
         variableId: object.id,
         variableName: displayName(object),
-        kind: "point",
+        kind: isPointObject(object) ? "point" : "equipment",
         status: connected ? "connected" : "available",
         edgeId: connected ? edge?.id : undefined,
         relationType: "association",
@@ -103,6 +110,49 @@ export function searchTargetPorts(
         createInput: true,
         status: "create",
         relationType: "value_flow",
+      });
+    }
+  }
+  return hits;
+}
+
+/** Layout ports a Calculation Object Link can attach to (dashed association). */
+export function searchLayoutTargets(
+  project: ProjectDocument,
+  query: string,
+  selfObjectId: string,
+  selfVariableId: string,
+): PortSearchHit[] {
+  const outbound = project.edges.find(
+    (edge) =>
+      edge.sourceObjectId === selfObjectId &&
+      edge.sourceVariableId === selfVariableId &&
+      !isValueFlowEdge(edge),
+  );
+  const hits: PortSearchHit[] = [];
+  const needle = query.trim().toLowerCase();
+  for (const object of project.objects) {
+    if (!isLayoutObject(object)) continue;
+    const ports = isEquipmentObject(object)
+      ? [object.id, ...equipmentPortIds(object).ins, ...equipmentPortIds(object).outs]
+      : [object.id, ...pointConnectionIds(object.connectionCount)];
+    const objectMatch = matchesObjectQuery(object, query);
+    if (needle && !objectMatch && !ports.some((port) => port.toLowerCase().includes(needle))) {
+      continue;
+    }
+    for (const port of ports) {
+      if (needle && !objectMatch && !port.toLowerCase().includes(needle)) continue;
+      const connected =
+        outbound != null && outbound.targetObjectId === object.id && outbound.targetVariableId === port;
+      hits.push({
+        objectId: object.id,
+        objectName: object.name,
+        variableId: port,
+        variableName: port === object.id ? displayName(object) : port,
+        kind: isPointObject(object) ? "point" : "equipment",
+        status: connected ? "connected" : "available",
+        edgeId: connected ? outbound?.id : undefined,
+        relationType: "association",
       });
     }
   }

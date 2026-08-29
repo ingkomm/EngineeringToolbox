@@ -100,3 +100,64 @@ describe("mergeFlowNodes", () => {
     expect(merged[0]?.position).toEqual({ x: 8, y: 9 });
   });
 });
+
+describe("arrangement and association edges", () => {
+  it("draws a directed point link and a dashed calculation association", () => {
+    const layout: ProjectDocument = {
+      id: "ws",
+      name: "ws",
+      objects: [
+        {
+          id: "obj_1",
+          name: "Object 1",
+          position: { x: 0, y: 0 },
+          inputs: [],
+          calculations: [],
+          outputs: [],
+          links: [{ id: "LINK_1", name: "LINK_1", targetObjectId: "PT_2", targetPortId: "C_1" }],
+        },
+        {
+          kind: "point",
+          id: "PT_1",
+          name: "PT_1",
+          position: { x: 1, y: 0 },
+          connectionCount: 2,
+          connections: [{ objectId: "PT_2", portId: "C_2", reversed: false }, null],
+        },
+        {
+          kind: "point",
+          id: "PT_2",
+          name: "PT_2",
+          position: { x: 2, y: 0 },
+          connectionCount: 2,
+          connections: [null, null],
+        },
+      ],
+      edges: [
+        {
+          id: "edge-obj_1-LINK_1-PT_2-C_1",
+          sourceObjectId: "obj_1",
+          sourceVariableId: "LINK_1",
+          targetObjectId: "PT_2",
+          targetVariableId: "C_1",
+          enabled: true,
+          relationType: "association",
+        },
+      ],
+    };
+    const edges = toFlowEdges(layout, () => undefined, () => undefined, () => undefined);
+    expect(edges.find((item) => item.id === "edge-obj_1-LINK_1-PT_2-C_1")).toMatchObject({
+      sourceHandle: "link:LINK_1",
+      targetHandle: "C_1",
+      className: expect.stringContaining("mapping-edge--association"),
+    });
+    expect(edges.find((item) => item.id === "arrlink:PT_1:C_1")).toMatchObject({
+      source: "PT_1",
+      target: "PT_2",
+      sourceHandle: "C_1",
+      targetHandle: "C_2",
+      type: "arrangementLink",
+      data: expect.objectContaining({ reversed: false, pointId: "PT_1", end: "C_1" }),
+    });
+  });
+});

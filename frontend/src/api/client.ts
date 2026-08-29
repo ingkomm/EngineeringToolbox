@@ -33,7 +33,7 @@ export async function fetchQuantities(): Promise<QuantitySpec[]> {
 
 export async function checkHealth(): Promise<boolean> {
   try {
-    const response = await fetch("/health");
+    const response = await fetch("/health", { cache: "no-store" });
     if (!response.ok) return false;
     const body = (await response.json()) as { status?: string };
     return body.status === "ok";

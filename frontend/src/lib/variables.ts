@@ -44,7 +44,7 @@ export function ownedVariables(project: ProjectDocument): OwnedVariable[] {
 export function allVariableIds(project: ProjectDocument): string[] {
   return project.objects.flatMap((object) => {
     if (!isCalculationObject(object)) return [];
-    return [...object.inputs, ...object.calculations].map((item) => item.id);
+    return [...object.inputs, ...object.calculations, ...(object.links ?? [])].map((item) => item.id);
   });
 }
 

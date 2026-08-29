@@ -303,8 +303,13 @@ Object A의 PIN/POUT만 바꾸면 Object A와 B가 갱신된다. 매핑되지 �
 | `object-{id}-output-{var}-link` | Output 행 | 링크 접기/펼치기. 접혀도 라벨은 `링크` |
 | `handle-out-{var}` | Output 행 우측 | RF source handle (`id=out:{var}`) |
 | `handle-in-{var}` | Input 행 좌측 | RF target handle (`id=in:{var}`) |
+| `object-{id}-add-link` | Node Link 헤더 | `addLink` |
+| `object-{id}-link-{var}-search` | Link 행 | Point / Equipment 검색 후 점선 연결 |
+| `object-{id}-link-{var}-target` | Link 행 | 연결된 Point/Equipment 표시 |
+| `handle-link-{var}` | Link 행 우측 | RF source handle (`id=link:{var}`) |
 | `edge-{id}-toggle` | 커넥터 | On/Off |
 | `edge-{id}-collapse` | 커넥터 | 무선 링크로 접기 |
+| `edge-arrlink:{pointId}:{end}-direction` | Point 연결선 | 화살표 방향 토글 |
 
 첫 Input 추가 시 Variable ID는 `IN_1`이다. ID를 `FLOW`로 바꾼 뒤에 testid가 `object-obj_1-input-FLOW-*`로 바뀐다.
 
@@ -318,7 +323,7 @@ Arrangement:
 | `object-{id}-IN_n` / `OUT_n` | Equipment 포트 | Point 연결 점과 드래그 연결 |
 | `object-{id}-in-count` | Equipment | In 포트 개수 |
 | `object-{id}-out-count` | Equipment | Out 포트 개수 |
-| `object-{id}-C_n` | Point 원 둘레 | Equipment 포트로 드래그 |
+| `object-{id}-C_n` | Point 원 둘레 | Equipment 포트 또는 다른 Point로 드래그 |
 | `object-{id}-count` | Point | 연결 점 개수 (2–4) |
 
 ## 10. Equipment and Point
@@ -328,12 +333,13 @@ Equipment와 Point는 Calculation Object와 **같은 공용 워크시트**에 �
 이 프로토타입 범위:
 
 - Equipment: 범용 심볼. In/Out 포트 개수를 지정한다. 포트 ID는 `IN_1`… / `OUT_1`…
-- Point: 원형 노드. 연결 점 개수는 2–4개(`C_1`…). 각 점을 Equipment In/Out에 드래그로 붙인다. 연결선은 꺾은선이다.
+- Point: 원형 노드. 연결 점 개수는 2–4개(`C_1`…). Equipment In/Out 또는 다른 Point에 드래그로 붙인다. 연결선은 꺾은선이며 화살표 방향은 토글한다.
+- Calculation Object Link: Point 또는 Equipment에 붙는 점선 association. 값은 흐르지 않는다.
 - Valve, Pipe, Signal, Annotation은 이 단계에 없다
 
 역할 분리:
 
-- React / React Flow: 화면 렌더링, 생성·이동, Point↔Equipment 드래그 연결
+- React / React Flow: 화면 렌더링, 생성·이동, Point↔Equipment/Point 드래그 연결, Link 점선
 - Python: 도메인 스키마, 저장/불러오기, ID·참조 무결성, Calculation과의 relation, evaluate 시 Equipment/Point skip
 
 `objects`는 판별 유니온이다. 기존 JSON에 `kind`가 없으면 Calculation Object로 로드한다. 예전 Arrangement 창 JSON(`kind: "arrangement"`)은 로드 시 Equipment/Point 노드로 펼친다.

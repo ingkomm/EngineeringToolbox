@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { ProjectDocument } from "../types/contract";
 import {
+  searchLayoutTargets,
   searchSourcePorts,
   searchTargetPorts,
   type PortLinkStatus,
@@ -26,7 +27,7 @@ export function PortSearch({
   project: ProjectDocument;
   selfObjectId: string;
   selfVariableId: string;
-  direction: "to-input" | "from-output";
+  direction: "to-input" | "from-output" | "to-layout";
   onPick: (hit: PortSearchHit) => void;
   onDisconnect: (hit: PortSearchHit) => void;
   testId: string;
@@ -37,7 +38,9 @@ export function PortSearch({
     () =>
       direction === "to-input"
         ? searchTargetPorts(project, query, selfObjectId, selfVariableId)
-        : searchSourcePorts(project, query, selfObjectId, selfVariableId),
+        : direction === "from-output"
+          ? searchSourcePorts(project, query, selfObjectId, selfVariableId)
+          : searchLayoutTargets(project, query, selfObjectId, selfVariableId),
     [direction, project, query, selfObjectId, selfVariableId],
   );
 
@@ -61,7 +64,9 @@ export function PortSearch({
             className="port-search__query nodrag nopan"
             value={query}
             data-testid={`${testId}-query`}
-            placeholder="오브젝트 ID / 이름"
+            placeholder={
+              direction === "to-layout" ? "Point / Equipment 검색…" : "오브젝트 ID / 이름"
+            }
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => event.stopPropagation()}
             autoFocus
