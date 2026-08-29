@@ -286,12 +286,18 @@ label.ghost-btn {
   overflow: hidden;
 }
 
+.react-flow__node:hover .ws-reveal,
+.react-flow__node.selected .ws-reveal,
 .ws-node:hover .ws-reveal,
 .ws-node.is-selected .ws-reveal {
   opacity: 1;
   pointer-events: auto;
 }
 
+.react-flow__node:hover .ws-node__tools > .ws-reveal,
+.react-flow__node.selected .ws-node__tools > .ws-reveal,
+.react-flow__node:hover .ws-node__tools.ws-reveal,
+.react-flow__node.selected .ws-node__tools.ws-reveal,
 .ws-node:hover .ws-node__tools > .ws-reveal,
 .ws-node.is-selected .ws-node__tools > .ws-reveal,
 .ws-node:hover .ws-node__tools.ws-reveal,
@@ -300,6 +306,8 @@ label.ghost-btn {
   max-height: 40px;
 }
 
+.react-flow__node:hover .ws-eq__ports.ws-reveal,
+.react-flow__node.selected .ws-eq__ports.ws-reveal,
 .ws-node:hover .ws-eq__ports.ws-reveal,
 .ws-node.is-selected .ws-eq__ports.ws-reveal {
   max-height: 40px;
@@ -374,6 +382,8 @@ label.ghost-btn {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
 }
 
+.react-flow__node:hover .ws-port__label,
+.react-flow__node.selected .ws-port__label,
 .ws-node:hover .ws-port__label,
 .ws-node.is-selected .ws-port__label {
   display: block;
