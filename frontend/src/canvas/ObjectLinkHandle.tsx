@@ -23,7 +23,7 @@ export function ObjectLinkHandle({
       />
       <button
         type="button"
-        className={`obj-link-side obj-link-side--${side} nodrag nopan`}
+        className={`obj-link-side obj-link-side--${side} ws-reveal nodrag nopan`}
         data-testid={`object-${nodeId}-obj-side`}
         title={side === "top" ? "노란 링크를 하단으로" : "노란 링크를 상단으로"}
         onClick={(event) => {

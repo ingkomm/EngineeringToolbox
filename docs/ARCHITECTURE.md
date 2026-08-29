@@ -288,8 +288,9 @@ Object A의 PIN/POUT만 바꾸면 Object A와 B가 갱신된다. 매핑되지 �
 | `btn-export-project` | 상단 바 | 프로젝트 JSON 다운로드 |
 | `btn-import-project` | 상단 바 | 프로젝트 JSON 불러오기 |
 | `btn-load-example` | 우측 사이드바 | `loadExample` |
-| `object-{id}-id` | Node 헤더 | Object ID, blur로 commit. 전역 유일 |
+| `object-{id}-id` | Node 헤더 | Object ID, blur로 commit. 전역 유일. 기본 숨김, hover/선택 시 표시 |
 | `object-{id}-name` | Node 헤더 | Object 이름, blur로 commit. 전역 유일 |
+| `object-{id}-expand` | Calculation 헤더 | compact/expanded 토글. 선택해도 Input/Calculation/Output/Link가 펼쳐짐 |
 | `object-{id}-add-input` | Node Input 헤더 | `addInput` |
 | `object-{id}-add-calc` | Node Calculation 헤더 | `addCalculation` |
 | `object-{id}-add-output` | Node Output 헤더 | `addOutput` |
@@ -313,6 +314,8 @@ Object A의 PIN/POUT만 바꾸면 Object A와 B가 갱신된다. 매핑되지 �
 | `edge-arrlink:{pointId}:{end}-direction` | Point 연결선 | 화살표 방향 토글 |
 
 첫 Input 추가 시 Variable ID는 `IN_1`이다. ID를 `FLOW`로 바꾼 뒤에 testid가 `object-obj_1-input-FLOW-*`로 바뀐다.
+
+캔버스 기본 표시는 이름·심볼·연결선·주요 값이다. Object ID, 포트명, 방향, 링크 On/Off, 편집/삭제 컨트롤은 hover 또는 선택 시에만 보인다. Calculation Object는 compact가 기본이며, 노드를 선택하거나 `object-{id}-expand`를 눌러야 Input / Calculation / Output / Link 섹션이 펼쳐진다. Equipment / Point / Calculation의 header·border·타이포·포트(10px)는 같은 `--ws-*` 토큰을 쓴다.
 
 Arrangement:
 

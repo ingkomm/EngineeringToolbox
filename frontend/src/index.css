@@ -13,6 +13,14 @@
   --danger: #ef6b6b;
   --input: #0b1220;
   --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  --ws-bg: var(--bg-node);
+  --ws-radius: 12px;
+  --ws-border: 1px solid var(--line-strong);
+  --ws-selected: 1px solid var(--accent);
+  --ws-title: 13px;
+  --ws-kicker: 10px;
+  --ws-mono: 11px;
+  --ws-port: 10px;
   font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
 }
 
@@ -199,32 +207,210 @@ label.ghost-btn {
   overflow: visible;
 }
 
-.calc-node {
+.ws-node {
   position: relative;
-  width: 760px;
-  background: var(--bg-node);
-  border: 1px solid var(--line-strong);
-  border-radius: 14px;
+  background: var(--ws-bg);
+  border: var(--ws-border);
+  border-radius: var(--ws-radius);
   box-shadow: var(--shadow);
   overflow: visible;
 }
 
-.calc-node__header {
-  min-height: 46px;
+.ws-node:hover:not(.is-selected) {
+  box-shadow: 0 0 0 1px rgba(108, 182, 255, 0.18), var(--shadow);
+}
+
+.ws-node.is-selected {
+  border: var(--ws-selected);
+  box-shadow: 0 0 0 1px rgba(62, 207, 142, 0.25), var(--shadow);
+}
+
+.ws-node__header {
+  min-height: 44px;
   padding: 8px 10px 8px 12px;
   border-bottom: 1px solid var(--line);
   display: grid;
-  grid-template-columns: 110px minmax(0, 1fr) auto;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 8px;
   align-items: center;
 }
 
-.calc-node__kicker {
+.ws-node__kicker {
   grid-column: 1 / -1;
-  font-size: 10px;
+  font-size: var(--ws-kicker);
   color: var(--accent);
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.ws-node__name,
+.ws-node__header .calc-row__name-input {
+  min-width: 0;
+  font-size: var(--ws-title);
+  font-weight: 600;
+}
+
+.ws-node__id,
+.ws-node__header .calc-node__id {
+  width: 88px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: var(--ws-mono);
+}
+
+.ws-node__tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ws-reveal {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.ws-node__tools > .ws-reveal,
+.ws-node__tools.ws-reveal {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 0;
+  max-height: 0;
+  overflow: hidden;
+}
+
+.ws-eq__ports.ws-reveal {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+}
+
+.ws-node:hover .ws-reveal,
+.ws-node.is-selected .ws-reveal {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ws-node:hover .ws-node__tools > .ws-reveal,
+.ws-node.is-selected .ws-node__tools > .ws-reveal,
+.ws-node:hover .ws-node__tools.ws-reveal,
+.ws-node.is-selected .ws-node__tools.ws-reveal {
+  max-width: 220px;
+  max-height: 40px;
+}
+
+.ws-node:hover .ws-eq__ports.ws-reveal,
+.ws-node.is-selected .ws-eq__ports.ws-reveal {
+  max-height: 40px;
+  padding: 4px 8px 8px;
+}
+
+.ws-node__compact {
+  position: relative;
+  min-height: 52px;
+  padding: 8px 18px 12px;
+}
+
+.ws-node__values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.ws-node__value {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: var(--ws-mono);
+  color: #d5e4f7;
+}
+
+.ws-node__value em {
+  font-style: normal;
+  color: var(--muted);
+  margin-right: 6px;
+}
+
+.ws-node__muted {
+  color: var(--muted);
+  font-size: var(--ws-mono);
+}
+
+.ws-node__rail {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+}
+
+.ws-node__rail--in {
+  left: 0;
+}
+
+.ws-node__rail--out {
+  right: 0;
+}
+
+.ws-port {
+  width: var(--ws-port) !important;
+  min-width: var(--ws-port);
+  height: var(--ws-port) !important;
+  border-radius: 50% !important;
+  font-size: 0;
+  padding: 0;
+}
+
+.ws-port__label {
+  display: none;
+  position: absolute;
+  top: 50%;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+.ws-node:hover .ws-port__label,
+.ws-node.is-selected .ws-port__label {
+  display: block;
+}
+
+.ws-eq-handle--in .ws-port__label,
+.calc-handle--in .ws-port__label,
+.ws-point-handle--left .ws-port__label {
+  left: calc(100% + 5px);
+  transform: translateY(-50%);
+  color: var(--accent);
+}
+
+.ws-eq-handle--out .ws-port__label,
+.calc-handle--out .ws-port__label,
+.ws-point-handle--right .ws-port__label {
+  right: calc(100% + 5px);
+  transform: translateY(-50%);
+  color: var(--accent-2);
+}
+
+.ws-point-handle--bottom .ws-port__label {
+  top: auto;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--muted);
+}
+
+.calc-node,
+.ws-node--calc {
+  width: 280px;
+}
+
+.ws-node--calc.is-expanded,
+.calc-node.is-expanded {
+  width: 760px;
 }
 
 .calc-node__id,
@@ -246,7 +432,7 @@ label.ghost-btn {
 }
 
 .calc-node__header .calc-row__name-input {
-  font-size: 15px;
+  font-size: var(--ws-title);
   font-weight: 600;
 }
 
@@ -515,9 +701,12 @@ label.ghost-btn {
 }
 
 .calc-handle {
-  width: 10px;
-  height: 10px;
+  width: var(--ws-port) !important;
+  height: var(--ws-port) !important;
   border: 2px solid #071018;
+}
+
+.calc-handle:not(.calc-handle--rail) {
   top: 50% !important;
 }
 
@@ -584,6 +773,13 @@ label.ghost-btn {
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.edge-controls.is-visible {
+  opacity: 1;
   pointer-events: all;
 }
 
@@ -1009,25 +1205,13 @@ label.ghost-btn {
   margin: 0;
 }
 
-.ws-eq {
-  position: relative;
+.ws-eq,
+.ws-node--eq {
   width: 176px;
-  background: #122033;
-  border: 1px solid var(--line-strong);
-  border-radius: 12px;
-  overflow: visible;
 }
 
 .ws-eq--selected {
-  border-color: var(--accent);
-}
-
-.ws-eq__header {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) auto;
-  gap: 4px;
-  align-items: center;
-  padding: 6px 8px 4px;
+  border: var(--ws-selected);
 }
 
 .ws-eq__body {
@@ -1037,15 +1221,7 @@ label.ghost-btn {
 }
 
 .ws-eq-handle {
-  width: auto !important;
-  min-width: 28px;
-  height: 16px !important;
-  padding: 0 4px;
-  border-radius: 8px !important;
-  font-size: 8px;
   font-weight: 700;
-  line-height: 14px;
-  text-align: center;
 }
 
 .ws-eq-handle.react-flow__handle-left {
@@ -1083,20 +1259,18 @@ label.ghost-btn {
   align-items: center;
 }
 
-.ws-point {
-  position: relative;
-  width: 84px;
-  height: 84px;
+.ws-point,
+.ws-node--point {
+  width: 88px;
+  height: 88px;
   border-radius: 50%;
-  background: #122033;
-  border: 2px solid var(--line-strong);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .ws-point--selected {
-  border-color: var(--accent);
+  border: var(--ws-selected);
 }
 
 .ws-point__core {
@@ -1111,27 +1285,37 @@ label.ghost-btn {
   pointer-events: auto;
 }
 
+.ws-point__name {
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ws-title);
+  font-weight: 600;
+  text-align: center;
+}
+
 .ws-point__id {
   width: 52px;
   border: 0;
   background: transparent;
   color: var(--text);
-  font-size: 11px;
+  font-size: var(--ws-mono);
   font-weight: 700;
   text-align: center;
 }
 
 .ws-point-handle {
-  width: 12px !important;
-  height: 12px !important;
+  width: var(--ws-port) !important;
+  height: var(--ws-port) !important;
   border-radius: 50% !important;
   background: #0b1220 !important;
   border: 2px solid var(--muted) !important;
 }
 
 .obj-link-handle {
-  width: 12px !important;
-  height: 12px !important;
+  width: var(--ws-port) !important;
+  height: var(--ws-port) !important;
   border-radius: 3px !important;
   background: #f0b429 !important;
   border: 2px solid #071018 !important;

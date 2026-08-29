@@ -33,15 +33,18 @@ function stopKeys(event: KeyboardEvent) {
   event.stopPropagation();
 }
 
-export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectNodeType>) {
+export function CalculationObjectNode({ id, selected, data }: NodeProps<CalculationObjectNodeType>) {
   const { object, project, mappedInputIds, quantities, onEdit } = data;
   const mapped = new Set(mappedInputIds);
+  const [expanded, setExpanded] = useState(false);
+  const open = Boolean(selected) || expanded;
   const updateNodeInternals = useUpdateNodeInternals();
   const handleSignature = [
     ...object.inputs.map((item) => item.id),
     ...object.outputs.map((item) => item.id),
     OBJECT_LINK_HANDLE,
     objectLinkSideOf(object),
+    open ? "open" : "compact",
   ].join("|");
 
   useLayoutEffect(() => {
@@ -59,7 +62,10 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
   ];
 
   return (
-    <article className="calc-node" data-testid={`object-${id}`}>
+    <article
+      className={`ws-node ws-node--calc calc-node ${selected ? "is-selected" : ""} ${open ? "is-expanded" : ""}`}
+      data-testid={`object-${id}`}
+    >
       <ObjectLinkHandle
         nodeId={id}
         side={objectLinkSideOf(object)}
@@ -71,35 +77,95 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
           })
         }
       />
-      <header className="calc-node__header">
-        <span className="calc-node__kicker">Calculation Object</span>
-        <ObjectIdField
-          value={object.id}
-          testId={`object-${id}-id`}
-          onCommit={(nextId) => onEdit({ type: "updateObject", objectId: id, patch: { id: nextId } })}
-        />
+      <header className="ws-node__header calc-node__header">
+        <span className="ws-node__kicker calc-node__kicker">Calculation</span>
         <NameField
           value={object.name}
           testId={`object-${id}-name`}
           onCommit={(name) => onEdit({ type: "updateObject", objectId: id, patch: { name } })}
         />
-        <button
-          type="button"
-          className="icon-btn nodrag"
-          title="객체 삭제"
-          data-testid={`object-${id}-delete`}
-          onClick={() => onEdit({ type: "deleteObject", objectId: id })}
-        >
-          ×
-        </button>
+        <div className="ws-node__tools">
+          <div className="ws-reveal">
+            <ObjectIdField
+              value={object.id}
+              testId={`object-${id}-id`}
+              onCommit={(nextId) => onEdit({ type: "updateObject", objectId: id, patch: { id: nextId } })}
+            />
+            <button
+              type="button"
+              className="icon-btn nodrag"
+              title="객체 삭제"
+              data-testid={`object-${id}-delete`}
+              onClick={() => onEdit({ type: "deleteObject", objectId: id })}
+            >
+              ×
+            </button>
+          </div>
+          <button
+            type="button"
+            className="icon-btn ws-node__expand nodrag"
+            title={expanded ? "접기" : "펼치기"}
+            data-testid={`object-${id}-expand`}
+            onClick={(event) => {
+              event.stopPropagation();
+              setExpanded((value) => !value);
+            }}
+          >
+            {open && expanded ? "▴" : "▾"}
+          </button>
+        </div>
       </header>
 
+      {!open ? (
+        <div className="ws-node__compact">
+          <div className="ws-node__values">
+            {object.outputs.length === 0 ? <span className="ws-node__muted">값 없음</span> : null}
+            {object.outputs.slice(0, 4).map((item) => (
+              <span key={item.id} className="ws-node__value">
+                <em>{displayName(item)}</em>
+                {formatValue(item.value)}
+              </span>
+            ))}
+          </div>
+          <div className="ws-node__rail ws-node__rail--in">
+            {object.inputs.map((item, index) => (
+              <RowHandle
+                key={item.id}
+                nodeId={id}
+                handleId={inputHandleId(item.id)}
+                type="target"
+                position={Position.Left}
+                className="ws-port calc-handle calc-handle--in calc-handle--rail"
+                style={{ top: `${((index + 1) / (object.inputs.length + 1)) * 100}%` }}
+                label={item.id}
+              />
+            ))}
+          </div>
+          <div className="ws-node__rail ws-node__rail--out">
+            {object.outputs.map((item, index) => (
+              <RowHandle
+                key={item.id}
+                nodeId={id}
+                handleId={outputHandleId(item.id)}
+                type="source"
+                position={Position.Right}
+                className="ws-port calc-handle calc-handle--out calc-handle--rail"
+                style={{ top: `${((index + 1) / (object.outputs.length + 1)) * 100}%` }}
+                label={item.id}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {open ? (
+        <>
       <section className="calc-table calc-table--input">
         <div className="calc-table__title">
           <span>Input</span>
           <button
             type="button"
-            className="link-btn nodrag"
+            className="link-btn ws-reveal nodrag"
             data-testid={`object-${id}-add-input`}
             onClick={() => onEdit({ type: "addInput", objectId: id })}
           >
@@ -124,9 +190,10 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
                 handleId={inputHandleId(item.id)}
                 type="target"
                 position={Position.Left}
-                className="calc-handle calc-handle--in"
+                className="ws-port calc-handle calc-handle--in"
+                label={item.id}
               />
-              <div className="port-tools">
+              <div className="port-tools ws-reveal">
                 <PortSearch
                   project={project}
                   selfObjectId={id}
@@ -203,7 +270,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
               />
               <button
                 type="button"
-                className="icon-btn nodrag"
+                className="icon-btn ws-reveal nodrag"
                 data-testid={`object-${id}-input-${item.id}-remove`}
                 onClick={() => onEdit({ type: "removeInput", objectId: id, index })}
               >
@@ -219,7 +286,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
           <span>Calculation</span>
           <button
             type="button"
-            className="link-btn nodrag"
+            className="link-btn ws-reveal nodrag"
             data-testid={`object-${id}-add-calc`}
             onClick={() => onEdit({ type: "addCalculation", objectId: id })}
           >
@@ -269,7 +336,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
             </span>
             <button
               type="button"
-              className="icon-btn nodrag"
+              className="icon-btn ws-reveal nodrag"
               data-testid={`object-${id}-calc-${item.id}-remove`}
               onClick={() => onEdit({ type: "removeCalculation", objectId: id, index })}
             >
@@ -310,7 +377,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
               {formatValue(item.value)}
             </span>
             <span className="calc-row__unit">{item.unit ?? "—"}</span>
-            <div className="port-tools">
+            <div className="port-tools ws-reveal">
               <PortSearch
                 project={project}
                 selfObjectId={id}
@@ -345,7 +412,8 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
               handleId={outputHandleId(item.id)}
               type="source"
               position={Position.Right}
-              className="calc-handle calc-handle--out"
+              className="ws-port calc-handle calc-handle--out"
+              label={item.id}
             />
           </div>
           );
@@ -357,7 +425,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
           <span>Link</span>
           <button
             type="button"
-            className="link-btn nodrag"
+            className="link-btn ws-reveal nodrag"
             data-testid={`object-${id}-add-link`}
             onClick={() => onEdit({ type: "addLink", objectId: id })}
           >
@@ -387,7 +455,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
               <span className="calc-row__target" data-testid={`object-${id}-link-${item.id}-target`}>
                 {item.targetObjectId ?? "—"}
               </span>
-              <div className="port-tools">
+              <div className="port-tools ws-reveal">
                 <PortSearch
                   project={project}
                   selfObjectId={id}
@@ -422,6 +490,8 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
           );
         })}
       </section>
+        </>
+      ) : null}
     </article>
   );
 }

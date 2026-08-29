@@ -33,7 +33,10 @@ export function PointObjectNode({ id, selected, data }: NodeProps<PointObjectNod
   }, [id, side, updateNodeInternals]);
 
   return (
-    <article className={`ws-point ${selected ? "ws-point--selected" : ""}`} data-testid={`object-${id}`}>
+    <article
+      className={`ws-node ws-node--point ws-point ${selected ? "is-selected ws-point--selected" : ""}`}
+      data-testid={`object-${id}`}
+    >
       <ObjectLinkHandle
         nodeId={id}
         side={side}
@@ -51,37 +54,42 @@ export function PointObjectNode({ id, selected, data }: NodeProps<PointObjectNod
           type="source"
           position={SIDE_POSITION[pointConnectionSide(endId)]}
           id={endId}
-          className={`ws-point-handle ws-point-handle--${pointConnectionSide(endId)} ${
+          className={`ws-port ws-point-handle ws-point-handle--${pointConnectionSide(endId)} ${
             object.connections[index] ? "ws-point-handle--on" : ""
           }`}
           data-testid={`object-${id}-${endId}`}
           title={`${id}.${endId}`}
-        />
+        >
+          <span className="ws-port__label">{endId}</span>
+        </Handle>
       ))}
       <div className="ws-point__core nodrag nopan">
-        <input
-          className="ws-point__id nodrag"
-          defaultValue={object.id}
-          data-testid={`object-${id}-id`}
-          onKeyDown={stopKeys}
-          onBlur={(event) => {
-            const nextId = event.target.value.trim();
-            if (!OBJECT_ID_RE.test(nextId) || nextId === object.id) {
-              event.target.value = object.id;
-              return;
-            }
-            onEdit({ type: "updatePoint", objectId: id, patch: { id: nextId } });
-          }}
-        />
-        <button
-          type="button"
-          className="icon-btn nodrag"
-          title="객체 삭제"
-          data-testid={`object-${id}-delete`}
-          onClick={() => onEdit({ type: "deleteObject", objectId: id })}
-        >
-          ×
-        </button>
+        <span className="ws-node__name ws-point__name">{object.name}</span>
+        <div className="ws-node__tools ws-reveal">
+          <input
+            className="ws-node__id ws-point__id nodrag"
+            defaultValue={object.id}
+            data-testid={`object-${id}-id`}
+            onKeyDown={stopKeys}
+            onBlur={(event) => {
+              const nextId = event.target.value.trim();
+              if (!OBJECT_ID_RE.test(nextId) || nextId === object.id) {
+                event.target.value = object.id;
+                return;
+              }
+              onEdit({ type: "updatePoint", objectId: id, patch: { id: nextId } });
+            }}
+          />
+          <button
+            type="button"
+            className="icon-btn nodrag"
+            title="객체 삭제"
+            data-testid={`object-${id}-delete`}
+            onClick={() => onEdit({ type: "deleteObject", objectId: id })}
+          >
+            ×
+          </button>
+        </div>
       </div>
     </article>
   );

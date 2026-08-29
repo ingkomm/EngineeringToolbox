@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, type Edge, type EdgeProps } from "@xyflow/react";
 
 export type ArrangementLinkEdgeType = Edge<
@@ -21,7 +22,9 @@ export function ArrangementLinkEdge({
   markerEnd,
   style,
   data,
+  selected,
 }: EdgeProps<ArrangementLinkEdgeType>) {
+  const [hovered, setHovered] = useState(false);
   const [path, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
@@ -33,16 +36,26 @@ export function ArrangementLinkEdge({
   });
   return (
     <>
-      <BaseEdge id={id} path={path} markerEnd={markerEnd} style={style} className="arr-point-link" />
+      <BaseEdge
+        id={id}
+        path={path}
+        markerEnd={markerEnd}
+        style={style}
+        className="arr-point-link"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      />
       <EdgeLabelRenderer>
         <div
-          className="edge-controls nodrag nopan"
+          className={`edge-controls nodrag nopan ${selected || hovered ? "is-visible" : ""}`}
           style={{
             position: "absolute",
             transform: `translate(-50%, -140%) translate(${labelX}px, ${labelY}px)`,
             pointerEvents: "all",
           }}
           onDoubleClick={(event) => event.stopPropagation()}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
         >
           <button
             type="button"

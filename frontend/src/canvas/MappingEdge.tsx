@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, type Edge, type EdgeProps } from "@xyflow/react";
 
 export type MappingEdgeType = Edge<
@@ -24,7 +25,9 @@ export function MappingEdge({
   targetPosition,
   data,
   markerEnd,
+  selected,
 }: EdgeProps<MappingEdgeType>) {
+  const [hovered, setHovered] = useState(false);
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
@@ -54,16 +57,20 @@ export function MappingEdge({
         path={edgePath}
         markerEnd={markerEnd}
         className={enabled ? "mapping-edge" : "mapping-edge mapping-edge--off"}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
       />
       <EdgeLabelRenderer>
         <div
-          className="edge-controls nodrag nopan"
+          className={`edge-controls nodrag nopan ${selected || hovered ? "is-visible" : ""}`}
           style={{
             position: "absolute",
             transform: `translate(-50%, -140%) translate(${labelX}px, ${labelY}px)`,
             pointerEvents: "all",
           }}
           onDoubleClick={(event) => event.stopPropagation()}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
         >
           <button
             type="button"

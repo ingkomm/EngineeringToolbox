@@ -29,7 +29,10 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
   }, [handleSignature, id, updateNodeInternals]);
 
   return (
-    <article className={`ws-eq ${selected ? "ws-eq--selected" : ""}`} data-testid={`object-${id}`}>
+    <article
+      className={`ws-node ws-node--eq ws-eq ${selected ? "is-selected ws-eq--selected" : ""}`}
+      data-testid={`object-${id}`}
+    >
       <ObjectLinkHandle
         nodeId={id}
         side={objectLinkSideOf(object)}
@@ -41,23 +44,10 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
           })
         }
       />
-      <header className="ws-eq__header">
+      <header className="ws-node__header ws-eq__header">
+        <span className="ws-node__kicker">Equipment</span>
         <input
-          className="calc-node__id nodrag"
-          defaultValue={object.id}
-          data-testid={`object-${id}-id`}
-          onKeyDown={stopKeys}
-          onBlur={(event) => {
-            const nextId = event.target.value.trim();
-            if (!OBJECT_ID_RE.test(nextId) || nextId === object.id) {
-              event.target.value = object.id;
-              return;
-            }
-            onEdit({ type: "updateObject", objectId: id, patch: { id: nextId } });
-          }}
-        />
-        <input
-          className="calc-row__name-input nodrag"
+          className="ws-node__name calc-row__name-input nodrag"
           defaultValue={object.name}
           data-testid={`object-${id}-name`}
           onKeyDown={stopKeys}
@@ -70,15 +60,31 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
             onEdit({ type: "updateObject", objectId: id, patch: { name } });
           }}
         />
-        <button
-          type="button"
-          className="icon-btn nodrag"
-          title="객체 삭제"
-          data-testid={`object-${id}-delete`}
-          onClick={() => onEdit({ type: "deleteObject", objectId: id })}
-        >
-          ×
-        </button>
+        <div className="ws-node__tools ws-reveal">
+          <input
+            className="ws-node__id calc-node__id nodrag"
+            defaultValue={object.id}
+            data-testid={`object-${id}-id`}
+            onKeyDown={stopKeys}
+            onBlur={(event) => {
+              const nextId = event.target.value.trim();
+              if (!OBJECT_ID_RE.test(nextId) || nextId === object.id) {
+                event.target.value = object.id;
+                return;
+              }
+              onEdit({ type: "updateObject", objectId: id, patch: { id: nextId } });
+            }}
+          />
+          <button
+            type="button"
+            className="icon-btn nodrag"
+            title="객체 삭제"
+            data-testid={`object-${id}-delete`}
+            onClick={() => onEdit({ type: "deleteObject", objectId: id })}
+          >
+            ×
+          </button>
+        </div>
       </header>
       <div className="ws-eq__body">
         <ArrangementSymbol symbolId={object.symbolId} title={object.name} selected={selected} />
@@ -88,12 +94,12 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
             type="source"
             position={Position.Left}
             id={portId}
-            className="ws-eq-handle ws-eq-handle--in"
+            className="ws-port ws-eq-handle ws-eq-handle--in"
             style={{ top: `${((index + 1) / (ports.ins.length + 1)) * 100}%` }}
             data-testid={`object-${id}-${portId}`}
             title={`${id}.${portId}`}
           >
-            {portId}
+            <span className="ws-port__label">{portId}</span>
           </Handle>
         ))}
         {ports.outs.map((portId, index) => (
@@ -102,16 +108,16 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
             type="source"
             position={Position.Right}
             id={portId}
-            className="ws-eq-handle ws-eq-handle--out"
+            className="ws-port ws-eq-handle ws-eq-handle--out"
             style={{ top: `${((index + 1) / (ports.outs.length + 1)) * 100}%` }}
             data-testid={`object-${id}-${portId}`}
             title={`${id}.${portId}`}
           >
-            {portId}
+            <span className="ws-port__label">{portId}</span>
           </Handle>
         ))}
       </div>
-      <div className="ws-eq__ports nodrag nopan">
+      <div className="ws-eq__ports ws-reveal nodrag nopan">
         <label>
           In
           <input
