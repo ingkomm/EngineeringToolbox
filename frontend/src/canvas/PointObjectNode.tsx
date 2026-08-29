@@ -57,15 +57,6 @@ export function PointObjectNode({ id, selected, data }: NodeProps<PointObjectNod
           })
         }
       />
-      <Handle
-        type="source"
-        position={Position.Top}
-        id={id}
-        className="pid-pt__hit"
-        data-testid={`object-${id}-hit`}
-        title={`${id} 연결`}
-        isConnectable
-      />
       {POINT_CONNECTION_IDS.map((endId, index) => (
         <Handle
           key={endId}

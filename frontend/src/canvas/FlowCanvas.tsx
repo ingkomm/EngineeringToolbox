@@ -32,6 +32,7 @@ import {
   canConnectObjectLink,
   isCalculationObject,
   isLayoutObject,
+  isLayoutPortId,
   isObjectLinkHandle,
   isValueFlowEdge,
 } from "../lib/worksheet";
@@ -127,8 +128,8 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
       if (
         isLayoutObject(sourceObject) &&
         isLayoutObject(targetObject) &&
-        !isObjectLinkHandle(connection.sourceHandle) &&
-        !isObjectLinkHandle(connection.targetHandle)
+        isLayoutPortId(connection.sourceHandle) &&
+        isLayoutPortId(connection.targetHandle)
       ) {
         onEdit({
           type: "connectArrangement",
@@ -178,7 +179,7 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
         return canConnectObjectLink(project, calc.id, layout.id);
       }
       if (isLayoutObject(sourceObject) && isLayoutObject(targetObject)) {
-        return true;
+        return isLayoutPortId(connection.sourceHandle) && isLayoutPortId(connection.targetHandle);
       }
 
       const source = parseHandleId(connection.sourceHandle);
