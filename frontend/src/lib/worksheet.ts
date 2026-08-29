@@ -31,6 +31,38 @@ export function isValueFlowEdge(edge: MappingEdge): boolean {
   return edge.relationType == null || edge.relationType === "value_flow";
 }
 
+export function isAssociationEdge(edge: MappingEdge): boolean {
+  return edge.relationType === "association";
+}
+
+export function isArrangementPipeEdge(edge: MappingEdge): boolean {
+  return edge.relationType === "pipe" || edge.relationType === "signal";
+}
+
+export function firstFreePointEnd(point: PointObject): string {
+  const index = point.connections.findIndex((end) => !end);
+  return POINT_CONNECTION_IDS[index >= 0 ? index : 0] ?? "C_1";
+}
+
+export function resolveLayoutPort(
+  object: WorksheetObject,
+  handleId: string | null | undefined,
+  role: "source" | "target",
+  otherHandle?: string | null,
+): string | null {
+  if (isObjectLinkHandle(handleId)) return null;
+  if (handleId && layoutPortExists(object, handleId) && isLayoutPortId(handleId)) return handleId;
+  if (isPointObject(object)) return firstFreePointEnd(object);
+  if (isEquipmentObject(object)) {
+    const ports = equipmentPortIds(object);
+    if (role === "source") return ports.outs[0] ?? ports.ins[0] ?? null;
+    if (otherHandle?.startsWith("OUT_")) return ports.ins[0] ?? ports.outs[0] ?? null;
+    if (otherHandle?.startsWith("IN_")) return ports.outs[0] ?? ports.ins[0] ?? null;
+    return ports.ins[0] ?? ports.outs[0] ?? null;
+  }
+  return null;
+}
+
 /** Object-to-object association (Calculation ↔ Equipment/Point) attaches here. */
 export const OBJECT_LINK_HANDLE = "OBJ";
 
@@ -262,7 +294,7 @@ export function normalizeLoadedProject(project: ProjectDocument): ProjectDocumen
     ...project,
     objects: normalized,
     edges: project.edges.map((edge) => {
-      if (isValueFlowEdge(edge)) return edge;
+      if (!isAssociationEdge(edge)) return edge;
       if (layoutIds.has(edge.targetObjectId) && objectIds.has(edge.sourceObjectId)) {
         return { ...edge, targetVariableId: OBJECT_LINK_HANDLE };
       }

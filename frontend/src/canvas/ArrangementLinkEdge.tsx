@@ -98,7 +98,7 @@ export function ArrangementLinkEdge({
           />
         ))}
         <div
-          className={`edge-controls nodrag nopan ${selected || hovered ? "is-visible" : ""}`}
+          className={`edge-controls nodrag nopan ${data?.pointId && (selected || hovered) ? "is-visible" : ""}`}
           style={{
             position: "absolute",
             transform: `translate(-50%, -140%) translate(${mid.x}px, ${mid.y}px)`,
@@ -113,14 +113,15 @@ export function ArrangementLinkEdge({
             className="edge-toggle nodrag nopan"
             data-testid={`edge-${id}-waypoint`}
             title="중간점 추가"
-            onClick={() =>
-              data?.onEdit?.({
+            onClick={() => {
+              if (!data?.pointId || !data.end) return;
+              data.onEdit?.({
                 type: "updatePointEnd",
                 pointId: data.pointId,
                 end: data.end,
                 patch: { waypoints: [...waypoints, mid] },
-              })
-            }
+              });
+            }}
           >
             +
           </button>

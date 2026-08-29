@@ -660,6 +660,24 @@ describe("worksheet equipment and points", () => {
     expect(project.objects.find(isPointObject)?.objectLinkSide).toBe("bottom");
   });
 
+  it("connects equipment to equipment and equipment to a point", () => {
+    let project = applyAll([{ type: "addEquipment" }, { type: "addEquipment" }, { type: "addPoint" }]);
+    project = applyWorkspaceEdit(
+      project,
+      { type: "connectArrangement", sourceObjectId: "EQ_1", targetObjectId: "EQ_2" },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(project.edges.some((edge) => edge.relationType === "pipe" && edge.sourceObjectId === "EQ_1" && edge.targetObjectId === "EQ_2")).toBe(true);
+    expect(project.edges.find((edge) => edge.relationType === "pipe")?.sourceVariableId).toBe("OUT_1");
+    expect(project.edges.find((edge) => edge.relationType === "pipe")?.targetVariableId).toBe("IN_1");
+    project = applyWorkspaceEdit(
+      project,
+      { type: "connectArrangement", sourceObjectId: "EQ_1", targetObjectId: "PT_1" },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(project.objects.find(isPointObject)?.connections.some((end) => end?.objectId === "EQ_1")).toBe(true);
+  });
+
   it("rotates and retags equipment without dropping old JSON fields", () => {
     let project = applyAll([{ type: "addEquipment", symbolId: "pump" }]);
     const equipment = project.objects.find(isEquipmentObject);

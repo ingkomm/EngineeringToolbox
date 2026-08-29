@@ -6,12 +6,13 @@ import { inputHandleId, outputHandleId } from "../lib/display";
 import {
   OBJECT_LINK_HANDLE,
   arrangementLinkId,
+  isArrangementPipeEdge,
+  isAssociationEdge,
   isCalculationObject,
   isLayoutObject,
   isLayoutPortId,
   isObjectLinkHandle,
   isPointObject,
-  isValueFlowEdge,
   pointConnectionIds,
 } from "../lib/worksheet";
 import { mappedInputsForObject } from "./mappedInputs";
@@ -95,7 +96,29 @@ export function toFlowEdges(
     const source = objects.get(edge.sourceObjectId);
     const target = objects.get(edge.targetObjectId);
     const collapsed = edge.collapsed === true;
-    const association = !isValueFlowEdge(edge);
+    const association = isAssociationEdge(edge);
+    const pipe = isArrangementPipeEdge(edge);
+    if (pipe) {
+      return {
+        id: edge.id,
+        source: edge.sourceObjectId,
+        target: edge.targetObjectId,
+        sourceHandle: mappingSourceHandle(source, edge.sourceVariableId),
+        targetHandle: mappingTargetHandle(target, edge.targetVariableId),
+        type: "arrangementLink" as const,
+        className: `arr-point-link-edge arr-point-link-edge--${edge.relationType}`,
+        interactionWidth: 20,
+        data: {
+          pointId: "",
+          end: "",
+          linkKind: edge.relationType === "signal" ? "signal" : "pipe",
+          showArrow: false,
+          waypoints: [],
+          onToggleDirection,
+          onEdit,
+        },
+      };
+    }
     return {
       id: edge.id,
       source: edge.sourceObjectId,

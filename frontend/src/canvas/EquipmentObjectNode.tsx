@@ -75,6 +75,15 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
         {symbol.render(equipmentTag(object))}
       </div>
       <span className="pid-eq__tag">{equipmentTag(object)}</span>
+      <Handle
+        type="source"
+        position={Position.Top}
+        id={id}
+        className="pid-eq__hit"
+        data-testid={`object-${id}-hit`}
+        title={`${id} 연결`}
+        isConnectable
+      />
       {ports.ins.map((portId, index) => (
         <Handle
           key={portId}

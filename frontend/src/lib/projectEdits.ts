@@ -33,6 +33,7 @@ import {
   normalizePointObject,
   parseArrangementLinkId,
   parsePointConnectionEnd,
+  resolveLayoutPort,
 } from "./worksheet";
 
 export const VARIABLE_ID_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -123,6 +124,14 @@ export type WorkspaceEdit =
       targetObjectId: string | null;
       targetPortId: string | null;
       reversed?: boolean;
+    }
+  | {
+      type: "connectArrangement";
+      sourceObjectId: string;
+      sourcePortId?: string | null;
+      targetObjectId: string;
+      targetPortId?: string | null;
+      linkKind?: "pipe" | "signal";
     }
   | { type: "togglePointLink"; pointId: string; end: string }
   | { type: "loadProject"; project: ProjectDocument }
@@ -978,6 +987,8 @@ export function applyWorkspaceEdit(
       );
     case "togglePointLink":
       return togglePointLink(project, edit.pointId, edit.end);
+    case "connectArrangement":
+      return connectArrangement(project, edit);
   }
 }
 
@@ -1352,6 +1363,62 @@ function togglePointLink(project: ProjectDocument, pointId: string, end: string)
       objects: project.objects.map((item) =>
         item.id === pointId ? normalizePointObject({ ...point, connections }) : item,
       ),
+    },
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
+function connectArrangement(
+  project: ProjectDocument,
+  edit: {
+    sourceObjectId: string;
+    sourcePortId?: string | null;
+    targetObjectId: string;
+    targetPortId?: string | null;
+    linkKind?: "pipe" | "signal";
+  },
+): EditResult {
+  if (edit.sourceObjectId === edit.targetObjectId) return noEval(project);
+  const source = project.objects.find((item) => item.id === edit.sourceObjectId);
+  const target = project.objects.find((item) => item.id === edit.targetObjectId);
+  if (!source || !target || !isLayoutObject(source) || !isLayoutObject(target)) return noEval(project);
+  const sourcePort = resolveLayoutPort(source, edit.sourcePortId, "source", edit.targetPortId);
+  const targetPort = resolveLayoutPort(target, edit.targetPortId, "target", edit.sourcePortId ?? sourcePort);
+  if (!sourcePort || !targetPort) return noEval(project);
+
+  if (isPointObject(source)) {
+    return connectPointEnd(project, source.id, sourcePort, target.id, targetPort, false);
+  }
+  if (isPointObject(target)) {
+    return connectPointEnd(project, target.id, targetPort, source.id, sourcePort, true);
+  }
+
+  const relationType = edit.linkKind === "signal" ? "signal" : "pipe";
+  const duplicate = project.edges.some(
+    (edge) =>
+      edge.sourceObjectId === source.id &&
+      edge.sourceVariableId === sourcePort &&
+      edge.targetObjectId === target.id &&
+      edge.targetVariableId === targetPort,
+  );
+  if (duplicate) return noEval(project);
+  return {
+    project: {
+      ...project,
+      edges: [
+        ...project.edges,
+        {
+          id: `pipe-${source.id}-${sourcePort}-${target.id}-${targetPort}`,
+          sourceObjectId: source.id,
+          sourceVariableId: sourcePort,
+          targetObjectId: target.id,
+          targetVariableId: targetPort,
+          enabled: true,
+          collapsed: false,
+          relationType,
+        },
+      ],
     },
     dirtyObjectIds: [],
     shouldEvaluate: false,

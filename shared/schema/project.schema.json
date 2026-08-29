@@ -198,7 +198,7 @@
         "collapsed": { "type": "boolean" },
         "relationType": {
           "type": "string",
-          "enum": ["value_flow", "reference", "association"]
+          "enum": ["value_flow", "reference", "association", "pipe", "signal"]
         }
       }
     }

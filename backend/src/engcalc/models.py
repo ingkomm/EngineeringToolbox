@@ -8,7 +8,7 @@ from typing import Annotated, Literal, TypeGuard, Union
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 VariableStatus = Literal["idle", "ok", "mapped", "error"]
-RelationType = Literal["value_flow", "reference", "association"]
+RelationType = Literal["value_flow", "reference", "association", "pipe", "signal"]
 ObjectKind = Literal["calculation", "equipment", "point"]
 
 VARIABLE_ID_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -347,7 +347,7 @@ class ProjectDocument(BaseModel):
                 if end.objectId == item.id:
                     raise ValueError(f"SELF_POINT_LINK: point {item.id} {end.portId}")
         for edge in self.edges:
-            if is_value_flow_edge(edge):
+            if edge.relationType != "association":
                 continue
             if edge.targetObjectId in hosts:
                 edge.targetVariableId = OBJECT_LINK_HANDLE

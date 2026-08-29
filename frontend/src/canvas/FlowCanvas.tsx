@@ -32,9 +32,7 @@ import {
   canConnectObjectLink,
   isCalculationObject,
   isLayoutObject,
-  isLayoutPortId,
   isObjectLinkHandle,
-  isPointObject,
   isValueFlowEdge,
 } from "../lib/worksheet";
 
@@ -58,10 +56,6 @@ interface FlowCanvasProps {
   onEdit: (edit: WorkspaceEdit) => void;
   onUndo?: () => void;
   onRedo?: () => void;
-}
-
-function isLayoutPortHandle(handleId: string | null | undefined): boolean {
-  return isLayoutPortId(handleId);
 }
 
 function isTypingTarget(target: EventTarget | null) {
@@ -131,38 +125,17 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
       }
 
       if (
-        isPointObject(sourceObject) &&
-        isLayoutObject(targetObject) &&
-        isLayoutPortHandle(connection.sourceHandle) &&
-        !isObjectLinkHandle(connection.sourceHandle) &&
-        !isObjectLinkHandle(connection.targetHandle)
-      ) {
-        const port = isLayoutPortHandle(connection.targetHandle) ? connection.targetHandle : targetObject.id;
-        onEdit({
-          type: "connectPointEnd",
-          pointId: sourceObject.id,
-          end: connection.sourceHandle!,
-          targetObjectId: targetObject.id,
-          targetPortId: port!,
-          reversed: false,
-        });
-        return;
-      }
-      if (
         isLayoutObject(sourceObject) &&
-        isPointObject(targetObject) &&
-        isLayoutPortHandle(connection.targetHandle) &&
+        isLayoutObject(targetObject) &&
         !isObjectLinkHandle(connection.sourceHandle) &&
         !isObjectLinkHandle(connection.targetHandle)
       ) {
-        const port = isLayoutPortHandle(connection.sourceHandle) ? connection.sourceHandle : sourceObject.id;
         onEdit({
-          type: "connectPointEnd",
-          pointId: targetObject.id,
-          end: connection.targetHandle!,
-          targetObjectId: sourceObject.id,
-          targetPortId: port!,
-          reversed: true,
+          type: "connectArrangement",
+          sourceObjectId: sourceObject.id,
+          sourcePortId: connection.sourceHandle,
+          targetObjectId: targetObject.id,
+          targetPortId: connection.targetHandle,
         });
         return;
       }
@@ -204,11 +177,8 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
         const layout = isLayoutObject(sourceObject) ? sourceObject : targetObject;
         return canConnectObjectLink(project, calc.id, layout.id);
       }
-      if (isPointObject(sourceObject) && isLayoutObject(targetObject)) {
-        return isLayoutPortHandle(connection.sourceHandle) && Boolean(connection.targetHandle);
-      }
-      if (isLayoutObject(sourceObject) && isPointObject(targetObject)) {
-        return isLayoutPortHandle(connection.targetHandle) && Boolean(connection.sourceHandle);
+      if (isLayoutObject(sourceObject) && isLayoutObject(targetObject)) {
+        return true;
       }
 
       const source = parseHandleId(connection.sourceHandle);
