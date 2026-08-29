@@ -1331,7 +1331,7 @@ label.ghost-btn {
   flex-direction: row;
   align-items: center;
   gap: 3px;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .obj-link-cluster--top {
@@ -1343,10 +1343,6 @@ label.ghost-btn {
   bottom: 0;
   top: auto;
   transform: translate(-50%, 50%);
-}
-
-.obj-link-cluster.is-visible {
-  pointer-events: auto;
 }
 
 .obj-link-cluster .obj-link-handle {
@@ -1378,6 +1374,13 @@ label.ghost-btn {
   line-height: 12px;
   cursor: pointer;
   transform: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.obj-link-cluster:hover .obj-link-side {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .ws-point-handle--on {
@@ -1516,26 +1519,17 @@ label.ghost-btn {
   display: block;
 }
 
-.obj-link-cluster:not(.is-visible) .obj-link-handle,
-.obj-link-handle:not(.is-visible) {
+.pid-eq:not(:hover):not(.is-hot):not(.is-selected) .obj-link-handle,
+.pid-pt:not(:hover):not(.is-hot):not(.is-selected) .obj-link-handle {
   opacity: 0;
-  pointer-events: none;
 }
 
-.obj-link-cluster.is-visible .obj-link-handle,
-.obj-link-handle.is-visible,
+.obj-link-cluster:hover .obj-link-handle,
 .ws-node:hover .obj-link-handle,
 .ws-node.is-selected .obj-link-handle,
-.react-flow:has(.react-flow__connection) .obj-link-cluster,
-.react-flow:has(.react-flow__connectionline) .obj-link-cluster {
+.react-flow:has(.react-flow__connection) .obj-link-handle,
+.react-flow:has(.react-flow__connectionline) .obj-link-handle {
   opacity: 1;
-  pointer-events: auto;
-}
-
-.react-flow:has(.react-flow__connection) .obj-link-cluster .obj-link-handle,
-.react-flow:has(.react-flow__connectionline) .obj-link-cluster .obj-link-handle {
-  opacity: 1;
-  pointer-events: all;
 }
 
 .pid-pop {
