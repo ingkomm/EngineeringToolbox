@@ -90,28 +90,31 @@ class CalculationObject(BaseModel):
     outputs: list[OutputBinding] = Field(default_factory=list)
 
 
-class ArrangementNamedSymbol(BaseModel):
-    """Domain identity for a placed symbol. View coordinates live in ArrangementView."""
+class ArrangementEquipment(BaseModel):
+    """Placed equipment. Port identities are IN_1..IN_n and OUT_1..OUT_n from the counts."""
 
     model_config = ConfigDict(extra="forbid")
 
     id: str
     name: str = ""
     symbolId: str = "generic-equipment"
+    inCount: int = Field(default=1, ge=0, le=8)
+    outCount: int = Field(default=1, ge=0, le=8)
 
     @model_validator(mode="after")
-    def default_name(self) -> ArrangementNamedSymbol:
+    def default_name(self) -> ArrangementEquipment:
         if not self.name.strip():
             self.name = self.id
         return self
 
 
-class ArrangementEquipment(ArrangementNamedSymbol):
-    symbolId: str = "generic-equipment"
+class PointEnd(BaseModel):
+    """One end of a Point, attached to an equipment In or Out port."""
 
+    model_config = ConfigDict(extra="forbid")
 
-class ArrangementValve(ArrangementNamedSymbol):
-    symbolId: str = "generic-valve"
+    equipmentId: str
+    portId: str
 
 
 class ArrangementPoint(BaseModel):
@@ -119,7 +122,8 @@ class ArrangementPoint(BaseModel):
 
     id: str
     name: str = ""
-    attachedToId: str | None = None
+    a: PointEnd | None = None
+    b: PointEnd | None = None
 
     @model_validator(mode="after")
     def default_name(self) -> ArrangementPoint:
@@ -128,34 +132,19 @@ class ArrangementPoint(BaseModel):
         return self
 
 
-class ArrangementConnector(BaseModel):
-    """Semantic pipe or signal between equipment, valves, or points. No engineering values."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    id: str
-    sourceId: str
-    targetId: str
-
-
-class ArrangementAnnotation(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    id: str
-    text: str = ""
-
-
 class ArrangementDomain(BaseModel):
     """Engineering-meaningful identities and connections. Independent of canvas coordinates."""
 
     model_config = ConfigDict(extra="forbid")
 
     equipment: list[ArrangementEquipment] = Field(default_factory=list)
-    valves: list[ArrangementValve] = Field(default_factory=list)
     points: list[ArrangementPoint] = Field(default_factory=list)
-    pipes: list[ArrangementConnector] = Field(default_factory=list)
-    signals: list[ArrangementConnector] = Field(default_factory=list)
-    annotations: list[ArrangementAnnotation] = Field(default_factory=list)
+
+
+def equipment_port_ids(equipment: ArrangementEquipment) -> set[str]:
+    ins = {f"IN_{index}" for index in range(1, equipment.inCount + 1)}
+    outs = {f"OUT_{index}" for index in range(1, equipment.outCount + 1)}
+    return ins | outs
 
 
 class ElementView(BaseModel):
@@ -207,29 +196,19 @@ class ArrangementObject(BaseModel):
 
         for item in self.domain.equipment:
             claim(item.id, "equipment")
-        for item in self.domain.valves:
-            claim(item.id, "valve")
         for item in self.domain.points:
             claim(item.id, "point")
-        for item in self.domain.pipes:
-            claim(item.id, "pipe")
-        for item in self.domain.signals:
-            claim(item.id, "signal")
-        for item in self.domain.annotations:
-            claim(item.id, "annotation")
 
-        equipment_ids = {item.id for item in self.domain.equipment}
-        node_ids = equipment_ids | {item.id for item in self.domain.valves} | {
-            item.id for item in self.domain.points
-        }
+        equipment_by_id = {item.id: item for item in self.domain.equipment}
         for point in self.domain.points:
-            if point.attachedToId and point.attachedToId not in equipment_ids:
-                raise ValueError(f"UNKNOWN_ELEMENT: point {point.id} attachedToId {point.attachedToId}")
-        for connector in [*self.domain.pipes, *self.domain.signals]:
-            if connector.sourceId not in node_ids:
-                raise ValueError(f"UNKNOWN_POINT: {connector.id} source {connector.sourceId}")
-            if connector.targetId not in node_ids:
-                raise ValueError(f"UNKNOWN_POINT: {connector.id} target {connector.targetId}")
+            for end in (point.a, point.b):
+                if end is None:
+                    continue
+                host = equipment_by_id.get(end.equipmentId)
+                if host is None:
+                    raise ValueError(f"UNKNOWN_ELEMENT: point {point.id} end {end.equipmentId}")
+                if end.portId not in equipment_port_ids(host):
+                    raise ValueError(f"UNKNOWN_POINT: point {point.id} port {end.portId}")
         return self
 
 

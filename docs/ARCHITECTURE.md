@@ -311,53 +311,42 @@ Arrangement:
 
 | testid | 위치 | 동작 |
 |---|---|---|
-| `object-{id}-add-equipment` | Arrangement 툴바 | 범용 Equipment 추가 |
-| `object-{id}-add-valve` | Arrangement 툴바 | 범용 Valve 추가 |
-| `object-{id}-add-point` | Arrangement 툴바 | Point 추가. Equipment가 선택되어 있으면 종속 |
-| `object-{id}-add-pipe` | Arrangement 툴바 | Pipe 연결 모드 |
-| `object-{id}-add-signal` | Arrangement 툴바 | Signal 연결 모드 |
-| `object-{id}-add-annotation` | Arrangement 툴바 | 주석 추가 |
+| `object-{id}-add-equipment` | Arrangement 툴바 | Equipment 추가 |
+| `object-{id}-add-point` | Arrangement 툴바 | Point 추가 (양끝 연결 전) |
 | `object-{id}-equipment-{eqId}` | 캔버스 | Equipment 선택/이동 |
-| `object-{id}-point-{ptId}` | 캔버스 | Point 선택/이동 |
-| `object-{id}-point-{ptId}-id` | 하단 Inspector | Point ID 편집 |
-| `object-{id}-point-{ptId}-name` | 하단 Inspector | Point 이름 편집 |
-| `object-{id}-pipe-{pipeId}` | SVG | Pipe 선 |
-| `object-{id}-signal-{sigId}` | SVG | Signal 선 |
+| `object-{id}-equipment-{eqId}-IN_n` / `OUT_n` | Equipment 포트 | Point 끝을 끌어다 놓음 |
+| `object-{id}-equipment-{eqId}-in-count` | Inspector | In 포트 개수 |
+| `object-{id}-equipment-{eqId}-out-count` | Inspector | Out 포트 개수 |
+| `object-{id}-point-{ptId}` | 캔버스 | Point 본체 이동 |
+| `object-{id}-point-{ptId}-a` / `-b` | Point 양끝 | Equipment 포트로 드래그 |
+| `object-{id}-point-{ptId}-id` | Inspector | Point ID |
+| `object-{id}-point-{ptId}-name` | Inspector | Point 이름 |
 
 ## 10. Arrangement Object
 
-Arrangement는 발전소 Equipment / Valve / Pipe / Signal / Point / Annotation을 벡터로 배치하는 도면 객체다. P&ID, 3D CAD, 배관해석이 아니며 **내부에서 공학 계산을 하지 않는다**.
+Arrangement는 Equipment와 Point로 계통 배치를 그리는 도면 객체다. 내부에서 공학 계산을 하지 않는다.
+
+이 프로토타입 범위:
+
+- Equipment: 범용 심볼. In/Out 포트 개수를 지정한다. 포트 ID는 `IN_1`… / `OUT_1`…
+- Point: 양끝을 가진 연결 요소. 각 끝을 Equipment In/Out에 드래그 앤 드롭으로 붙인다
+- Valve, Pipe, Signal, Annotation은 이 단계에 없다
 
 역할 분리:
 
-- React / React Flow: 화면 렌더링, 생성·이동·연결, 선택 상태
+- React / React Flow: 화면 렌더링, 생성·이동, Point↔Equipment 드래그 연결
 - Python: 도메인 스키마, 저장/불러오기, ID·참조 무결성, Calculation과의 relation, evaluate 시 Arrangement skip
 
 `objects`는 판별 유니온이다. 기존 JSON에 `kind`가 없으면 Calculation Object로 로드한다.
 
-```
-CalculationObject.kind = "calculation"   // default
-ArrangementObject.kind = "arrangement"
-```
-
 Arrangement 저장 모델은 Domain과 View를 분리한다.
 
-- Domain: 요소 ID/종류/이름, Pipe·Signal의 의미적 연결, Point의 `attachedToId`, `symbolId` (이후 사용자 SVG 확장)
-- View: 워크시트 `position`, 캔버스 width/height/rotation/zIndex, `elements[id]`의 x/y/width/height/rotation/zIndex/visible
+- Domain: Equipment ID/이름/`inCount`/`outCount`, Point ID/이름, Point 끝 `a`/`b`의 `{ equipmentId, portId }`
+- View: 워크시트 `position`, 캔버스 크기, `elements[id]` 좌표
 
-요소를 화면에서 옮기는 것은 View만 바꾸고 Domain을 바꾼 것으로 취급하지 않는다. Arrangement 노드 전체 이동은 `position`만 바꾼다.
+Point를 Equipment에 연결하는 것은 Domain이다. Equipment/Point를 화면에서 옮기는 것은 View다.
 
-Point는 Arrangement 내부 포트다. Calculation Object Input/Output Port와 워크시트 Edge로 연결한다.
-
-```
-sourceObjectId, sourceVariableId (port 또는 point),
-targetObjectId, targetVariableId (port 또는 point),
-relationType: value_flow | reference | association
-```
-
-기존 Edge는 `relationType` 생략 시 `value_flow`다. Arrangement Point 연결은 `association`이며 값을 계산·전파하지 않는다. Arrangement에 `value_flow`를 걸면 Python이 `ARRANGEMENT_HAS_NO_VALUE`로 거부하고, 다른 Calculation Object 평가는 계속한다.
-
-내부 Pipe/Signal은 React Flow Edge가 아니라 Arrangement domain connector다. 화면에서는 SVG 선으로 그린다 (Pipe 실선, Signal 파선).
+Point는 워크시트에서 Calculation Object Port와 `association` Edge로 연결할 수 있다. Arrangement에 `value_flow`를 걸면 Python이 `ARRANGEMENT_HAS_NO_VALUE`로 거부한다.
 
 평가 시 Arrangement는 `evaluatedObjectIds`에 넣지 않으며 formula evaluator를 호출하지 않는다.
 

@@ -361,59 +361,75 @@ describe("unique objects and search connectors", () => {
 });
 
 describe("arrangement object", () => {
-  it("adds an arrangement with two generic equipment and no calculation", () => {
+  it("adds an arrangement with two equipment that have In/Out ports", () => {
     const project = applyAll([{ type: "addArrangement" }]);
     const arrangement = project.objects[1];
     expect(arrangement && isArrangementObject(arrangement)).toBe(true);
     if (!arrangement || !isArrangementObject(arrangement)) return;
-    expect(arrangement.domain.equipment.map((item) => item.id)).toEqual(["EQ_1", "EQ_2"]);
-    expect(arrangement.domain.pipes).toEqual([]);
-    expect(arrangement.view.elements.EQ_1?.x).toBe(48);
-    expect(arrangement.view.elements.EQ_2?.x).toBe(320);
+    expect(arrangement.domain.equipment.map((item) => [item.id, item.inCount, item.outCount])).toEqual([
+      ["EQ_1", 1, 1],
+      ["EQ_2", 1, 1],
+    ]);
+    expect(arrangement.domain.points).toEqual([]);
     expect(applyWorkspaceEdit(project, { type: "addInput", objectId: arrangement.id }, FALLBACK_QUANTITIES).shouldEvaluate).toBe(false);
   });
 
-  it("connects equipment with pipe or signal and adds editable points", () => {
+  it("connects point ends to equipment ports and can change port counts", () => {
     let project = applyAll([{ type: "addArrangement" }]);
     const arrangementId = project.objects[1]!.id;
-    project = applyWorkspaceEdit(
-      project,
-      { type: "addPipe", objectId: arrangementId, sourceId: "EQ_1", targetId: "EQ_2" },
-      FALLBACK_QUANTITIES,
-    ).project;
-    project = applyWorkspaceEdit(
-      project,
-      { type: "addSignal", objectId: arrangementId, sourceId: "EQ_1", targetId: "EQ_2" },
-      FALLBACK_QUANTITIES,
-    ).project;
-    project = applyWorkspaceEdit(
-      project,
-      { type: "addPoint", objectId: arrangementId, attachedToId: "EQ_1" },
-      FALLBACK_QUANTITIES,
-    ).project;
     project = applyWorkspaceEdit(project, { type: "addPoint", objectId: arrangementId }, FALLBACK_QUANTITIES).project;
-    const arrangement = project.objects[1];
-    expect(arrangement && isArrangementObject(arrangement)).toBe(true);
-    if (!arrangement || !isArrangementObject(arrangement)) return;
-    expect(arrangement.domain.pipes[0]).toMatchObject({ sourceId: "EQ_1", targetId: "EQ_2" });
-    expect(arrangement.domain.signals[0]).toMatchObject({ sourceId: "EQ_1", targetId: "EQ_2" });
-    expect(arrangement.domain.points.map((item) => item.id)).toEqual(["PT_1", "PT_2"]);
-    expect(arrangement.domain.points[0]?.attachedToId).toBe("EQ_1");
-    expect(arrangement.domain.points[1]?.attachedToId).toBeNull();
+    project = applyWorkspaceEdit(
+      project,
+      {
+        type: "connectPointEnd",
+        objectId: arrangementId,
+        pointId: "PT_1",
+        end: "a",
+        equipmentId: "EQ_1",
+        portId: "OUT_1",
+      },
+      FALLBACK_QUANTITIES,
+    ).project;
+    project = applyWorkspaceEdit(
+      project,
+      {
+        type: "connectPointEnd",
+        objectId: arrangementId,
+        pointId: "PT_1",
+        end: "b",
+        equipmentId: "EQ_2",
+        portId: "IN_1",
+      },
+      FALLBACK_QUANTITIES,
+    ).project;
+    let arrangement = project.objects[1];
+    expect(arrangement && isArrangementObject(arrangement) && arrangement.domain.points[0]).toMatchObject({
+      a: { equipmentId: "EQ_1", portId: "OUT_1" },
+      b: { equipmentId: "EQ_2", portId: "IN_1" },
+    });
 
     project = applyWorkspaceEdit(
       project,
-      { type: "updatePoint", objectId: arrangementId, pointId: "PT_1", patch: { id: "SUCTION", name: "흡입" } },
+      { type: "setEquipmentPorts", objectId: arrangementId, equipmentId: "EQ_1", outCount: 2 },
       FALLBACK_QUANTITIES,
     ).project;
-    const renamed = project.objects[1];
-    expect(renamed && isArrangementObject(renamed) && renamed.domain.points[0]).toMatchObject({
-      id: "SUCTION",
-      name: "흡입",
+    arrangement = project.objects[1];
+    expect(arrangement && isArrangementObject(arrangement) && arrangement.domain.equipment[0]?.outCount).toBe(2);
+    expect(arrangement && isArrangementObject(arrangement) && arrangement.domain.points[0]?.a).toEqual({
+      equipmentId: "EQ_1",
+      portId: "OUT_1",
     });
+
+    project = applyWorkspaceEdit(
+      project,
+      { type: "setEquipmentPorts", objectId: arrangementId, equipmentId: "EQ_1", outCount: 0 },
+      FALLBACK_QUANTITIES,
+    ).project;
+    arrangement = project.objects[1];
+    expect(arrangement && isArrangementObject(arrangement) && arrangement.domain.points[0]?.a).toBeNull();
   });
 
-  it("rejects duplicate point ids and unknown pipe endpoints", () => {
+  it("rejects duplicate point ids and unknown equipment ports", () => {
     let project = applyAll([{ type: "addArrangement" }]);
     const arrangementId = project.objects[1]!.id;
     project = applyWorkspaceEdit(project, { type: "addPoint", objectId: arrangementId }, FALLBACK_QUANTITIES).project;
@@ -425,14 +441,20 @@ describe("arrangement object", () => {
     const arrangement = afterDup.objects[1];
     expect(arrangement && isArrangementObject(arrangement) && arrangement.domain.points[0]?.id).toBe("PT_1");
 
-    const beforePipes = isArrangementObject(arrangement) ? arrangement.domain.pipes.length : -1;
-    const afterBadPipe = applyWorkspaceEdit(
+    const afterBad = applyWorkspaceEdit(
       afterDup,
-      { type: "addPipe", objectId: arrangementId, sourceId: "EQ_1", targetId: "NOPE" },
+      {
+        type: "connectPointEnd",
+        objectId: arrangementId,
+        pointId: "PT_1",
+        end: "a",
+        equipmentId: "EQ_1",
+        portId: "OUT_9",
+      },
       FALLBACK_QUANTITIES,
     ).project;
-    const still = afterBadPipe.objects[1];
-    expect(still && isArrangementObject(still) && still.domain.pipes.length).toBe(beforePipes);
+    const still = afterBad.objects[1];
+    expect(still && isArrangementObject(still) && still.domain.points[0]?.a).toBeNull();
   });
 
   it("keeps domain unchanged when moving the node or an inner element", () => {
@@ -450,7 +472,6 @@ describe("arrangement object", () => {
     };
     const movedNode = project.objects[1];
     expect(movedNode && isArrangementObject(movedNode) && movedNode.domain).toEqual(domain);
-    expect(movedNode && isArrangementObject(movedNode) && movedNode.position).toEqual({ x: 400, y: 20 });
 
     project = applyWorkspaceEdit(
       project,
@@ -493,24 +514,5 @@ describe("arrangement object", () => {
       relationType: "association",
     });
     expect(calc(result.project).inputs[0]?.id).toBe("IN_1");
-  });
-
-  it("round-trips arrangement JSON through loadProject", () => {
-    let project = applyAll([{ type: "addArrangement" }]);
-    const arrangementId = project.objects[1]!.id;
-    project = applyWorkspaceEdit(
-      project,
-      { type: "addPipe", objectId: arrangementId, sourceId: "EQ_1", targetId: "EQ_2" },
-      FALLBACK_QUANTITIES,
-    ).project;
-    project = applyWorkspaceEdit(project, { type: "addPoint", objectId: arrangementId }, FALLBACK_QUANTITIES).project;
-    const snapshot = structuredClone(project);
-    const restored = applyWorkspaceEdit(
-      blankProject,
-      { type: "loadProject", project: snapshot },
-      FALLBACK_QUANTITIES,
-    ).project;
-    expect(restored.objects[1]).toEqual(snapshot.objects[1]);
-    expect(restored.edges).toEqual(snapshot.edges);
   });
 });

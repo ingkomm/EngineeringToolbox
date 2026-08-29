@@ -802,35 +802,59 @@ label.ghost-btn {
   fill: none;
 }
 
-.arr-item {
+.arr-eq {
   position: absolute;
-  border: 0;
-  padding: 0;
-  background: transparent;
   cursor: grab;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
 }
 
-.arr-item--selected .arr-symbol__body {
+.arr-eq--selected .arr-symbol__body {
   stroke: var(--accent);
 }
 
+.arr-eq-port {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  min-width: 28px;
+  height: 16px;
+  padding: 0 4px;
+  border: 1px solid var(--accent);
+  background: #0b1220;
+  color: var(--accent);
+  border-radius: 8px;
+  font-size: 8px;
+  font-weight: 700;
+  cursor: crosshair;
+  z-index: 3;
+}
+
+.arr-eq-port--in {
+  left: 0;
+}
+
+.arr-eq-port--out {
+  left: 100%;
+  color: var(--accent-2);
+  border-color: var(--accent-2);
+}
+
 .arr-item__label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4px;
   font-size: 10px;
   color: var(--muted);
-  margin-top: 2px;
-  max-width: 100%;
+  text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  pointer-events: none;
 }
 
 .arr-symbol,
 .arr-symbol-svg {
   width: 100%;
-  height: 100%;
+  height: calc(100% - 14px);
 }
 
 .arr-symbol__body {
@@ -855,15 +879,15 @@ label.ghost-btn {
   stroke-width: 1.5;
 }
 
-.arr-symbol__stroke {
-  fill: none;
-  stroke: #c5d4e8;
+.arr-point-link {
+  stroke: #6cb6ff;
   stroke-width: 2;
-  stroke-linecap: round;
+  fill: none;
 }
 
-.arr-symbol__stroke--pipe {
-  stroke: #6cb6ff;
+.arr-point-link--preview {
+  stroke-dasharray: 4 3;
+  stroke: var(--warn);
 }
 
 .arr-point {
@@ -871,25 +895,46 @@ label.ghost-btn {
   cursor: grab;
 }
 
-.arr-point__glyph {
-  width: 100%;
-  height: 100%;
-  overflow: visible;
+.arr-point--bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 0 4px;
+  background: #122033;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
 }
 
-.arr-point__glyph circle {
-  fill: #0b1220;
-  stroke: var(--accent);
-  stroke-width: 1.6;
+.arr-point--selected {
+  border-color: var(--accent);
 }
 
-.arr-point__glyph path {
-  stroke: var(--accent);
-  stroke-width: 1.2;
+.arr-point__id {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.arr-point--selected .arr-point__glyph circle {
-  stroke: var(--warn);
+.arr-point-end {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+  background: #0b1220;
+  cursor: crosshair;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.arr-point-end--on {
+  border-color: var(--accent);
+  background: var(--accent);
 }
 
 .arr-point-handle {
@@ -900,28 +945,13 @@ label.ghost-btn {
 }
 
 .arr-point-handle--in {
-  left: -4px !important;
+  top: -4px !important;
+  left: 50% !important;
 }
 
 .arr-point-handle--out {
-  right: -4px !important;
-}
-
-.arr-note {
-  position: absolute;
-}
-
-.arr-note__text {
-  width: 100%;
-  min-height: 36px;
-  resize: none;
-  border: 1px dashed var(--line-strong);
-  background: rgba(16, 24, 38, 0.9);
-  color: var(--text);
-  border-radius: 6px;
-  padding: 4px 6px;
-  font: inherit;
-  font-size: 11px;
+  bottom: -4px !important;
+  left: 50% !important;
 }
 
 .arr-inspector {
@@ -932,6 +962,26 @@ label.ghost-btn {
   border-top: 1px solid var(--line);
   font-size: 11px;
   color: var(--muted);
+}
+
+.arr-inspector--ports {
+  flex-direction: row;
+  align-items: center;
+}
+
+.arr-inspector--ports label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.arr-count {
+  width: 52px;
+  border: 1px solid var(--line);
+  background: var(--input);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 2px 6px;
 }
 
 .arr-inspector__row {

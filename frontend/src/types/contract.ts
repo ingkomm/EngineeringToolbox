@@ -48,36 +48,29 @@ export interface CalculationObject {
   outputs: OutputBinding[];
 }
 
-export interface ArrangementNamedSymbol {
+export interface ArrangementEquipment {
   id: string;
   name: string;
   symbolId: string;
+  inCount: number;
+  outCount: number;
+}
+
+export interface PointEnd {
+  equipmentId: string;
+  portId: string;
 }
 
 export interface ArrangementPoint {
   id: string;
   name: string;
-  attachedToId?: string | null;
-}
-
-export interface ArrangementConnector {
-  id: string;
-  sourceId: string;
-  targetId: string;
-}
-
-export interface ArrangementAnnotation {
-  id: string;
-  text: string;
+  a: PointEnd | null;
+  b: PointEnd | null;
 }
 
 export interface ArrangementDomain {
-  equipment: ArrangementNamedSymbol[];
-  valves: ArrangementNamedSymbol[];
+  equipment: ArrangementEquipment[];
   points: ArrangementPoint[];
-  pipes: ArrangementConnector[];
-  signals: ArrangementConnector[];
-  annotations: ArrangementAnnotation[];
 }
 
 export interface ElementView {

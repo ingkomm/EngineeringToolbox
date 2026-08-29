@@ -122,14 +122,25 @@
         "visible": { "type": "boolean" }
       }
     },
-    "arrangementNamedSymbol": {
+    "arrangementEquipment": {
       "type": "object",
       "additionalProperties": false,
       "required": ["id"],
       "properties": {
         "id": { "$ref": "#/$defs/variableId" },
         "name": { "type": "string" },
-        "symbolId": { "type": "string", "minLength": 1 }
+        "symbolId": { "type": "string", "minLength": 1 },
+        "inCount": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "outCount": { "type": "integer", "minimum": 0, "maximum": 8 }
+      }
+    },
+    "pointEnd": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["equipmentId", "portId"],
+      "properties": {
+        "equipmentId": { "$ref": "#/$defs/variableId" },
+        "portId": { "$ref": "#/$defs/variableId" }
       }
     },
     "arrangementPoint": {
@@ -139,56 +150,22 @@
       "properties": {
         "id": { "$ref": "#/$defs/variableId" },
         "name": { "type": "string" },
-        "attachedToId": { "type": ["string", "null"] }
-      }
-    },
-    "arrangementConnector": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "sourceId", "targetId"],
-      "properties": {
-        "id": { "$ref": "#/$defs/variableId" },
-        "sourceId": { "$ref": "#/$defs/variableId" },
-        "targetId": { "$ref": "#/$defs/variableId" }
-      }
-    },
-    "arrangementAnnotation": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id"],
-      "properties": {
-        "id": { "$ref": "#/$defs/variableId" },
-        "text": { "type": "string" }
+        "a": { "anyOf": [{ "$ref": "#/$defs/pointEnd" }, { "type": "null" }] },
+        "b": { "anyOf": [{ "$ref": "#/$defs/pointEnd" }, { "type": "null" }] }
       }
     },
     "arrangementDomain": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["equipment", "valves", "points", "pipes", "signals", "annotations"],
+      "required": ["equipment", "points"],
       "properties": {
         "equipment": {
           "type": "array",
-          "items": { "$ref": "#/$defs/arrangementNamedSymbol" }
-        },
-        "valves": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/arrangementNamedSymbol" }
+          "items": { "$ref": "#/$defs/arrangementEquipment" }
         },
         "points": {
           "type": "array",
           "items": { "$ref": "#/$defs/arrangementPoint" }
-        },
-        "pipes": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/arrangementConnector" }
-        },
-        "signals": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/arrangementConnector" }
-        },
-        "annotations": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/arrangementAnnotation" }
         }
       }
     },

@@ -18,9 +18,9 @@ import {
 } from "./variables";
 import {
   arrangementElementIds,
-  arrangementNodeIds,
   defaultElementView,
   emptyArrangementDomain,
+  hasEquipmentPort,
   isArrangementObject,
   isCalculationObject,
   isValueFlowEdge,
@@ -64,13 +64,17 @@ export type WorkspaceEdit =
   | { type: "toggleEdgeCollapsed"; edgeId: string }
   | { type: "deleteEdges"; edgeIds: string[] }
   | { type: "addEquipment"; objectId: string }
-  | { type: "addValve"; objectId: string }
-  | { type: "addPoint"; objectId: string; attachedToId?: string | null }
+  | { type: "addPoint"; objectId: string }
   | { type: "updatePoint"; objectId: string; pointId: string; patch: { id?: string; name?: string } }
-  | { type: "addPipe"; objectId: string; sourceId: string; targetId: string }
-  | { type: "addSignal"; objectId: string; sourceId: string; targetId: string }
-  | { type: "addAnnotation"; objectId: string }
-  | { type: "updateAnnotation"; objectId: string; annotationId: string; text: string }
+  | { type: "setEquipmentPorts"; objectId: string; equipmentId: string; inCount?: number; outCount?: number }
+  | {
+      type: "connectPointEnd";
+      objectId: string;
+      pointId: string;
+      end: "a" | "b";
+      equipmentId: string | null;
+      portId: string | null;
+    }
   | { type: "moveElement"; objectId: string; elementId: string; x: number; y: number }
   | { type: "loadProject"; project: ProjectDocument }
   | { type: "loadExample" }
@@ -820,33 +824,15 @@ export function applyWorkspaceEdit(
       };
     }
     case "addEquipment":
-      return addArrangementSymbol(project, edit.objectId, "equipment");
-    case "addValve":
-      return addArrangementSymbol(project, edit.objectId, "valve");
+      return addArrangementEquipment(project, edit.objectId);
     case "addPoint":
-      return addArrangementPoint(project, edit.objectId, edit.attachedToId);
+      return addArrangementPoint(project, edit.objectId);
     case "updatePoint":
       return updateArrangementPoint(project, edit.objectId, edit.pointId, edit.patch);
-    case "addPipe":
-      return addArrangementConnector(project, edit.objectId, "pipes", edit.sourceId, edit.targetId);
-    case "addSignal":
-      return addArrangementConnector(project, edit.objectId, "signals", edit.sourceId, edit.targetId);
-    case "addAnnotation":
-      return addArrangementNote(project, edit.objectId);
-    case "updateAnnotation":
-      return {
-        project: patchArrangement(project, edit.objectId, (object) => ({
-          ...object,
-          domain: {
-            ...object.domain,
-            annotations: object.domain.annotations.map((item) =>
-              item.id === edit.annotationId ? { ...item, text: edit.text } : item,
-            ),
-          },
-        })),
-        dirtyObjectIds: [],
-        shouldEvaluate: false,
-      };
+    case "setEquipmentPorts":
+      return setEquipmentPorts(project, edit.objectId, edit.equipmentId, edit.inCount, edit.outCount);
+    case "connectPointEnd":
+      return connectPointEnd(project, edit.objectId, edit.pointId, edit.end, edit.equipmentId, edit.portId);
     case "moveElement":
       return moveArrangementElement(project, edit.objectId, edit.elementId, edit.x, edit.y);
   }
@@ -884,8 +870,8 @@ function defaultArrangement(id: string, name: string, position: { x: number; y: 
     domain: {
       ...emptyArrangementDomain(),
       equipment: [
-        { id: "EQ_1", name: "Equipment 1", symbolId: "generic-equipment" },
-        { id: "EQ_2", name: "Equipment 2", symbolId: "generic-equipment" },
+        { id: "EQ_1", name: "Equipment 1", symbolId: "generic-equipment", inCount: 1, outCount: 1 },
+        { id: "EQ_2", name: "Equipment 2", symbolId: "generic-equipment", inCount: 1, outCount: 1 },
       ],
     },
     view: {
@@ -905,30 +891,21 @@ function noEval(project: ProjectDocument): EditResult {
   return { project, dirtyObjectIds: [], shouldEvaluate: false };
 }
 
-function addArrangementSymbol(
-  project: ProjectDocument,
-  objectId: string,
-  kind: "equipment" | "valve",
-): EditResult {
+function addArrangementEquipment(project: ProjectDocument, objectId: string): EditResult {
   const object = project.objects.find((item) => item.id === objectId);
   if (!object || !isArrangementObject(object)) return noEval(project);
-  const prefix = kind === "equipment" ? "EQ" : "VL";
-  const id = nextArrangementElementId(object, prefix);
-  const count = kind === "equipment" ? object.domain.equipment.length : object.domain.valves.length;
-  const view = defaultElementView(48 + count * 140, kind === "equipment" ? 80 : 200, 96, kind === "valve" ? 48 : 64);
+  const id = nextArrangementElementId(object, "EQ");
+  const count = object.domain.equipment.length;
+  const view = defaultElementView(48 + count * 160, 72, 112, 72);
   return {
     project: patchArrangement(project, objectId, (current) => ({
       ...current,
       domain: {
         ...current.domain,
-        equipment:
-          kind === "equipment"
-            ? [...current.domain.equipment, { id, name: id, symbolId: "generic-equipment" }]
-            : current.domain.equipment,
-        valves:
-          kind === "valve"
-            ? [...current.domain.valves, { id, name: id, symbolId: "generic-valve" }]
-            : current.domain.valves,
+        equipment: [
+          ...current.domain.equipment,
+          { id, name: id, symbolId: "generic-equipment", inCount: 1, outCount: 1 },
+        ],
       },
       view: {
         ...current.view,
@@ -940,30 +917,21 @@ function addArrangementSymbol(
   };
 }
 
-function addArrangementPoint(
-  project: ProjectDocument,
-  objectId: string,
-  attachedToId?: string | null,
-): EditResult {
+function addArrangementPoint(project: ProjectDocument, objectId: string): EditResult {
   const object = project.objects.find((item) => item.id === objectId);
   if (!object || !isArrangementObject(object)) return noEval(project);
-  if (attachedToId && !object.domain.equipment.some((item) => item.id === attachedToId)) {
-    return noEval(project);
-  }
   const id = nextArrangementElementId(object, "PT");
-  const host = attachedToId ? object.view.elements[attachedToId] : undefined;
-  const view = defaultElementView(
-    host ? host.x + host.width / 2 - 10 : object.view.width / 2 - 10,
-    host ? host.y + host.height + 12 : object.view.height / 2 - 10,
-    20,
-    20,
-  );
+  const first = object.domain.equipment[0] ? object.view.elements[object.domain.equipment[0].id] : undefined;
+  const second = object.domain.equipment[1] ? object.view.elements[object.domain.equipment[1].id] : undefined;
+  const midX = first && second ? (first.x + first.width + second.x) / 2 - 44 : object.view.width / 2 - 44;
+  const midY = first ? first.y + first.height / 2 - 14 : object.view.height / 2 - 14;
+  const view = defaultElementView(midX, midY, 88, 28);
   return {
     project: patchArrangement(project, objectId, (current) => ({
       ...current,
       domain: {
         ...current.domain,
-        points: [...current.domain.points, { id, name: id, attachedToId: attachedToId ?? null }],
+        points: [...current.domain.points, { id, name: id, a: null, b: null }],
       },
       view: {
         ...current.view,
@@ -1002,16 +970,6 @@ function updateArrangementPoint(
         points: item.domain.points.map((point) =>
           point.id === pointId ? { ...point, id: nextId, name: nextName } : point,
         ),
-        pipes: item.domain.pipes.map((pipe) => ({
-          ...pipe,
-          sourceId: pipe.sourceId === pointId ? nextId : pipe.sourceId,
-          targetId: pipe.targetId === pointId ? nextId : pipe.targetId,
-        })),
-        signals: item.domain.signals.map((signal) => ({
-          ...signal,
-          sourceId: signal.sourceId === pointId ? nextId : signal.sourceId,
-          targetId: signal.targetId === pointId ? nextId : signal.targetId,
-        })),
       },
       view: { ...item.view, elements },
     };
@@ -1032,49 +990,81 @@ function updateArrangementPoint(
   };
 }
 
-function addArrangementConnector(
+function clampPortCount(value: number | undefined, fallback: number): number {
+  if (value == null || Number.isNaN(value)) return fallback;
+  return Math.max(0, Math.min(8, Math.floor(value)));
+}
+
+function setEquipmentPorts(
   project: ProjectDocument,
   objectId: string,
-  collection: "pipes" | "signals",
-  sourceId: string,
-  targetId: string,
+  equipmentId: string,
+  inCount: number | undefined,
+  outCount: number | undefined,
 ): EditResult {
   const object = project.objects.find((item) => item.id === objectId);
   if (!object || !isArrangementObject(object)) return noEval(project);
-  const nodes = arrangementNodeIds(object);
-  if (sourceId === targetId || !nodes.has(sourceId) || !nodes.has(targetId)) return noEval(project);
-  const prefix = collection === "pipes" ? "PIPE" : "SIG";
-  const id = nextArrangementElementId(object, prefix);
+  const equipment = object.domain.equipment.find((item) => item.id === equipmentId);
+  if (!equipment) return noEval(project);
+  const nextIn = clampPortCount(inCount, equipment.inCount);
+  const nextOut = clampPortCount(outCount, equipment.outCount);
   return {
-    project: patchArrangement(project, objectId, (current) => ({
-      ...current,
-      domain: {
-        ...current.domain,
-        [collection]: [...current.domain[collection], { id, sourceId, targetId }],
-      },
-    })),
+    project: patchArrangement(project, objectId, (current) => {
+      const updated = current.domain.equipment.map((item) =>
+        item.id === equipmentId ? { ...item, inCount: nextIn, outCount: nextOut } : item,
+      );
+      const byId = new Map(updated.map((item) => [item.id, item]));
+      return {
+        ...current,
+        domain: {
+          equipment: updated,
+          points: current.domain.points.map((point) => ({
+            ...point,
+            a: point.a && byId.get(point.a.equipmentId) && hasEquipmentPort(byId.get(point.a.equipmentId)!, point.a.portId)
+              ? point.a
+              : point.a && point.a.equipmentId === equipmentId
+                ? null
+                : point.a,
+            b: point.b && byId.get(point.b.equipmentId) && hasEquipmentPort(byId.get(point.b.equipmentId)!, point.b.portId)
+              ? point.b
+              : point.b && point.b.equipmentId === equipmentId
+                ? null
+                : point.b,
+          })),
+        },
+      };
+    }),
     dirtyObjectIds: [],
     shouldEvaluate: false,
   };
 }
 
-function addArrangementNote(project: ProjectDocument, objectId: string): EditResult {
+function connectPointEnd(
+  project: ProjectDocument,
+  objectId: string,
+  pointId: string,
+  end: "a" | "b",
+  equipmentId: string | null,
+  portId: string | null,
+): EditResult {
   const object = project.objects.find((item) => item.id === objectId);
   if (!object || !isArrangementObject(object)) return noEval(project);
-  const id = nextArrangementElementId(object, "NOTE");
+  const point = object.domain.points.find((item) => item.id === pointId);
+  if (!point) return noEval(project);
+  let nextEnd: { equipmentId: string; portId: string } | null = null;
+  if (equipmentId && portId) {
+    const host = object.domain.equipment.find((item) => item.id === equipmentId);
+    if (!host || !hasEquipmentPort(host, portId)) return noEval(project);
+    nextEnd = { equipmentId, portId };
+  }
   return {
     project: patchArrangement(project, objectId, (current) => ({
       ...current,
       domain: {
         ...current.domain,
-        annotations: [...current.domain.annotations, { id, text: "Note" }],
-      },
-      view: {
-        ...current.view,
-        elements: {
-          ...current.view.elements,
-          [id]: defaultElementView(24, 24, 160, 36),
-        },
+        points: current.domain.points.map((item) =>
+          item.id === pointId ? { ...item, [end]: nextEnd } : item,
+        ),
       },
     })),
     dirtyObjectIds: [],
@@ -1093,19 +1083,14 @@ function moveArrangementElement(
   if (!object || !isArrangementObject(object)) return noEval(project);
   const previous = object.view.elements[elementId];
   if (!previous) return noEval(project);
-  const dx = x - previous.x;
-  const dy = y - previous.y;
   return {
-    project: patchArrangement(project, objectId, (current) => {
-      const elements = { ...current.view.elements, [elementId]: { ...previous, x, y } };
-      for (const point of current.domain.points) {
-        if (point.attachedToId !== elementId) continue;
-        const pointView = elements[point.id];
-        if (!pointView) continue;
-        elements[point.id] = { ...pointView, x: pointView.x + dx, y: pointView.y + dy };
-      }
-      return { ...current, view: { ...current.view, elements } };
-    }),
+    project: patchArrangement(project, objectId, (current) => ({
+      ...current,
+      view: {
+        ...current.view,
+        elements: { ...current.view.elements, [elementId]: { ...previous, x, y } },
+      },
+    })),
     dirtyObjectIds: [],
     shouldEvaluate: false,
   };
