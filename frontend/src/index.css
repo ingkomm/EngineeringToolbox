@@ -983,3 +983,125 @@ label.ghost-btn {
 .arr-inspector--hint {
   margin: 0;
 }
+
+.ws-eq {
+  width: 176px;
+  background: #122033;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  overflow: visible;
+}
+
+.ws-eq--selected {
+  border-color: var(--accent);
+}
+
+.ws-eq__header {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 4px;
+  align-items: center;
+  padding: 6px 8px 4px;
+}
+
+.ws-eq__body {
+  position: relative;
+  height: 72px;
+  padding: 0 10px;
+}
+
+.ws-eq-handle {
+  width: auto !important;
+  min-width: 28px;
+  height: 16px !important;
+  padding: 0 4px;
+  border-radius: 8px !important;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+  transform: translate(-50%, -50%) !important;
+}
+
+.ws-eq-handle--in {
+  background: #0b1220 !important;
+  border: 1px solid var(--accent) !important;
+  color: var(--accent);
+}
+
+.ws-eq-handle--out {
+  background: #0b1220 !important;
+  border: 1px solid var(--accent-2) !important;
+  color: var(--accent-2);
+}
+
+.ws-eq__ports {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  padding: 4px 8px 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.ws-eq__ports label {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.ws-point {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: #122033;
+  border: 2px solid var(--line-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ws-point--selected {
+  border-color: var(--accent);
+}
+
+.ws-point__core {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.ws-point__core > * {
+  pointer-events: auto;
+}
+
+.ws-point__id {
+  width: 52px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.ws-point__count {
+  display: flex;
+  justify-content: center;
+}
+
+.ws-point-handle {
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 50% !important;
+  background: #0b1220 !important;
+  border: 2px solid var(--muted) !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+.ws-point-handle--on {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+}

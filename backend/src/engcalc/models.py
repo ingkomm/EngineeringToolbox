@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 VariableStatus = Literal["idle", "ok", "mapped", "error"]
 RelationType = Literal["value_flow", "reference", "association"]
-ObjectKind = Literal["calculation", "arrangement"]
+ObjectKind = Literal["calculation", "equipment", "point"]
 
 VARIABLE_ID_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 OBJECT_ID_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
@@ -90,26 +90,8 @@ class CalculationObject(BaseModel):
     outputs: list[OutputBinding] = Field(default_factory=list)
 
 
-class ArrangementEquipment(BaseModel):
-    """Placed equipment. Port identities are IN_1..IN_n and OUT_1..OUT_n from the counts."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    id: str
-    name: str = ""
-    symbolId: str = "generic-equipment"
-    inCount: int = Field(default=1, ge=0, le=8)
-    outCount: int = Field(default=1, ge=0, le=8)
-
-    @model_validator(mode="after")
-    def default_name(self) -> ArrangementEquipment:
-        if not self.name.strip():
-            self.name = self.id
-        return self
-
-
 class PointEnd(BaseModel):
-    """One end of a Point, attached to an equipment In or Out port."""
+    """One Point connection, attached to an equipment In or Out port."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -117,12 +99,34 @@ class PointEnd(BaseModel):
     portId: str
 
 
-class ArrangementPoint(BaseModel):
+class EquipmentObject(BaseModel):
+    """Worksheet equipment. Port identities are IN_1..IN_n and OUT_1..OUT_n from the counts."""
+
     model_config = ConfigDict(extra="forbid")
 
+    kind: Literal["equipment"] = "equipment"
     id: str
     name: str = ""
-    connectionCount: int = Field(default=2, ge=1, le=8)
+    position: Position
+    symbolId: str = "generic-equipment"
+    inCount: int = Field(default=1, ge=0, le=8)
+    outCount: int = Field(default=1, ge=0, le=8)
+
+    @model_validator(mode="after")
+    def default_name(self) -> EquipmentObject:
+        if not self.name.strip():
+            self.name = self.id
+        return self
+
+
+class PointObject(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["point"] = "point"
+    id: str
+    name: str = ""
+    position: Position
+    connectionCount: int = Field(default=2, ge=2, le=4)
     connections: list[PointEnd | None] = Field(default_factory=list)
 
     @model_validator(mode="before")
@@ -139,7 +143,7 @@ class ArrangementPoint(BaseModel):
         return payload
 
     @model_validator(mode="after")
-    def default_name_and_pad(self) -> ArrangementPoint:
+    def default_name_and_pad(self) -> PointObject:
         if not self.name.strip():
             self.name = self.id
         padded = list(self.connections)
@@ -149,87 +153,51 @@ class ArrangementPoint(BaseModel):
         return self
 
 
-class ArrangementDomain(BaseModel):
-    """Engineering-meaningful identities and connections. Independent of canvas coordinates."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    equipment: list[ArrangementEquipment] = Field(default_factory=list)
-    points: list[ArrangementPoint] = Field(default_factory=list)
-
-
-def equipment_port_ids(equipment: ArrangementEquipment) -> set[str]:
+def equipment_port_ids(equipment: EquipmentObject) -> set[str]:
     ins = {f"IN_{index}" for index in range(1, equipment.inCount + 1)}
     outs = {f"OUT_{index}" for index in range(1, equipment.outCount + 1)}
     return ins | outs
 
 
-class ElementView(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    x: float
-    y: float
-    width: float = 96
-    height: float = 64
-    rotation: float = 0
-    zIndex: int = 0
-    visible: bool = True
-
-
-class ArrangementView(BaseModel):
-    """Worksheet-local drawing state. Moving elements here is not a domain change."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    width: float = 720
-    height: float = 400
-    rotation: float = 0
-    zIndex: int = 0
-    elements: dict[str, ElementView] = Field(default_factory=dict)
-
-
-class ArrangementObject(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    kind: Literal["arrangement"] = "arrangement"
-    id: str
-    name: str
-    position: Position
-    domain: ArrangementDomain = Field(default_factory=ArrangementDomain)
-    view: ArrangementView = Field(default_factory=ArrangementView)
-
-    @model_validator(mode="after")
-    def validate_referential_integrity(self) -> ArrangementObject:
-        claimed: dict[str, str] = {}
-
-        def claim(item_id: str, kind: str) -> None:
-            if not VARIABLE_ID_RE.match(item_id):
-                raise ValueError(f"INVALID_ELEMENT_ID: {item_id}")
-            previous = claimed.get(item_id)
-            if previous:
-                code = "DUPLICATE_POINT_ID" if kind == "point" or previous == "point" else "DUPLICATE_ELEMENT_ID"
-                raise ValueError(f"{code}: {item_id}")
-            claimed[item_id] = kind
-
-        for item in self.domain.equipment:
-            claim(item.id, "equipment")
-        for item in self.domain.points:
-            claim(item.id, "point")
-
-        equipment_by_id = {item.id: item for item in self.domain.equipment}
-        for point in self.domain.points:
-            for end in point.connections:
-                if end is None:
-                    continue
-                host = equipment_by_id.get(end.equipmentId)
-                if host is None:
-                    raise ValueError(f"UNKNOWN_ELEMENT: point {point.id} end {end.equipmentId}")
-                if end.portId not in equipment_port_ids(host):
-                    raise ValueError(f"UNKNOWN_POINT: point {point.id} port {end.portId}")
-        return self
+def _explode_legacy_arrangement(item: dict) -> list[dict]:
+    origin = item.get("position") or {"x": 0, "y": 0}
+    domain = item.get("domain") or {}
+    view = item.get("view") or {}
+    elements = view.get("elements") or {}
+    exploded: list[dict] = []
+    for equipment in domain.get("equipment") or []:
+        if not isinstance(equipment, dict):
+            continue
+        element = elements.get(equipment.get("id"), {}) if isinstance(elements, dict) else {}
+        exploded.append(
+            {
+                "kind": "equipment",
+                "id": equipment.get("id"),
+                "name": equipment.get("name") or equipment.get("id"),
+                "position": {
+                    "x": float(origin.get("x", 0)) + float(element.get("x", 0) or 0),
+                    "y": float(origin.get("y", 0)) + float(element.get("y", 0) or 0),
+                },
+                "symbolId": equipment.get("symbolId") or "generic-equipment",
+                "inCount": equipment.get("inCount", 1),
+                "outCount": equipment.get("outCount", 1),
+            }
+        )
+    for point in domain.get("points") or []:
+        if not isinstance(point, dict):
+            continue
+        element = elements.get(point.get("id"), {}) if isinstance(elements, dict) else {}
+        payload = dict(point)
+        payload["kind"] = "point"
+        payload["position"] = {
+            "x": float(origin.get("x", 0)) + float(element.get("x", 0) or 0),
+            "y": float(origin.get("y", 0)) + float(element.get("y", 0) or 0),
+        }
+        exploded.append(payload)
+    return exploded
 
 
-WorksheetObject = Annotated[Union[CalculationObject, ArrangementObject], Field(discriminator="kind")]
+WorksheetObject = Annotated[Union[CalculationObject, EquipmentObject, PointObject], Field(discriminator="kind")]
 
 
 class Edge(BaseModel):
@@ -245,12 +213,22 @@ class Edge(BaseModel):
     relationType: RelationType = "value_flow"
 
 
-def is_calculation_object(obj: CalculationObject | ArrangementObject) -> TypeGuard[CalculationObject]:
-    return getattr(obj, "kind", "calculation") != "arrangement"
+def is_calculation_object(obj: CalculationObject | EquipmentObject | PointObject) -> TypeGuard[CalculationObject]:
+    return getattr(obj, "kind", "calculation") == "calculation"
 
 
-def is_arrangement_object(obj: CalculationObject | ArrangementObject) -> TypeGuard[ArrangementObject]:
-    return getattr(obj, "kind", "calculation") == "arrangement"
+def is_equipment_object(obj: CalculationObject | EquipmentObject | PointObject) -> TypeGuard[EquipmentObject]:
+    return getattr(obj, "kind", None) == "equipment"
+
+
+def is_point_object(obj: CalculationObject | EquipmentObject | PointObject) -> TypeGuard[PointObject]:
+    return getattr(obj, "kind", None) == "point"
+
+
+def is_layout_object(
+    obj: CalculationObject | EquipmentObject | PointObject,
+) -> TypeGuard[EquipmentObject | PointObject]:
+    return is_equipment_object(obj) or is_point_object(obj)
 
 
 def is_value_flow_edge(edge: Edge) -> bool:
@@ -262,12 +240,12 @@ class ProjectDocument(BaseModel):
 
     id: str
     name: str
-    objects: list[CalculationObject | ArrangementObject] = Field(default_factory=list)
+    objects: list[CalculationObject | EquipmentObject | PointObject] = Field(default_factory=list)
     edges: list[Edge] = Field(default_factory=list)
 
     @model_validator(mode="before")
     @classmethod
-    def tag_object_kinds(cls, data: object) -> object:
+    def tag_and_explode(cls, data: object) -> object:
         if not isinstance(data, dict):
             return data
         objects = data.get("objects")
@@ -275,12 +253,39 @@ class ProjectDocument(BaseModel):
             return data
         tagged: list[object] = []
         for item in objects:
-            if isinstance(item, dict) and "kind" not in item:
+            if not isinstance(item, dict):
+                tagged.append(item)
+                continue
+            kind = item.get("kind")
+            if kind is None:
                 kind = "arrangement" if "domain" in item else "calculation"
-                tagged.append({**item, "kind": kind})
+                item = {**item, "kind": kind}
+            if kind == "arrangement" or "domain" in item and kind not in {"calculation", "equipment", "point"}:
+                tagged.extend(_explode_legacy_arrangement(item))
             else:
                 tagged.append(item)
         return {**data, "objects": tagged}
+
+    @model_validator(mode="after")
+    def validate_layout_refs(self) -> ProjectDocument:
+        seen: set[str] = set()
+        for item in self.objects:
+            if item.id in seen:
+                raise ValueError(f"DUPLICATE_OBJECT_ID: {item.id}")
+            seen.add(item.id)
+        equipment_by_id = {item.id: item for item in self.objects if is_equipment_object(item)}
+        for item in self.objects:
+            if not is_point_object(item):
+                continue
+            for end in item.connections:
+                if end is None:
+                    continue
+                host = equipment_by_id.get(end.equipmentId)
+                if host is None:
+                    raise ValueError(f"UNKNOWN_ELEMENT: point {item.id} end {end.equipmentId}")
+                if end.portId not in equipment_port_ids(host):
+                    raise ValueError(f"UNKNOWN_POINT: point {item.id} port {end.portId}")
+        return self
 
 
 class EvalError(BaseModel):

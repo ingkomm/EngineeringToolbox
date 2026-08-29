@@ -14,8 +14,9 @@ from engcalc.models import (
     OutputBinding,
     ProjectDocument,
     VARIABLE_ID_RE,
-    is_arrangement_object,
     is_calculation_object,
+    is_layout_object,
+    is_point_object,
     is_value_flow_edge,
 )
 from engcalc.quantities import QuantityError, infer_formula_quantity, is_known_quantity, si_unit_for
@@ -124,7 +125,7 @@ def _validate_structure(project: ProjectDocument) -> list[EvalError]:
     seen_names: dict[str, tuple[str, str]] = {}
 
     for obj in project.objects:
-        if is_arrangement_object(obj):
+        if is_layout_object(obj):
             continue
         local_seen: set[str] = set()
         owned: list[tuple[str, str, str]] = []
@@ -245,17 +246,17 @@ def _validate_structure(project: ProjectDocument) -> list[EvalError]:
         source = next(obj for obj in project.objects if obj.id == edge.sourceObjectId)
         target = next(obj for obj in project.objects if obj.id == edge.targetObjectId)
         if is_value_flow_edge(edge):
-            if is_arrangement_object(source) or is_arrangement_object(target):
+            if is_layout_object(source) or is_layout_object(target):
                 errors.append(
                     EvalError(
-                        objectId=source.id if is_arrangement_object(source) else target.id,
+                        objectId=source.id if is_layout_object(source) else target.id,
                         variableId=edge.sourceVariableId
-                        if is_arrangement_object(source)
+                        if is_layout_object(source)
                         else edge.targetVariableId,
                         code="ARRANGEMENT_HAS_NO_VALUE",
                         message=(
-                            f"Edge {edge.id} cannot use value_flow with an Arrangement Object. "
-                            "Arrangement does not calculate values; use association or reference."
+                            f"Edge {edge.id} cannot use value_flow with Equipment or Point. "
+                            "They do not calculate values; use association or reference."
                         ),
                     )
                 )
@@ -309,7 +310,7 @@ def _validate_structure(project: ProjectDocument) -> list[EvalError]:
                 EvalError(
                     objectId=edge.sourceObjectId,
                     variableId=edge.sourceVariableId,
-                    code="UNKNOWN_POINT" if is_arrangement_object(source) else "UNKNOWN_OUTPUT_PORT",
+                    code="UNKNOWN_POINT" if is_layout_object(source) else "UNKNOWN_OUTPUT_PORT",
                     message=f"Edge {edge.id} source port/point does not exist",
                 )
             )
@@ -318,7 +319,7 @@ def _validate_structure(project: ProjectDocument) -> list[EvalError]:
                 EvalError(
                     objectId=edge.targetObjectId,
                     variableId=edge.targetVariableId,
-                    code="UNKNOWN_POINT" if is_arrangement_object(target) else "UNKNOWN_INPUT_PORT",
+                    code="UNKNOWN_POINT" if is_layout_object(target) else "UNKNOWN_INPUT_PORT",
                     message=f"Edge {edge.id} target port/point does not exist",
                 )
             )
@@ -327,14 +328,18 @@ def _validate_structure(project: ProjectDocument) -> list[EvalError]:
 
 
 def _has_source_endpoint(obj: CalculationObject | object, port_id: str) -> bool:
-    if is_arrangement_object(obj):
-        return any(point.id == port_id for point in obj.domain.points)
+    if is_point_object(obj):
+        return port_id == obj.id or port_id in {f"C_{index}" for index in range(1, obj.connectionCount + 1)}
+    if is_layout_object(obj):
+        return False
     return any(item.id == port_id for item in obj.outputs)
 
 
 def _has_target_endpoint(obj: CalculationObject | object, port_id: str) -> bool:
-    if is_arrangement_object(obj):
-        return any(point.id == port_id for point in obj.domain.points)
+    if is_point_object(obj):
+        return port_id == obj.id or port_id in {f"C_{index}" for index in range(1, obj.connectionCount + 1)}
+    if is_layout_object(obj):
+        return False
     return any(item.id == port_id for item in obj.inputs)
 
 

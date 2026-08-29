@@ -2,7 +2,7 @@ import type { ProjectDocument } from "../types/contract";
 import type { WorkspaceEdit } from "../lib/projectEdits";
 import type { QuantitySpec } from "../lib/quantities";
 import { inputHandleId, outputHandleId } from "../lib/display";
-import { isArrangementObject, isValueFlowEdge } from "../lib/worksheet";
+import { arrangementLinkId, isEquipmentObject, isPointObject, isValueFlowEdge, pointConnectionIds } from "../lib/worksheet";
 import { mappedInputsForObject } from "./mappedInputs";
 
 export { mappedInputsForObject } from "./mappedInputs";
@@ -13,17 +13,21 @@ export function toFlowNodeRecords(
   onEdit: (edit: WorkspaceEdit) => void,
 ) {
   return project.objects.map((object) => {
-    if (isArrangementObject(object)) {
+    if (isEquipmentObject(object)) {
       return {
         id: object.id,
-        type: "arrangementObject" as const,
+        type: "equipmentObject" as const,
         position: object.position,
-        style: { width: object.view.width },
-        data: {
-          object,
-          project,
-          onEdit,
-        },
+        data: { object, onEdit },
+        draggable: true,
+      };
+    }
+    if (isPointObject(object)) {
+      return {
+        id: object.id,
+        type: "pointObject" as const,
+        position: object.position,
+        data: { object, onEdit },
         draggable: true,
       };
     }
@@ -49,17 +53,19 @@ export function toFlowEdges(
   onToggleCollapsed: (edgeId: string) => void,
 ) {
   const objects = new Map(project.objects.map((item) => [item.id, item]));
-  return project.edges.map((edge) => {
+  const mapping = project.edges.map((edge) => {
     const source = objects.get(edge.sourceObjectId);
     const target = objects.get(edge.targetObjectId);
     const collapsed = edge.collapsed === true;
     const association = !isValueFlowEdge(edge);
+    const sourceHandle = source && isPointObject(source) ? undefined : outputHandleId(edge.sourceVariableId);
+    const targetHandle = target && isPointObject(target) ? undefined : inputHandleId(edge.targetVariableId);
     return {
       id: edge.id,
       source: edge.sourceObjectId,
       target: edge.targetObjectId,
-      sourceHandle: outputHandleId(edge.sourceVariableId),
-      targetHandle: inputHandleId(edge.targetVariableId),
+      sourceHandle,
+      targetHandle,
       type: "mapping" as const,
       className: [
         "mapping-edge",
@@ -82,6 +88,31 @@ export function toFlowEdges(
       },
     };
   });
+
+  const links = project.objects.flatMap((object) => {
+    if (!isPointObject(object)) return [];
+    return pointConnectionIds(object.connectionCount).flatMap((endId, index) => {
+      const end = object.connections[index];
+      if (!end) return [];
+      const host = objects.get(end.equipmentId);
+      if (!host || !isEquipmentObject(host)) return [];
+      return [
+        {
+          id: arrangementLinkId(object.id, endId),
+          source: object.id,
+          target: end.equipmentId,
+          sourceHandle: endId,
+          targetHandle: end.portId,
+          type: "arrangementLink" as const,
+          className: "arr-point-link-edge",
+          interactionWidth: 20,
+          data: { pointId: object.id, end: endId },
+        },
+      ];
+    });
+  });
+
+  return [...mapping, ...links];
 }
 
 export function mergeFlowNodes<T extends { id: string; data: unknown; position: { x: number; y: number } }>(

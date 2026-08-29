@@ -3,6 +3,7 @@ import {
   Background,
   BackgroundVariant,
   ConnectionLineType,
+  ConnectionMode,
   Controls,
   Panel,
   ReactFlow,
@@ -13,21 +14,24 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { ArrangementObjectNode } from "./ArrangementObjectNode";
+import { ArrangementLinkEdge } from "./ArrangementLinkEdge";
 import { CalculationObjectNode } from "./CalculationObjectNode";
+import { EquipmentObjectNode } from "./EquipmentObjectNode";
 import { MappingEdge } from "./MappingEdge";
+import { PointObjectNode } from "./PointObjectNode";
 import { mergeFlowNodes, toFlowEdges, toFlowNodeRecords } from "./flowModel";
 import { parseHandleId } from "../lib/display";
 import type { WorkspaceEdit } from "../lib/projectEdits";
 import type { QuantitySpec } from "../lib/quantities";
 import type { ProjectDocument } from "../types/contract";
-import { isArrangementObject, isCalculationObject, isValueFlowEdge } from "../lib/worksheet";
+import { isCalculationObject, isEquipmentObject, isPointObject, isValueFlowEdge } from "../lib/worksheet";
 
 const nodeTypes = {
   calculationObject: CalculationObjectNode,
-  arrangementObject: ArrangementObjectNode,
+  equipmentObject: EquipmentObjectNode,
+  pointObject: PointObjectNode,
 };
-const edgeTypes = { mapping: MappingEdge };
+const edgeTypes = { mapping: MappingEdge, arrangementLink: ArrangementLinkEdge };
 
 const defaultEdgeOptions = {
   type: "mapping" as const,
@@ -50,22 +54,8 @@ function toFlowNodes(
   return toFlowNodeRecords(project, quantities, onEdit);
 }
 
-function endpointExists(
-  project: ProjectDocument,
-  objectId: string | null | undefined,
-  portId: string,
-  role: "source" | "target",
-): boolean {
-  if (!objectId) return false;
-  const object = project.objects.find((item) => item.id === objectId);
-  if (!object) return false;
-  if (isArrangementObject(object)) {
-    return object.domain.points.some((point) => point.id === portId);
-  }
-  if (!isCalculationObject(object)) return false;
-  return role === "source"
-    ? object.outputs.some((item) => item.id === portId)
-    : object.inputs.some((item) => item.id === portId);
+function isLayoutPortHandle(handleId: string | null | undefined): boolean {
+  return Boolean(handleId && /^(IN|OUT|C)_\d+$/.test(handleId));
 }
 
 export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: FlowCanvasProps) {
@@ -94,25 +84,38 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      const source = parseHandleId(connection.sourceHandle);
-      const target = parseHandleId(connection.targetHandle);
-      if (!connection.source || !connection.target || source?.kind !== "out" || target?.kind !== "in") {
-        return;
-      }
+      if (!connection.source || !connection.target || connection.source === connection.target) return;
       const sourceObject = project.objects.find((item) => item.id === connection.source);
       const targetObject = project.objects.find((item) => item.id === connection.target);
-      const relationType =
-        (sourceObject && isArrangementObject(sourceObject)) ||
-        (targetObject && isArrangementObject(targetObject))
-          ? "association"
-          : "value_flow";
+      if (!sourceObject || !targetObject) return;
+
+      const pointToEquipment =
+        isPointObject(sourceObject) && isEquipmentObject(targetObject)
+          ? { point: sourceObject, equipment: targetObject, end: connection.sourceHandle, port: connection.targetHandle }
+          : isEquipmentObject(sourceObject) && isPointObject(targetObject)
+            ? { point: targetObject, equipment: sourceObject, end: connection.targetHandle, port: connection.sourceHandle }
+            : null;
+      if (pointToEquipment && isLayoutPortHandle(pointToEquipment.end) && isLayoutPortHandle(pointToEquipment.port)) {
+        onEdit({
+          type: "connectPointEnd",
+          pointId: pointToEquipment.point.id,
+          end: pointToEquipment.end!,
+          equipmentId: pointToEquipment.equipment.id,
+          portId: pointToEquipment.port!,
+        });
+        return;
+      }
+
+      const source = parseHandleId(connection.sourceHandle);
+      const target = parseHandleId(connection.targetHandle);
+      if (source?.kind !== "out" || target?.kind !== "in") return;
+      if (!isCalculationObject(sourceObject) || !isCalculationObject(targetObject)) return;
       onEdit({
         type: "connectMapping",
         sourceObjectId: connection.source,
         sourceVariableId: source.variableId,
         targetObjectId: connection.target,
         targetVariableId: target.variableId,
-        relationType,
       });
     },
     [onEdit, project.objects],
@@ -120,21 +123,22 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
 
   const isValidConnection = useCallback(
     (connection: Connection | Edge) => {
-      const source = parseHandleId(connection.sourceHandle);
-      const target = parseHandleId(connection.targetHandle);
-      if (source?.kind !== "out" || target?.kind !== "in" || connection.source === connection.target) {
-        return false;
-      }
+      if (!connection.source || !connection.target || connection.source === connection.target) return false;
       const sourceObject = project.objects.find((item) => item.id === connection.source);
       const targetObject = project.objects.find((item) => item.id === connection.target);
       if (!sourceObject || !targetObject) return false;
-      if (isArrangementObject(sourceObject) || isArrangementObject(targetObject)) {
-        return (
-          endpointExists(project, connection.source, source.variableId, "source") &&
-          endpointExists(project, connection.target, target.variableId, "target")
-        );
+
+      const pointEquip =
+        (isPointObject(sourceObject) && isEquipmentObject(targetObject)) ||
+        (isEquipmentObject(sourceObject) && isPointObject(targetObject));
+      if (pointEquip) {
+        return isLayoutPortHandle(connection.sourceHandle) && isLayoutPortHandle(connection.targetHandle);
       }
-      if (!isCalculationObject(targetObject)) return false;
+
+      const source = parseHandleId(connection.sourceHandle);
+      const target = parseHandleId(connection.targetHandle);
+      if (source?.kind !== "out" || target?.kind !== "in") return false;
+      if (!isCalculationObject(sourceObject) || !isCalculationObject(targetObject)) return false;
       if (targetObject.calculations.some((item) => item.id === source.variableId)) return false;
       const sourceBusy = project.edges.some(
         (edge) =>
@@ -165,6 +169,7 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
       isValidConnection={isValidConnection}
       defaultEdgeOptions={defaultEdgeOptions}
       connectionLineType={ConnectionLineType.SmoothStep}
+      connectionMode={ConnectionMode.Loose}
       onInit={onInit}
       onNodeDragStop={(_event, node) => {
         onProjectChange({
@@ -194,10 +199,18 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
         <button
           type="button"
           className="ghost-btn"
-          data-testid="btn-add-arrangement"
-          onClick={() => onEdit({ type: "addArrangement" })}
+          data-testid="btn-add-equipment"
+          onClick={() => onEdit({ type: "addEquipment" })}
         >
-          + Arrangement
+          + Equipment
+        </button>
+        <button
+          type="button"
+          className="ghost-btn"
+          data-testid="btn-add-point"
+          onClick={() => onEdit({ type: "addPoint" })}
+        >
+          + Point
         </button>
       </Panel>
     </ReactFlow>

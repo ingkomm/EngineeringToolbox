@@ -283,7 +283,8 @@ Object A의 PIN/POUT만 바꾸면 Object A와 B가 갱신된다. 매핑되지 �
 | `btn-new-worksheet` | 상단 바 | `newWorkspace` |
 | `btn-evaluate` | 상단 바 | `POST /api/v1/evaluate` |
 | `btn-add-object` | Canvas Panel top-left | `addObject` (Calculation Object) |
-| `btn-add-arrangement` | Canvas Panel top-left | `addArrangement` |
+| `btn-add-equipment` | Canvas Panel top-left | `addEquipment` |
+| `btn-add-point` | Canvas Panel top-left | `addPoint` |
 | `btn-export-project` | 상단 바 | 프로젝트 JSON 다운로드 |
 | `btn-import-project` | 상단 바 | 프로젝트 JSON 불러오기 |
 | `btn-load-example` | 우측 사이드바 | `loadExample` |
@@ -311,45 +312,36 @@ Arrangement:
 
 | testid | 위치 | 동작 |
 |---|---|---|
-| `object-{id}-add-equipment` | Arrangement 툴바 | Equipment 추가 |
-| `object-{id}-add-point` | Arrangement 툴바 | Point 추가 |
-| `object-{id}-equipment-{eqId}` | 캔버스 | Equipment 선택/이동 |
-| `object-{id}-equipment-{eqId}-IN_n` / `OUT_n` | Equipment 포트 | Point 연결 점을 끌어다 놓음 |
-| `object-{id}-equipment-{eqId}-in-count` | Inspector | In 포트 개수 |
-| `object-{id}-equipment-{eqId}-out-count` | Inspector | Out 포트 개수 |
-| `object-{id}-point-{ptId}` | 캔버스 | Point 본체 이동 |
-| `object-{id}-point-{ptId}-C_n` | Point 연결 점 | Equipment 포트로 드래그 |
-| `object-{id}-point-{ptId}-count` | Inspector | Point 연결 점 개수 |
-| `object-{id}-point-{ptId}-id` | Inspector | Point ID |
-| `object-{id}-point-{ptId}-name` | Inspector | Point 이름 |
+| `btn-add-equipment` | 캔버스 패널 | Equipment를 공용 워크시트에 추가 |
+| `btn-add-point` | 캔버스 패널 | Point를 공용 워크시트에 추가 |
+| `object-{id}` | 워크시트 노드 | Equipment / Point 선택·이동 |
+| `object-{id}-IN_n` / `OUT_n` | Equipment 포트 | Point 연결 점과 드래그 연결 |
+| `object-{id}-in-count` | Equipment | In 포트 개수 |
+| `object-{id}-out-count` | Equipment | Out 포트 개수 |
+| `object-{id}-C_n` | Point 원 둘레 | Equipment 포트로 드래그 |
+| `object-{id}-count` | Point | 연결 점 개수 (2–4) |
 
-## 10. Arrangement Object
+## 10. Equipment and Point
 
-Arrangement는 Equipment와 Point로 계통 배치를 그리는 도면 객체다. 내부에서 공학 계산을 하지 않는다.
+Equipment와 Point는 Calculation Object와 **같은 공용 워크시트**에 놓인다. 별도의 Arrangement 창/노드로 감싸지 않는다. 내부에서 공학 계산을 하지 않는다.
 
 이 프로토타입 범위:
 
 - Equipment: 범용 심볼. In/Out 포트 개수를 지정한다. 포트 ID는 `IN_1`… / `OUT_1`…
-- Point: 연결 점 개수를 지정하는 막대. 각 점(`C_1`…)을 Equipment In/Out에 드래그 앤 드롭으로 붙인다. 연결선은 꺾은선이다.
+- Point: 원형 노드. 연결 점 개수는 2–4개(`C_1`…). 각 점을 Equipment In/Out에 드래그로 붙인다. 연결선은 꺾은선이다.
 - Valve, Pipe, Signal, Annotation은 이 단계에 없다
 
 역할 분리:
 
 - React / React Flow: 화면 렌더링, 생성·이동, Point↔Equipment 드래그 연결
-- Python: 도메인 스키마, 저장/불러오기, ID·참조 무결성, Calculation과의 relation, evaluate 시 Arrangement skip
+- Python: 도메인 스키마, 저장/불러오기, ID·참조 무결성, Calculation과의 relation, evaluate 시 Equipment/Point skip
 
-`objects`는 판별 유니온이다. 기존 JSON에 `kind`가 없으면 Calculation Object로 로드한다.
+`objects`는 판별 유니온이다. 기존 JSON에 `kind`가 없으면 Calculation Object로 로드한다. 예전 Arrangement 창 JSON(`kind: "arrangement"`)은 로드 시 Equipment/Point 노드로 펼친다.
 
-Arrangement 저장 모델은 Domain과 View를 분리한다.
+- Equipment/Point의 워크시트 `position`은 화면 좌표다. 연결(`connections`)은 도메인이다.
+- Equipment/Point에 `value_flow`를 걸면 Python이 `ARRANGEMENT_HAS_NO_VALUE`로 거부한다.
 
-- Domain: Equipment ID/이름/`inCount`/`outCount`, Point ID/이름/`connectionCount`, 각 연결 점 `connections[]`의 `{ equipmentId, portId }`
-- View: 워크시트 `position`, 캔버스 크기, `elements[id]` 좌표
-
-Point를 Equipment에 연결하는 것은 Domain이다. Equipment/Point를 화면에서 옮기는 것은 View다.
-
-Point는 워크시트에서 Calculation Object Port와 `association` Edge로 연결할 수 있다. Arrangement에 `value_flow`를 걸면 Python이 `ARRANGEMENT_HAS_NO_VALUE`로 거부한다.
-
-평가 시 Arrangement는 `evaluatedObjectIds`에 넣지 않으며 formula evaluator를 호출하지 않는다.
+평가 시 Equipment/Point는 `evaluatedObjectIds`에 넣지 않으며 formula evaluator를 호출하지 않는다.
 
 허용:
 

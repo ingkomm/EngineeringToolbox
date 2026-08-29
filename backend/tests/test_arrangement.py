@@ -7,18 +7,9 @@ from pydantic import ValidationError
 
 from engcalc.engine import evaluate_project
 from engcalc.models import (
-    ArrangementDomain,
-    ArrangementEquipment,
-    ArrangementObject,
-    ArrangementPoint,
-    ArrangementView,
-    CalculationObject,
-    Edge,
-    ElementView,
-    FormulaVariable,
-    InputVariable,
-    OutputBinding,
+    EquipmentObject,
     PointEnd,
+    PointObject,
     Position,
     ProjectDocument,
 )
@@ -26,50 +17,30 @@ from engcalc.models import (
 EXAMPLES = Path(__file__).resolve().parents[1] / "examples" / "prototype.json"
 
 
-def _arrangement(
-    *,
-    extra_points: list[ArrangementPoint] | None = None,
-    position: Position | None = None,
-) -> ArrangementObject:
-    points = [
-        ArrangementPoint(
+def _layout() -> list[EquipmentObject | PointObject]:
+    return [
+        EquipmentObject(id="EQ_1", name="Pump A", position=Position(x=128, y=500), inCount=1, outCount=1),
+        EquipmentObject(id="EQ_2", name="Tank B", position=Position(x=400, y=500), inCount=1, outCount=1),
+        PointObject(
             id="PT_1",
             name="Suction",
-            a=PointEnd(equipmentId="EQ_1", portId="OUT_1"),
-            b=PointEnd(equipmentId="EQ_2", portId="IN_1"),
-        ),
-        *(extra_points or []),
-    ]
-    return ArrangementObject(
-        id="arr_1",
-        name="Arrangement 1",
-        position=position or Position(x=80, y=420),
-        domain=ArrangementDomain(
-            equipment=[
-                ArrangementEquipment(id="EQ_1", name="Pump A", inCount=1, outCount=1),
-                ArrangementEquipment(id="EQ_2", name="Tank B", inCount=1, outCount=1),
+            position=Position(x=260, y=522),
+            connectionCount=2,
+            connections=[
+                PointEnd(equipmentId="EQ_1", portId="OUT_1"),
+                PointEnd(equipmentId="EQ_2", portId="IN_1"),
             ],
-            points=points,
         ),
-        view=ArrangementView(
-            width=720,
-            height=400,
-            elements={
-                "EQ_1": ElementView(x=48, y=80, width=112, height=72),
-                "EQ_2": ElementView(x=320, y=80, width=112, height=72),
-                "PT_1": ElementView(x=180, y=102, width=88, height=28),
-            },
-        ),
-    )
+    ]
 
 
 def is_calc(obj: object) -> bool:
-    return getattr(obj, "kind", "calculation") != "arrangement"
+    return getattr(obj, "kind", "calculation") == "calculation"
 
 
-def test_prototype_calculation_still_runs_with_arrangement() -> None:
+def test_prototype_calculation_still_runs_with_layout_objects() -> None:
     project = ProjectDocument.model_validate_json(EXAMPLES.read_text(encoding="utf-8"))
-    project.objects.append(_arrangement())
+    project.objects.extend(_layout())
     result = evaluate_project(project)
     by_id = {obj.id: obj for obj in result.project.objects}
     object_a = by_id["obj-a"]
@@ -80,65 +51,123 @@ def test_prototype_calculation_still_runs_with_arrangement() -> None:
     assert power.value == 360.0
     assert result_var.value == 720.0
     assert result.evaluatedObjectIds == ["obj-a", "obj-b"]
-    assert "arr_1" not in result.evaluatedObjectIds
+    assert "EQ_1" not in result.evaluatedObjectIds
+    assert "PT_1" not in result.evaluatedObjectIds
 
 
-def test_arrangement_roundtrip_preserves_point_ends() -> None:
-    project = ProjectDocument(id="ws", name="ws", objects=[_arrangement()], edges=[])
+def test_layout_roundtrip_preserves_point_connections() -> None:
+    project = ProjectDocument(id="ws", name="ws", objects=_layout(), edges=[])
     restored = ProjectDocument.model_validate(project.model_dump())
-    loaded = restored.objects[0]
-    assert loaded.kind == "arrangement"
-    assert loaded.domain.points[0].connections[0].portId == "OUT_1"  # type: ignore[union-attr]
-    assert loaded.domain.points[0].connections[1].equipmentId == "EQ_2"  # type: ignore[union-attr]
-    assert loaded.domain.points[0].connectionCount == 2
-    assert loaded.view.elements["EQ_2"].x == 320
+    point = next(obj for obj in restored.objects if obj.id == "PT_1")
+    assert point.kind == "point"
+    assert point.connections[0].portId == "OUT_1"  # type: ignore[union-attr]
+    assert point.connections[1].equipmentId == "EQ_2"  # type: ignore[union-attr]
+    equipment = next(obj for obj in restored.objects if obj.id == "EQ_2")
+    assert equipment.position.x == 400
 
 
 def test_duplicate_point_id_is_rejected() -> None:
-    with pytest.raises(ValidationError, match="DUPLICATE_POINT_ID"):
-        _arrangement(extra_points=[ArrangementPoint(id="PT_1", name="dup")])
+    with pytest.raises(ValidationError):
+        ProjectDocument(
+            id="ws",
+            name="ws",
+            objects=[
+                PointObject(id="PT_1", name="one", position=Position(x=0, y=0)),
+                PointObject(id="PT_1", name="dup", position=Position(x=1, y=1)),
+            ],
+            edges=[],
+        )
 
 
 def test_unknown_point_end_port_is_rejected() -> None:
     with pytest.raises(ValidationError, match="UNKNOWN_POINT"):
-        ArrangementObject(
-            id="arr_1",
-            name="Arrangement 1",
-            position=Position(x=0, y=0),
-            domain=ArrangementDomain(
-                equipment=[ArrangementEquipment(id="EQ_1", inCount=1, outCount=1)],
-                points=[
-                    ArrangementPoint(
-                        id="PT_1",
-                        a=PointEnd(equipmentId="EQ_1", portId="OUT_9"),
-                    )
-                ],
-            ),
+        ProjectDocument(
+            id="ws",
+            name="ws",
+            objects=[
+                EquipmentObject(id="EQ_1", position=Position(x=0, y=0), inCount=1, outCount=1),
+                PointObject(
+                    id="PT_1",
+                    position=Position(x=0, y=0),
+                    connections=[PointEnd(equipmentId="EQ_1", portId="OUT_9")],
+                ),
+            ],
+            edges=[],
         )
 
 
-def test_point_keeps_multiple_connections() -> None:
-    point = ArrangementPoint(
-        id="PT_1",
-        connectionCount=4,
-        connections=[
-            PointEnd(equipmentId="EQ_1", portId="OUT_1"),
-            None,
-            None,
-            PointEnd(equipmentId="EQ_2", portId="IN_1"),
-        ],
-    )
-    loaded = _arrangement(extra_points=[]).model_copy(
-        update={
-            "domain": _arrangement().domain.model_copy(update={"points": [point]}),
+def test_explodes_legacy_arrangement_object() -> None:
+    project = ProjectDocument.model_validate(
+        {
+            "id": "ws",
+            "name": "ws",
+            "objects": [
+                {
+                    "kind": "arrangement",
+                    "id": "arr_1",
+                    "name": "Arrangement 1",
+                    "position": {"x": 10, "y": 20},
+                    "domain": {
+                        "equipment": [{"id": "EQ_1", "name": "Pump A", "inCount": 1, "outCount": 1}],
+                        "points": [
+                            {
+                                "id": "PT_1",
+                                "a": {"equipmentId": "EQ_1", "portId": "OUT_1"},
+                                "b": None,
+                            }
+                        ],
+                    },
+                    "view": {
+                        "width": 720,
+                        "height": 400,
+                        "elements": {
+                            "EQ_1": {"x": 48, "y": 80},
+                            "PT_1": {"x": 180, "y": 102},
+                        },
+                    },
+                }
+            ],
+            "edges": [],
         }
     )
-    restored = ArrangementObject.model_validate(loaded.model_dump())
-    assert restored.domain.points[0].connectionCount == 4
-    assert restored.domain.points[0].connections[3].portId == "IN_1"  # type: ignore[union-attr]
+    ids = [obj.id for obj in project.objects]
+    assert "arr_1" not in ids
+    equipment = next(obj for obj in project.objects if obj.id == "EQ_1")
+    point = next(obj for obj in project.objects if obj.id == "PT_1")
+    assert equipment.kind == "equipment"
+    assert equipment.position.x == 58
+    assert point.kind == "point"
+    assert point.connections[0].portId == "OUT_1"  # type: ignore[union-attr]
 
 
-def test_arrangement_does_not_call_formula_evaluation(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_point_keeps_four_connections() -> None:
+    project = ProjectDocument(
+        id="ws",
+        name="ws",
+        objects=[
+            EquipmentObject(id="EQ_1", position=Position(x=0, y=0), inCount=1, outCount=1),
+            EquipmentObject(id="EQ_2", position=Position(x=1, y=0), inCount=1, outCount=1),
+            PointObject(
+                id="PT_1",
+                position=Position(x=2, y=0),
+                connectionCount=4,
+                connections=[
+                    PointEnd(equipmentId="EQ_1", portId="OUT_1"),
+                    None,
+                    None,
+                    PointEnd(equipmentId="EQ_2", portId="IN_1"),
+                ],
+            ),
+        ],
+        edges=[],
+    )
+    restored = ProjectDocument.model_validate(project.model_dump())
+    point = next(obj for obj in restored.objects if obj.id == "PT_1")
+    assert point.connectionCount == 4
+    assert point.connections[3].portId == "IN_1"  # type: ignore[union-attr]
+
+
+def test_layout_objects_do_not_call_formula_evaluation(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
     from engcalc import engine as engine_mod
 
@@ -149,6 +178,6 @@ def test_arrangement_does_not_call_formula_evaluation(monkeypatch: pytest.Monkey
         return real(formula, env)
 
     monkeypatch.setattr(engine_mod, "evaluate_formula", wrapped)
-    result = evaluate_project(ProjectDocument(id="ws", name="ws", objects=[_arrangement()], edges=[]))
+    result = evaluate_project(ProjectDocument(id="ws", name="ws", objects=_layout(), edges=[]))
     assert calls == []
     assert result.evaluatedObjectIds == []

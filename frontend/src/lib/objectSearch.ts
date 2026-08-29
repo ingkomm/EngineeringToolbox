@@ -1,6 +1,6 @@
 import type { MappingEdge, ProjectDocument, WorksheetObject } from "../types/contract";
 import { displayName } from "./variables";
-import { isArrangementObject, isCalculationObject, isValueFlowEdge } from "./worksheet";
+import { isCalculationObject, isPointObject, isValueFlowEdge } from "./worksheet";
 
 export type PortLinkStatus = "connected" | "occupied" | "available" | "create";
 
@@ -49,24 +49,22 @@ export function searchTargetPorts(
   const hits: PortSearchHit[] = [];
   for (const object of project.objects) {
     if (object.id === selfObjectId || !matchesObjectQuery(object, query)) continue;
-    if (isArrangementObject(object)) {
-      for (const point of object.domain.points) {
-        const edge = inboundEdge(project.edges, object.id, point.id);
-        const connected =
-          edge != null &&
-          edge.sourceObjectId === selfObjectId &&
-          edge.sourceVariableId === selfVariableId;
-        hits.push({
-          objectId: object.id,
-          objectName: object.name,
-          variableId: point.id,
-          variableName: displayName(point),
-          kind: "point",
-          status: connected ? "connected" : "available",
-          edgeId: connected ? edge?.id : undefined,
-          relationType: "association",
-        });
-      }
+    if (isPointObject(object)) {
+      const edge = inboundEdge(project.edges, object.id, object.id);
+      const connected =
+        edge != null &&
+        edge.sourceObjectId === selfObjectId &&
+        edge.sourceVariableId === selfVariableId;
+      hits.push({
+        objectId: object.id,
+        objectName: object.name,
+        variableId: object.id,
+        variableName: displayName(object),
+        kind: "point",
+        status: connected ? "connected" : "available",
+        edgeId: connected ? edge?.id : undefined,
+        relationType: "association",
+      });
       continue;
     }
     if (!isCalculationObject(object)) continue;
@@ -122,25 +120,23 @@ export function searchSourcePorts(
   const hits: PortSearchHit[] = [];
   for (const object of project.objects) {
     if (object.id === selfObjectId || !matchesObjectQuery(object, query)) continue;
-    if (isArrangementObject(object)) {
-      for (const point of object.domain.points) {
-        const outgoing = outboundEdge(project.edges, object.id, point.id);
-        const connected =
-          inbound != null &&
-          inbound.sourceObjectId === object.id &&
-          inbound.sourceVariableId === point.id;
-        hits.push({
-          objectId: object.id,
-          objectName: object.name,
-          variableId: point.id,
-          variableName: displayName(point),
-          kind: "point",
-          status: connected ? "connected" : "available",
-          edgeId: connected ? inbound?.id : undefined,
-          relationType: "association",
-        });
-        void outgoing;
-      }
+    if (isPointObject(object)) {
+      const outgoing = outboundEdge(project.edges, object.id, object.id);
+      const connected =
+        inbound != null &&
+        inbound.sourceObjectId === object.id &&
+        inbound.sourceVariableId === object.id;
+      hits.push({
+        objectId: object.id,
+        objectName: object.name,
+        variableId: object.id,
+        variableName: displayName(object),
+        kind: "point",
+        status: connected ? "connected" : "available",
+        edgeId: connected ? inbound?.id : undefined,
+        relationType: "association",
+      });
+      void outgoing;
       continue;
     }
     if (!isCalculationObject(object)) continue;

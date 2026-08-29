@@ -48,59 +48,31 @@ export interface CalculationObject {
   outputs: OutputBinding[];
 }
 
-export interface ArrangementEquipment {
-  id: string;
-  name: string;
-  symbolId: string;
-  inCount: number;
-  outCount: number;
-}
-
 export interface PointEnd {
   equipmentId: string;
   portId: string;
 }
 
-export interface ArrangementPoint {
+export interface EquipmentObject {
+  kind: "equipment";
   id: string;
   name: string;
+  position: { x: number; y: number };
+  symbolId: string;
+  inCount: number;
+  outCount: number;
+}
+
+export interface PointObject {
+  kind: "point";
+  id: string;
+  name: string;
+  position: { x: number; y: number };
   connectionCount: number;
   connections: Array<PointEnd | null>;
 }
 
-export interface ArrangementDomain {
-  equipment: ArrangementEquipment[];
-  points: ArrangementPoint[];
-}
-
-export interface ElementView {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  rotation: number;
-  zIndex: number;
-  visible: boolean;
-}
-
-export interface ArrangementView {
-  width: number;
-  height: number;
-  rotation: number;
-  zIndex: number;
-  elements: Record<string, ElementView>;
-}
-
-export interface ArrangementObject {
-  kind: "arrangement";
-  id: string;
-  name: string;
-  position: { x: number; y: number };
-  domain: ArrangementDomain;
-  view: ArrangementView;
-}
-
-export type WorksheetObject = CalculationObject | ArrangementObject;
+export type WorksheetObject = CalculationObject | EquipmentObject | PointObject;
 
 export interface MappingEdge {
   id: string;

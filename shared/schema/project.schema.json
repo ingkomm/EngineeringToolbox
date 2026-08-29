@@ -14,7 +14,8 @@
       "items": {
         "oneOf": [
           { "$ref": "#/$defs/calculationObject" },
-          { "$ref": "#/$defs/arrangementObject" }
+          { "$ref": "#/$defs/equipmentObject" },
+          { "$ref": "#/$defs/pointObject" }
         ]
       }
     },
@@ -108,32 +109,6 @@
         }
       }
     },
-    "elementView": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["x", "y"],
-      "properties": {
-        "x": { "type": "number" },
-        "y": { "type": "number" },
-        "width": { "type": "number" },
-        "height": { "type": "number" },
-        "rotation": { "type": "number" },
-        "zIndex": { "type": "integer" },
-        "visible": { "type": "boolean" }
-      }
-    },
-    "arrangementEquipment": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id"],
-      "properties": {
-        "id": { "$ref": "#/$defs/variableId" },
-        "name": { "type": "string" },
-        "symbolId": { "type": "string", "minLength": 1 },
-        "inCount": { "type": "integer", "minimum": 0, "maximum": 8 },
-        "outCount": { "type": "integer", "minimum": 0, "maximum": 8 }
-      }
-    },
     "pointEnd": {
       "type": "object",
       "additionalProperties": false,
@@ -143,61 +118,34 @@
         "portId": { "$ref": "#/$defs/variableId" }
       }
     },
-    "arrangementPoint": {
+    "equipmentObject": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id"],
+      "required": ["kind", "id", "name", "position"],
       "properties": {
+        "kind": { "type": "string", "const": "equipment" },
         "id": { "$ref": "#/$defs/variableId" },
         "name": { "type": "string" },
-        "connectionCount": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "position": { "$ref": "#/$defs/position" },
+        "symbolId": { "type": "string", "minLength": 1 },
+        "inCount": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "outCount": { "type": "integer", "minimum": 0, "maximum": 8 }
+      }
+    },
+    "pointObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "name", "position"],
+      "properties": {
+        "kind": { "type": "string", "const": "point" },
+        "id": { "$ref": "#/$defs/variableId" },
+        "name": { "type": "string" },
+        "position": { "$ref": "#/$defs/position" },
+        "connectionCount": { "type": "integer", "minimum": 2, "maximum": 4 },
         "connections": {
           "type": "array",
           "items": { "anyOf": [{ "$ref": "#/$defs/pointEnd" }, { "type": "null" }] }
         }
-      }
-    },
-    "arrangementDomain": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["equipment", "points"],
-      "properties": {
-        "equipment": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/arrangementEquipment" }
-        },
-        "points": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/arrangementPoint" }
-        }
-      }
-    },
-    "arrangementView": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["width", "height", "elements"],
-      "properties": {
-        "width": { "type": "number" },
-        "height": { "type": "number" },
-        "rotation": { "type": "number" },
-        "zIndex": { "type": "integer" },
-        "elements": {
-          "type": "object",
-          "additionalProperties": { "$ref": "#/$defs/elementView" }
-        }
-      }
-    },
-    "arrangementObject": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["kind", "id", "name", "position", "domain", "view"],
-      "properties": {
-        "kind": { "type": "string", "const": "arrangement" },
-        "id": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$" },
-        "name": { "type": "string", "minLength": 1 },
-        "position": { "$ref": "#/$defs/position" },
-        "domain": { "$ref": "#/$defs/arrangementDomain" },
-        "view": { "$ref": "#/$defs/arrangementView" }
       }
     },
     "edge": {

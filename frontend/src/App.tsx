@@ -7,7 +7,7 @@ import { blankProject } from "./example/blankProject";
 import { FALLBACK_QUANTITIES, type QuantitySpec } from "./lib/quantities";
 import { applyWorkspaceEdit, type WorkspaceEdit } from "./lib/projectEdits";
 import type { EvalError, ProjectDocument } from "./types/contract";
-import { isArrangementObject } from "./lib/worksheet";
+import { isEquipmentObject, isPointObject } from "./lib/worksheet";
 
 export function App() {
   const [project, setProject] = useState<ProjectDocument>(blankProject);
@@ -97,14 +97,24 @@ export function App() {
       JSON.stringify(
         {
           objects: project.objects.map((object) => {
-            if (isArrangementObject(object)) {
+            if (isEquipmentObject(object)) {
               return {
-                kind: "arrangement",
+                kind: "equipment",
                 id: object.id,
                 name: object.name,
                 position: object.position,
-                domain: object.domain,
-                view: object.view,
+                inCount: object.inCount,
+                outCount: object.outCount,
+              };
+            }
+            if (isPointObject(object)) {
+              return {
+                kind: "point",
+                id: object.id,
+                name: object.name,
+                position: object.position,
+                connectionCount: object.connectionCount,
+                connections: object.connections,
               };
             }
             return {
@@ -225,8 +235,8 @@ export function App() {
           <section>
             <h2>워크시트</h2>
             <p className="side-pane__hint">
-              Calculation Object와 Arrangement Object를 같은 워크시트에 둘 수 있습니다. Arrangement는 계통 배치만
-              기록하며 계산하지 않습니다. Point와 Calculation Port는 association으로 연결합니다.
+              Calculation Object, Equipment, Point를 같은 워크시트에 둡니다. Equipment와 Point는 계통 배치만
+              기록하며 계산하지 않습니다. Point 연결 점을 Equipment In/Out에 끌어 연결합니다.
             </p>
             <button
               className="ghost-btn"
