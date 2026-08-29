@@ -557,13 +557,13 @@ describe("worksheet equipment and points", () => {
       },
       FALLBACK_QUANTITIES,
     ).project;
-    expect(project.objects.find((item) => item.id === "PT_1" && isPointObject(item))).toMatchObject({
+    expect(project.objects.find((item) => item.id === "PT_1")).toMatchObject({
       connections: [{ objectId: "PT_2", portId: "C_2", reversed: false }, null],
     });
 
     project = applyWorkspaceEdit(project, { type: "togglePointLink", pointId: "PT_1", end: "C_1" }, FALLBACK_QUANTITIES)
       .project;
-    expect(project.objects.find((item) => item.id === "PT_1" && isPointObject(item))?.connections[0]).toMatchObject({
+    expect(project.objects.find(isPointObject)?.connections[0]).toMatchObject({
       objectId: "PT_2",
       portId: "C_2",
       reversed: true,

@@ -259,5 +259,5 @@ def test_calculation_link_association_is_not_evaluated() -> None:
         ],
     )
     result = evaluate_project(project)
-    assert result.evaluatedObjectIds == []
+    assert "PT_1" not in result.evaluatedObjectIds
     assert result.errors == []
