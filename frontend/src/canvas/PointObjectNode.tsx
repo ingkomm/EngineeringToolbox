@@ -2,7 +2,8 @@ import { Handle, Position, type Node, type NodeProps, useUpdateNodeInternals } f
 import { useLayoutEffect, type KeyboardEvent } from "react";
 import type { PointObject } from "../types/contract";
 import { OBJECT_ID_RE, type WorkspaceEdit } from "../lib/projectEdits";
-import { pointConnectionIds } from "../lib/worksheet";
+import { POINT_CONNECTION_IDS, pointConnectionSide } from "../lib/worksheet";
+import { ObjectLinkHandle } from "./ObjectLinkHandle";
 
 export type PointObjectNodeType = Node<
   {
@@ -16,33 +17,32 @@ function stopKeys(event: KeyboardEvent) {
   event.stopPropagation();
 }
 
-function handleStyle(index: number, count: number): { left: string; top: string } {
-  const angle = Math.PI + (2 * Math.PI * index) / count;
-  return {
-    left: `${50 + 46 * Math.cos(angle)}%`,
-    top: `${50 + 46 * Math.sin(angle)}%`,
-  };
-}
+const SIDE_POSITION: Record<"left" | "right" | "bottom", Position> = {
+  left: Position.Left,
+  right: Position.Right,
+  bottom: Position.Bottom,
+};
 
 export function PointObjectNode({ id, selected, data }: NodeProps<PointObjectNodeType>) {
   const { object, onEdit } = data;
-  const ends = pointConnectionIds(object.connectionCount);
   const updateNodeInternals = useUpdateNodeInternals();
 
   useLayoutEffect(() => {
     updateNodeInternals(id);
-  }, [ends.join("|"), id, updateNodeInternals]);
+  }, [id, updateNodeInternals]);
 
   return (
     <article className={`ws-point ${selected ? "ws-point--selected" : ""}`} data-testid={`object-${id}`}>
-      {ends.map((endId, index) => (
+      <ObjectLinkHandle nodeId={id} />
+      {POINT_CONNECTION_IDS.map((endId, index) => (
         <Handle
           key={endId}
           type="source"
-          position={Position.Left}
+          position={SIDE_POSITION[pointConnectionSide(endId)]}
           id={endId}
-          className={`ws-point-handle ${object.connections[index] ? "ws-point-handle--on" : ""}`}
-          style={handleStyle(index, ends.length)}
+          className={`ws-point-handle ws-point-handle--${pointConnectionSide(endId)} ${
+            object.connections[index] ? "ws-point-handle--on" : ""
+          }`}
           data-testid={`object-${id}-${endId}`}
           title={`${id}.${endId}`}
         />
@@ -62,24 +62,6 @@ export function PointObjectNode({ id, selected, data }: NodeProps<PointObjectNod
             onEdit({ type: "updatePoint", objectId: id, patch: { id: nextId } });
           }}
         />
-        <label className="ws-point__count">
-          <input
-            className="arr-count nodrag"
-            type="number"
-            min={2}
-            max={4}
-            value={object.connectionCount}
-            data-testid={`object-${id}-count`}
-            onKeyDown={stopKeys}
-            onChange={(event) =>
-              onEdit({
-                type: "updatePoint",
-                objectId: id,
-                patch: { connectionCount: Number(event.target.value) },
-              })
-            }
-          />
-        </label>
         <button
           type="button"
           className="icon-btn nodrag"

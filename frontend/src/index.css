@@ -200,6 +200,7 @@ label.ghost-btn {
 }
 
 .calc-node {
+  position: relative;
   width: 760px;
   background: var(--bg-node);
   border: 1px solid var(--line-strong);
@@ -365,7 +366,7 @@ label.ghost-btn {
 }
 
 .calc-row--link {
-  grid-template-columns: 88px minmax(0, 1fr) auto 14px;
+  grid-template-columns: 88px minmax(0, 1fr) auto;
 }
 
 .calc-row__target {
@@ -1009,6 +1010,7 @@ label.ghost-btn {
 }
 
 .ws-eq {
+  position: relative;
   width: 176px;
   background: #122033;
   border: 1px solid var(--line-strong);
@@ -1044,7 +1046,14 @@ label.ghost-btn {
   font-weight: 700;
   line-height: 14px;
   text-align: center;
+}
+
+.ws-eq-handle.react-flow__handle-left {
   transform: translate(-50%, -50%) !important;
+}
+
+.ws-eq-handle.react-flow__handle-right {
+  transform: translate(50%, -50%) !important;
 }
 
 .ws-eq-handle--in {
@@ -1075,6 +1084,7 @@ label.ghost-btn {
 }
 
 .ws-point {
+  position: relative;
   width: 84px;
   height: 84px;
   border-radius: 50%;
@@ -1111,18 +1121,20 @@ label.ghost-btn {
   text-align: center;
 }
 
-.ws-point__count {
-  display: flex;
-  justify-content: center;
-}
-
 .ws-point-handle {
   width: 12px !important;
   height: 12px !important;
   border-radius: 50% !important;
   background: #0b1220 !important;
   border: 2px solid var(--muted) !important;
-  transform: translate(-50%, -50%) !important;
+}
+
+.obj-link-handle {
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 3px !important;
+  background: #f0b429 !important;
+  border: 2px solid #071018 !important;
 }
 
 .ws-point-handle--on {

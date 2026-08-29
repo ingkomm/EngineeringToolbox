@@ -1,7 +1,8 @@
 import { Position, type Node, type NodeProps, useUpdateNodeInternals } from "@xyflow/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import type { CalculationObject, ProjectDocument } from "../types/contract";
-import { formatValue, inputHandleId, linkHandleId, outputHandleId } from "../lib/display";
+import { formatValue, inputHandleId, outputHandleId } from "../lib/display";
+import { ObjectLinkHandle } from "./ObjectLinkHandle";
 import {
   applyCandidate,
   identifierAt,
@@ -11,6 +12,7 @@ import {
   type FormulaCandidate,
 } from "../lib/formulaComplete";
 import { OBJECT_ID_RE, VARIABLE_ID_RE, type WorkspaceEdit } from "../lib/projectEdits";
+import { OBJECT_LINK_HANDLE } from "../lib/worksheet";
 import { displayName } from "../lib/variables";
 import type { QuantitySpec } from "../lib/quantities";
 import { RowHandle } from "./RowHandle";
@@ -38,7 +40,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
   const handleSignature = [
     ...object.inputs.map((item) => item.id),
     ...object.outputs.map((item) => item.id),
-    ...(object.links ?? []).map((item) => item.id),
+    OBJECT_LINK_HANDLE,
   ].join("|");
 
   useLayoutEffect(() => {
@@ -57,6 +59,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
 
   return (
     <article className="calc-node" data-testid={`object-${id}`}>
+      <ObjectLinkHandle nodeId={id} />
       <header className="calc-node__header">
         <span className="calc-node__kicker">Calculation Object</span>
         <ObjectIdField
@@ -350,7 +353,9 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
             + 링크
           </button>
         </div>
-        {(object.links ?? []).length === 0 ? <p className="calc-empty">Point / Equipment에 점선으로 연결합니다</p> : null}
+        {(object.links ?? []).length === 0 ? (
+          <p className="calc-empty">상단 노란 점으로 Point / Equipment와 점선 연결합니다</p>
+        ) : null}
         {(object.links ?? []).map((item, index) => {
           return (
             <div className="calc-row calc-row--link" key={item.id} data-testid={`object-${id}-link-row-${item.id}`}>
@@ -369,7 +374,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
                 }}
               />
               <span className="calc-row__target" data-testid={`object-${id}-link-${item.id}-target`}>
-                {item.targetObjectId ? `${item.targetObjectId}${item.targetPortId && item.targetPortId !== item.targetObjectId ? `.${item.targetPortId}` : ""}` : "—"}
+                {item.targetObjectId ?? "—"}
               </span>
               <div className="port-tools">
                 <PortSearch
@@ -384,7 +389,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
                       objectId: id,
                       linkId: item.id,
                       targetObjectId: hit.objectId,
-                      targetPortId: hit.variableId,
+                      targetPortId: OBJECT_LINK_HANDLE,
                     })
                   }
                   onDisconnect={(hit) => {
@@ -402,13 +407,6 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
                   ×
                 </button>
               </div>
-              <RowHandle
-                nodeId={id}
-                handleId={linkHandleId(item.id)}
-                type="source"
-                position={Position.Right}
-                className="calc-handle calc-handle--link"
-              />
             </div>
           );
         })}

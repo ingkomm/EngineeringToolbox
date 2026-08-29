@@ -28,22 +28,38 @@ export function isValueFlowEdge(edge: MappingEdge): boolean {
   return edge.relationType == null || edge.relationType === "value_flow";
 }
 
-export function clampConnectionCount(value: number | undefined, fallback = 2): number {
-  if (value == null || Number.isNaN(value)) return fallback;
-  return Math.max(2, Math.min(4, Math.floor(value)));
+/** Object-to-object association (Calculation ↔ Equipment/Point) attaches here. */
+export const OBJECT_LINK_HANDLE = "OBJ";
+
+/** Fixed Point piping ends: left, right, bottom. */
+export const POINT_CONNECTION_IDS = ["C_1", "C_2", "C_3"] as const;
+export const POINT_CONNECTION_COUNT = POINT_CONNECTION_IDS.length;
+
+export type PointConnectionSide = "left" | "right" | "bottom";
+
+export function clampConnectionCount(_value?: number): number {
+  return POINT_CONNECTION_COUNT;
 }
 
-export function pointConnectionIds(count: number): string[] {
-  return Array.from({ length: clampConnectionCount(count) }, (_, index) => `C_${index + 1}`);
+export function pointConnectionIds(_count?: number): string[] {
+  return [...POINT_CONNECTION_IDS];
+}
+
+export function pointConnectionSide(end: string): PointConnectionSide {
+  if (end === "C_2" || end === "b") return "right";
+  if (end === "C_3") return "bottom";
+  return "left";
 }
 
 export function parsePointConnectionEnd(end: string): number | null {
   if (end === "a") return 0;
   if (end === "b") return 1;
-  const match = /^C_(\d+)$/.exec(end);
-  if (!match) return null;
-  const index = Number(match[1]) - 1;
+  const index = POINT_CONNECTION_IDS.indexOf(end as (typeof POINT_CONNECTION_IDS)[number]);
   return index >= 0 ? index : null;
+}
+
+export function isObjectLinkHandle(portId: string | null | undefined): boolean {
+  return portId === OBJECT_LINK_HANDLE;
 }
 
 export function equipmentPortIds(equipment: Pick<EquipmentObject, "inCount" | "outCount">): { ins: string[]; outs: string[] } {
@@ -58,7 +74,7 @@ export function hasEquipmentPort(equipment: Pick<EquipmentObject, "inCount" | "o
 }
 
 export function isLayoutPortId(portId: string | null | undefined): boolean {
-  return Boolean(portId && (/^(IN|OUT|C)_\d+$/.test(portId) || portId === "a" || portId === "b"));
+  return Boolean(portId && (/^(IN|OUT)_\d+$/.test(portId) || parsePointConnectionEnd(portId) != null));
 }
 
 export function normalizePointEnd(end: {
@@ -74,12 +90,12 @@ export function normalizePointEnd(end: {
 }
 
 export function layoutPortExists(object: WorksheetObject, portId: string): boolean {
+  if (isObjectLinkHandle(portId) || portId === object.id) return isLayoutObject(object);
   if (isEquipmentObject(object)) {
-    return portId === object.id || hasEquipmentPort(object, portId);
+    return hasEquipmentPort(object, portId);
   }
   if (isPointObject(object)) {
-    const index = parsePointConnectionEnd(portId);
-    return portId === object.id || (index != null && index < object.connectionCount);
+    return parsePointConnectionEnd(portId) != null;
   }
   return false;
 }
@@ -94,14 +110,13 @@ export function normalizePointObject(point: {
   b?: PointEnd | null;
 }): PointObject {
   const fromLegacy = point.connections ?? [point.a ?? null, point.b ?? null];
-  const count = clampConnectionCount(point.connectionCount, Math.max(2, fromLegacy.length));
   return {
     kind: "point",
     id: point.id,
     name: (point.name ?? "").trim() || point.id,
     position: point.position ?? { x: 80, y: 420 },
-    connectionCount: count,
-    connections: Array.from({ length: count }, (_, index) => normalizePointEnd(fromLegacy[index] ?? null)),
+    connectionCount: POINT_CONNECTION_COUNT,
+    connections: POINT_CONNECTION_IDS.map((_, index) => normalizePointEnd(fromLegacy[index] ?? null)),
   };
 }
 
@@ -110,7 +125,7 @@ export function arrangementLinkId(pointId: string, end: string): string {
 }
 
 export function parseArrangementLinkId(edgeId: string): { pointId: string; end: string } | null {
-  const match = /^arrlink:([^:]+):(C_\d+|a|b)$/.exec(edgeId);
+  const match = /^arrlink:([^:]+):(C_[123]|a|b)$/.exec(edgeId);
   if (!match) return null;
   return { pointId: match[1]!, end: match[2]! };
 }
@@ -180,5 +195,28 @@ export function normalizeLoadedProject(project: ProjectDocument): ProjectDocumen
     }
     objects.push(object as WorksheetObject);
   }
-  return { ...project, objects };
+  const objectIds = new Set(objects.map((item) => item.id));
+  const layoutIds = new Set(objects.filter(isLayoutObject).map((item) => item.id));
+  const normalized = objects.map((object) => {
+    if (!isCalculationObject(object)) return object;
+    return {
+      ...object,
+      links: (object.links ?? []).map((link) =>
+        link.targetObjectId && layoutIds.has(link.targetObjectId)
+          ? { ...link, targetPortId: OBJECT_LINK_HANDLE }
+          : link,
+      ),
+    };
+  });
+  return {
+    ...project,
+    objects: normalized,
+    edges: project.edges.map((edge) => {
+      if (isValueFlowEdge(edge)) return edge;
+      if (layoutIds.has(edge.targetObjectId) && objectIds.has(edge.sourceObjectId)) {
+        return { ...edge, targetVariableId: OBJECT_LINK_HANDLE };
+      }
+      return edge;
+    }),
+  };
 }

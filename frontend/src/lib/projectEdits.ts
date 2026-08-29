@@ -20,6 +20,7 @@ import {
   sourceVariable,
 } from "./variables";
 import {
+  OBJECT_LINK_HANDLE,
   clampConnectionCount,
   isCalculationObject,
   isEquipmentObject,
@@ -56,7 +57,7 @@ export type WorkspaceEdit =
   | {
       type: "connectLink";
       objectId: string;
-      linkId: string;
+      linkId?: string;
       targetObjectId: string | null;
       targetPortId?: string | null;
     }
@@ -664,7 +665,7 @@ export function applyWorkspaceEdit(
     case "updateLink":
       return updateCalculationLink(project, edit.objectId, edit.index, edit.patch);
     case "connectLink":
-      return connectCalculationLink(project, edit.objectId, edit.linkId, edit.targetObjectId, edit.targetPortId ?? null);
+      return connectObjectLink(project, edit.objectId, edit.linkId, edit.targetObjectId, edit.targetPortId ?? null);
     case "connectMapping": {
       const sourceObject = project.objects.find((item) => item.id === edit.sourceObjectId);
       const targetObject = project.objects.find((item) => item.id === edit.targetObjectId);
@@ -981,7 +982,7 @@ function addWorksheetPoint(project: ProjectDocument): EditResult {
     id,
     name: id,
     position: nextLayoutPosition(project),
-    connectionCount: 2,
+    connectionCount: 3,
   });
   return { project: { ...project, objects: [...project.objects, object] }, dirtyObjectIds: [], shouldEvaluate: false };
 }
@@ -1001,7 +1002,7 @@ function updateWorksheetPoint(
     ...current,
     id: nextId,
     name: nextName,
-    connectionCount: clampConnectionCount(patch.connectionCount, current.connectionCount),
+    connectionCount: clampConnectionCount(),
   });
   let next = project;
   if (nextId !== current.id) next = rekeyObject(next, current.id, nextId);
@@ -1192,12 +1193,38 @@ function updateCalculationLink(
   };
 }
 
+function connectObjectLink(
+  project: ProjectDocument,
+  objectId: string,
+  linkId: string | undefined,
+  targetObjectId: string | null,
+  targetPortId: string | null,
+): EditResult {
+  let next = project;
+  let resolvedId = linkId;
+  const object = next.objects.find((item) => item.id === objectId);
+  if (!object || !isCalculationObject(object)) return noEval(project);
+  if (!resolvedId) {
+    const empty = (object.links ?? []).find((item) => !item.targetObjectId);
+    if (empty) {
+      resolvedId = empty.id;
+    } else {
+      next = addCalculationLink(next, objectId).project;
+      const created = next.objects.find((item) => item.id === objectId);
+      resolvedId =
+        created && isCalculationObject(created) ? created.links?.at(-1)?.id : undefined;
+    }
+  }
+  if (!resolvedId) return noEval(project);
+  return connectCalculationLink(next, objectId, resolvedId, targetObjectId, targetPortId);
+}
+
 function connectCalculationLink(
   project: ProjectDocument,
   objectId: string,
   linkId: string,
   targetObjectId: string | null,
-  targetPortId: string | null,
+  _targetPortId: string | null,
 ): EditResult {
   const object = project.objects.find((item) => item.id === objectId);
   if (!object || !isCalculationObject(object)) return noEval(project);
@@ -1206,9 +1233,8 @@ function connectCalculationLink(
   if (targetObjectId) {
     const host = project.objects.find((item) => item.id === targetObjectId);
     if (!host || !isLayoutObject(host)) return noEval(project);
-    if (targetPortId && !layoutPortExists(host, targetPortId)) return noEval(project);
   }
-  const nextPort = targetObjectId ? targetPortId ?? targetObjectId : null;
+  const nextPort = targetObjectId ? OBJECT_LINK_HANDLE : null;
   const next = patchObject(project, objectId, (item) => ({
     ...item,
     links: (item.links ?? []).map((itemLink) =>

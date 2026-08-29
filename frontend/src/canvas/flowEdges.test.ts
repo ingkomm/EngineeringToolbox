@@ -114,41 +114,41 @@ describe("arrangement and association edges", () => {
           inputs: [],
           calculations: [],
           outputs: [],
-          links: [{ id: "LINK_1", name: "LINK_1", targetObjectId: "PT_2", targetPortId: "C_1" }],
+          links: [{ id: "LINK_1", name: "LINK_1", targetObjectId: "PT_2", targetPortId: "OBJ" }],
         },
         {
           kind: "point",
           id: "PT_1",
           name: "PT_1",
           position: { x: 1, y: 0 },
-          connectionCount: 2,
-          connections: [{ objectId: "PT_2", portId: "C_2", reversed: false }, null],
+          connectionCount: 3,
+          connections: [{ objectId: "PT_2", portId: "C_2", reversed: false }, null, null],
         },
         {
           kind: "point",
           id: "PT_2",
           name: "PT_2",
           position: { x: 2, y: 0 },
-          connectionCount: 2,
-          connections: [null, null],
+          connectionCount: 3,
+          connections: [null, null, null],
         },
       ],
       edges: [
         {
-          id: "edge-obj_1-LINK_1-PT_2-C_1",
+          id: "edge-obj_1-LINK_1-PT_2-OBJ",
           sourceObjectId: "obj_1",
           sourceVariableId: "LINK_1",
           targetObjectId: "PT_2",
-          targetVariableId: "C_1",
+          targetVariableId: "OBJ",
           enabled: true,
           relationType: "association",
         },
       ],
     };
     const edges = toFlowEdges(layout, () => undefined, () => undefined, () => undefined);
-    expect(edges.find((item) => item.id === "edge-obj_1-LINK_1-PT_2-C_1")).toMatchObject({
-      sourceHandle: "link:LINK_1",
-      targetHandle: "C_1",
+    expect(edges.find((item) => item.id === "edge-obj_1-LINK_1-PT_2-OBJ")).toMatchObject({
+      sourceHandle: "OBJ",
+      targetHandle: "OBJ",
       className: expect.stringContaining("mapping-edge--association"),
     });
     expect(edges.find((item) => item.id === "arrlink:PT_1:C_1")).toMatchObject({

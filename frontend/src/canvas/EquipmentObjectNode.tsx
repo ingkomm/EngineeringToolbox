@@ -4,6 +4,7 @@ import type { EquipmentObject } from "../types/contract";
 import { OBJECT_ID_RE, type WorkspaceEdit } from "../lib/projectEdits";
 import { equipmentPortIds } from "../lib/worksheet";
 import { ArrangementSymbol } from "./arrangementSymbols";
+import { ObjectLinkHandle } from "./ObjectLinkHandle";
 
 export type EquipmentObjectNodeType = Node<
   {
@@ -29,6 +30,7 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
 
   return (
     <article className={`ws-eq ${selected ? "ws-eq--selected" : ""}`} data-testid={`object-${id}`}>
+      <ObjectLinkHandle nodeId={id} />
       <header className="ws-eq__header">
         <input
           className="calc-node__id nodrag"

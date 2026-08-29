@@ -2,12 +2,14 @@ import { MarkerType } from "@xyflow/react";
 import type { ProjectDocument } from "../types/contract";
 import type { WorkspaceEdit } from "../lib/projectEdits";
 import type { QuantitySpec } from "../lib/quantities";
-import { inputHandleId, linkHandleId, outputHandleId } from "../lib/display";
+import { inputHandleId, outputHandleId } from "../lib/display";
 import {
+  OBJECT_LINK_HANDLE,
   arrangementLinkId,
   isCalculationObject,
   isLayoutObject,
   isLayoutPortId,
+  isObjectLinkHandle,
   isPointObject,
   isValueFlowEdge,
   pointConnectionIds,
@@ -52,9 +54,10 @@ function mappingSourceHandle(
   variableId: string,
 ): string | undefined {
   if (source && isCalculationObject(source) && (source.links ?? []).some((item) => item.id === variableId)) {
-    return linkHandleId(variableId);
+    return OBJECT_LINK_HANDLE;
   }
   if (source && isLayoutObject(source)) {
+    if (isObjectLinkHandle(variableId) || variableId === source.id) return OBJECT_LINK_HANDLE;
     return isLayoutPortId(variableId) ? variableId : undefined;
   }
   return outputHandleId(variableId);
@@ -65,7 +68,11 @@ function mappingTargetHandle(
   variableId: string,
 ): string | undefined {
   if (target && isLayoutObject(target)) {
+    if (isObjectLinkHandle(variableId) || variableId === target.id) return OBJECT_LINK_HANDLE;
     return isLayoutPortId(variableId) ? variableId : undefined;
+  }
+  if (target && isCalculationObject(target) && (target.links ?? []).some((item) => item.id === variableId)) {
+    return OBJECT_LINK_HANDLE;
   }
   return inputHandleId(variableId);
 }
@@ -113,7 +120,7 @@ export function toFlowEdges(
 
   const links = project.objects.flatMap((object) => {
     if (!isPointObject(object)) return [];
-    return pointConnectionIds(object.connectionCount).flatMap((endId, index) => {
+    return pointConnectionIds().flatMap((endId, index) => {
       const end = object.connections[index];
       if (!end) return [];
       const host = objects.get(end.objectId);

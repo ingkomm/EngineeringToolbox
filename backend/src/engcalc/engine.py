@@ -329,8 +329,6 @@ def _validate_structure(project: ProjectDocument) -> list[EvalError]:
 
 
 def _has_source_endpoint(obj: CalculationObject | object, port_id: str) -> bool:
-    if is_point_object(obj):
-        return port_id == obj.id or port_id in {f"C_{index}" for index in range(1, obj.connectionCount + 1)}
     if is_layout_object(obj):
         return port_id in layout_port_ids(obj)
     return any(item.id == port_id for item in obj.outputs) or any(item.id == port_id for item in obj.links)

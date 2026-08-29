@@ -142,7 +142,7 @@ def test_explodes_legacy_arrangement_object() -> None:
     assert point.connections[0].portId == "OUT_1"  # type: ignore[union-attr]
 
 
-def test_point_keeps_four_connections() -> None:
+def test_point_always_has_three_connections() -> None:
     project = ProjectDocument(
         id="ws",
         name="ws",
@@ -165,8 +165,9 @@ def test_point_keeps_four_connections() -> None:
     )
     restored = ProjectDocument.model_validate(project.model_dump())
     point = next(obj for obj in restored.objects if obj.id == "PT_1")
-    assert point.connectionCount == 4
-    assert point.connections[3].portId == "IN_1"  # type: ignore[union-attr]
+    assert point.connectionCount == 3
+    assert len(point.connections) == 3
+    assert point.connections[0].portId == "OUT_1"  # type: ignore[union-attr]
 
 
 def test_layout_objects_do_not_call_formula_evaluation(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -258,6 +259,9 @@ def test_calculation_link_association_is_not_evaluated() -> None:
             )
         ],
     )
+    calc = next(obj for obj in project.objects if obj.id == "obj_1")
+    assert calc.links[0].targetPortId == "OBJ"
+    assert project.edges[0].targetVariableId == "OBJ"
     result = evaluate_project(project)
     assert "PT_1" not in result.evaluatedObjectIds
     assert result.errors == []

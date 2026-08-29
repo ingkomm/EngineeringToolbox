@@ -1,13 +1,11 @@
 import type { MappingEdge, ProjectDocument, WorksheetObject } from "../types/contract";
 import { displayName } from "./variables";
 import {
-  equipmentPortIds,
+  OBJECT_LINK_HANDLE,
   isCalculationObject,
-  isEquipmentObject,
   isLayoutObject,
   isPointObject,
   isValueFlowEdge,
-  pointConnectionIds,
 } from "./worksheet";
 
 export type PortLinkStatus = "connected" | "occupied" | "available" | "create";
@@ -130,31 +128,19 @@ export function searchLayoutTargets(
       !isValueFlowEdge(edge),
   );
   const hits: PortSearchHit[] = [];
-  const needle = query.trim().toLowerCase();
   for (const object of project.objects) {
-    if (!isLayoutObject(object)) continue;
-    const ports = isEquipmentObject(object)
-      ? [object.id, ...equipmentPortIds(object).ins, ...equipmentPortIds(object).outs]
-      : [object.id, ...pointConnectionIds(object.connectionCount)];
-    const objectMatch = matchesObjectQuery(object, query);
-    if (needle && !objectMatch && !ports.some((port) => port.toLowerCase().includes(needle))) {
-      continue;
-    }
-    for (const port of ports) {
-      if (needle && !objectMatch && !port.toLowerCase().includes(needle)) continue;
-      const connected =
-        outbound != null && outbound.targetObjectId === object.id && outbound.targetVariableId === port;
-      hits.push({
-        objectId: object.id,
-        objectName: object.name,
-        variableId: port,
-        variableName: port === object.id ? displayName(object) : port,
-        kind: isPointObject(object) ? "point" : "equipment",
-        status: connected ? "connected" : "available",
-        edgeId: connected ? outbound?.id : undefined,
-        relationType: "association",
-      });
-    }
+    if (!isLayoutObject(object) || !matchesObjectQuery(object, query)) continue;
+    const connected = outbound != null && outbound.targetObjectId === object.id;
+    hits.push({
+      objectId: object.id,
+      objectName: object.name,
+      variableId: OBJECT_LINK_HANDLE,
+      variableName: displayName(object),
+      kind: isPointObject(object) ? "point" : "equipment",
+      status: connected ? "connected" : "available",
+      edgeId: connected ? outbound?.id : undefined,
+      relationType: "association",
+    });
   }
   return hits;
 }

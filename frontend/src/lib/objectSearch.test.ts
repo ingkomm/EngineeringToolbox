@@ -160,7 +160,7 @@ describe("connector object search", () => {
           id: "PT_1",
           name: "Suction",
           position: { x: 0, y: 1 },
-          connectionCount: 2,
+          connectionCount: 3,
           connections: [null, null],
         },
         {
@@ -186,18 +186,12 @@ describe("connector object search", () => {
       ],
     };
     const hits = searchLayoutTargets(withLayout, "suction", "obj_a", "LINK_1");
-    expect(hits).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ objectId: "PT_1", variableId: "C_1", status: "connected", kind: "point" }),
-        expect.objectContaining({ objectId: "PT_1", variableId: "PT_1", status: "available", kind: "point" }),
-      ]),
-    );
+    expect(hits).toEqual([
+      expect.objectContaining({ objectId: "PT_1", variableId: "OBJ", status: "connected", kind: "point" }),
+    ]);
     const equipmentHits = searchLayoutTargets(withLayout, "EQ_1", "obj_a", "LINK_1");
-    expect(equipmentHits).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ objectId: "EQ_1", variableId: "IN_1", kind: "equipment", status: "available" }),
-        expect.objectContaining({ objectId: "EQ_1", variableId: "OUT_1", kind: "equipment" }),
-      ]),
-    );
+    expect(equipmentHits).toEqual([
+      expect.objectContaining({ objectId: "EQ_1", variableId: "OBJ", kind: "equipment", status: "available" }),
+    ]);
   });
 });

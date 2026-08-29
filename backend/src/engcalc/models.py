@@ -156,7 +156,7 @@ class PointObject(BaseModel):
     id: str
     name: str = ""
     position: Position
-    connectionCount: int = Field(default=2, ge=2, le=4)
+    connectionCount: int = Field(default=3, ge=2, le=4)
     connections: list[PointEnd | None] = Field(default_factory=list)
 
     @model_validator(mode="before")
@@ -169,18 +169,23 @@ class PointObject(BaseModel):
         legacy_b = payload.pop("b", None)
         if "connections" not in payload and (legacy_a is not None or legacy_b is not None):
             payload["connections"] = [legacy_a, legacy_b]
-            payload.setdefault("connectionCount", 2)
+            payload.setdefault("connectionCount", 3)
         return payload
 
     @model_validator(mode="after")
     def default_name_and_pad(self) -> PointObject:
         if not self.name.strip():
             self.name = self.id
+        self.connectionCount = 3
         padded = list(self.connections)
-        while len(padded) < self.connectionCount:
+        while len(padded) < 3:
             padded.append(None)
-        self.connections = padded[: self.connectionCount]
+        self.connections = padded[:3]
         return self
+
+
+OBJECT_LINK_HANDLE = "OBJ"
+POINT_CONNECTION_IDS = ("C_1", "C_2", "C_3")
 
 
 def equipment_port_ids(equipment: EquipmentObject) -> set[str]:
@@ -190,12 +195,12 @@ def equipment_port_ids(equipment: EquipmentObject) -> set[str]:
 
 
 def point_port_ids(point: PointObject) -> set[str]:
-    return {point.id, *(f"C_{index}" for index in range(1, point.connectionCount + 1))}
+    return {point.id, OBJECT_LINK_HANDLE, *POINT_CONNECTION_IDS}
 
 
 def layout_port_ids(obj: EquipmentObject | PointObject) -> set[str]:
     if is_equipment_object(obj):
-        return {obj.id, *equipment_port_ids(obj)}
+        return {obj.id, OBJECT_LINK_HANDLE, *equipment_port_ids(obj)}
     return point_port_ids(obj)
 
 
@@ -315,6 +320,10 @@ class ProjectDocument(BaseModel):
             seen.add(item.id)
         hosts = {item.id: item for item in self.objects if is_layout_object(item)}
         for item in self.objects:
+            if is_calculation_object(item):
+                for link in item.links:
+                    if link.targetObjectId and link.targetObjectId in hosts:
+                        link.targetPortId = OBJECT_LINK_HANDLE
             if not is_point_object(item):
                 continue
             for index, end in enumerate(item.connections):
@@ -323,10 +332,17 @@ class ProjectDocument(BaseModel):
                 host = hosts.get(end.objectId)
                 if host is None:
                     raise ValueError(f"UNKNOWN_ELEMENT: point {item.id} end {end.objectId}")
-                if end.portId not in layout_port_ids(host):
+                if end.portId == OBJECT_LINK_HANDLE or end.portId not in layout_port_ids(host):
                     raise ValueError(f"UNKNOWN_POINT: point {item.id} port {end.portId}")
                 if end.objectId == item.id and end.portId == f"C_{index + 1}":
                     raise ValueError(f"SELF_POINT_LINK: point {item.id} {end.portId}")
+        for edge in self.edges:
+            if is_value_flow_edge(edge):
+                continue
+            if edge.targetObjectId in hosts:
+                edge.targetVariableId = OBJECT_LINK_HANDLE
+            if edge.sourceObjectId in hosts and edge.sourceVariableId not in layout_port_ids(hosts[edge.sourceObjectId]):
+                edge.sourceVariableId = OBJECT_LINK_HANDLE
         return self
 
 
