@@ -208,6 +208,22 @@ def test_point_can_connect_to_another_point() -> None:
     assert point.connections[0].reversed is False  # type: ignore[union-attr]
 
 
+def test_same_point_internal_loop_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="SELF_POINT_LINK"):
+        ProjectDocument(
+            id="ws",
+            name="ws",
+            objects=[
+                PointObject(
+                    id="PT_1",
+                    position=Position(x=0, y=0),
+                    connections=[PointEnd(objectId="PT_1", portId="C_2"), None, None],
+                )
+            ],
+            edges=[],
+        )
+
+
 def test_legacy_equipment_id_migrates_to_object_id() -> None:
     project = ProjectDocument.model_validate(
         {

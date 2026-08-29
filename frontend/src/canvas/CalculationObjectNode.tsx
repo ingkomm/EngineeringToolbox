@@ -12,7 +12,7 @@ import {
   type FormulaCandidate,
 } from "../lib/formulaComplete";
 import { OBJECT_ID_RE, VARIABLE_ID_RE, type WorkspaceEdit } from "../lib/projectEdits";
-import { OBJECT_LINK_HANDLE } from "../lib/worksheet";
+import { OBJECT_LINK_HANDLE, objectLinkSideOf } from "../lib/worksheet";
 import { displayName } from "../lib/variables";
 import type { QuantitySpec } from "../lib/quantities";
 import { RowHandle } from "./RowHandle";
@@ -41,6 +41,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
     ...object.inputs.map((item) => item.id),
     ...object.outputs.map((item) => item.id),
     OBJECT_LINK_HANDLE,
+    objectLinkSideOf(object),
   ].join("|");
 
   useLayoutEffect(() => {
@@ -59,7 +60,17 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
 
   return (
     <article className="calc-node" data-testid={`object-${id}`}>
-      <ObjectLinkHandle nodeId={id} />
+      <ObjectLinkHandle
+        nodeId={id}
+        side={objectLinkSideOf(object)}
+        onToggleSide={() =>
+          onEdit({
+            type: "setObjectLinkSide",
+            objectId: id,
+            side: objectLinkSideOf(object) === "top" ? "bottom" : "top",
+          })
+        }
+      />
       <header className="calc-node__header">
         <span className="calc-node__kicker">Calculation Object</span>
         <ObjectIdField
@@ -354,7 +365,7 @@ export function CalculationObjectNode({ id, data }: NodeProps<CalculationObjectN
           </button>
         </div>
         {(object.links ?? []).length === 0 ? (
-          <p className="calc-empty">상단 노란 점으로 Point / Equipment와 점선 연결합니다</p>
+          <p className="calc-empty">노란 점으로 Point / Equipment와 점선 연결합니다</p>
         ) : null}
         {(object.links ?? []).map((item, index) => {
           return (

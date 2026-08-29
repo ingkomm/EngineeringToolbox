@@ -306,7 +306,8 @@ Object A의 PIN/POUT만 바꾸면 Object A와 B가 갱신된다. 매핑되지 �
 | `object-{id}-add-link` | Node Link 헤더 | `addLink` |
 | `object-{id}-link-{var}-search` | Link 행 | Point / Equipment 객체 검색 후 점선 연결 |
 | `object-{id}-link-{var}-target` | Link 행 | 연결된 Point/Equipment 표시 |
-| `object-{id}-obj` | 객체 상단 | 객체 간 Link 핸들 (`id=OBJ`) |
+| `object-{id}-obj` | 객체 상/하단 | 객체 간 Link 핸들 (`id=OBJ`) |
+| `object-{id}-obj-side` | 노란 점 옆 | 상단/하단 위치 토글 |
 | `edge-{id}-toggle` | 커넥터 | On/Off |
 | `edge-{id}-collapse` | 커넥터 | 무선 링크로 접기 |
 | `edge-arrlink:{pointId}:{end}-direction` | Point 연결선 | 화살표 방향 토글 |
@@ -333,7 +334,7 @@ Equipment와 Point는 Calculation Object와 **같은 공용 워크시트**에 �
 
 - Equipment: 범용 심볼. In/Out 포트 개수를 지정한다. 포트 ID는 `IN_1`… / `OUT_1`…
 - Point: 원형 노드. 배관 연결 점은 좌·우·아래 3개(`C_1`/`C_2`/`C_3`)로 고정한다. Equipment In/Out 또는 다른 Point에 드래그로 붙인다. 연결선은 꺾은선이며 화살표 방향은 토글한다.
-- Calculation Object Link: 각 객체 상단의 `OBJ` 점에만 붙는 점선 association. 값은 흐르지 않는다.
+- Calculation Object Link: 각 객체의 노란 `OBJ` 점에만 붙는 점선 association. 위치는 상단/하단을 고른다. 객체당 하나이며 더블클릭으로 지운다. 값은 흐르지 않는다.
 - Valve, Pipe, Signal, Annotation은 이 단계에 없다
 
 역할 분리:

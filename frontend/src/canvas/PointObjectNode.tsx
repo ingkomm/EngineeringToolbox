@@ -2,7 +2,7 @@ import { Handle, Position, type Node, type NodeProps, useUpdateNodeInternals } f
 import { useLayoutEffect, type KeyboardEvent } from "react";
 import type { PointObject } from "../types/contract";
 import { OBJECT_ID_RE, type WorkspaceEdit } from "../lib/projectEdits";
-import { POINT_CONNECTION_IDS, pointConnectionSide } from "../lib/worksheet";
+import { POINT_CONNECTION_IDS, objectLinkSideOf, pointConnectionSide } from "../lib/worksheet";
 import { ObjectLinkHandle } from "./ObjectLinkHandle";
 
 export type PointObjectNodeType = Node<
@@ -25,15 +25,26 @@ const SIDE_POSITION: Record<"left" | "right" | "bottom", Position> = {
 
 export function PointObjectNode({ id, selected, data }: NodeProps<PointObjectNodeType>) {
   const { object, onEdit } = data;
+  const side = objectLinkSideOf(object);
   const updateNodeInternals = useUpdateNodeInternals();
 
   useLayoutEffect(() => {
     updateNodeInternals(id);
-  }, [id, updateNodeInternals]);
+  }, [id, side, updateNodeInternals]);
 
   return (
     <article className={`ws-point ${selected ? "ws-point--selected" : ""}`} data-testid={`object-${id}`}>
-      <ObjectLinkHandle nodeId={id} />
+      <ObjectLinkHandle
+        nodeId={id}
+        side={side}
+        onToggleSide={() =>
+          onEdit({
+            type: "setObjectLinkSide",
+            objectId: id,
+            side: side === "top" ? "bottom" : "top",
+          })
+        }
+      />
       {POINT_CONNECTION_IDS.map((endId, index) => (
         <Handle
           key={endId}

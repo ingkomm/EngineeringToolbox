@@ -42,6 +42,7 @@ export function ArrangementLinkEdge({
             transform: `translate(-50%, -140%) translate(${labelX}px, ${labelY}px)`,
             pointerEvents: "all",
           }}
+          onDoubleClick={(event) => event.stopPropagation()}
         >
           <button
             type="button"

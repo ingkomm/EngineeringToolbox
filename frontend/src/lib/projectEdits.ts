@@ -21,6 +21,7 @@ import {
 } from "./variables";
 import {
   OBJECT_LINK_HANDLE,
+  canConnectObjectLink,
   clampConnectionCount,
   isCalculationObject,
   isEquipmentObject,
@@ -88,6 +89,7 @@ export type WorkspaceEdit =
       patch: { id?: string; name?: string; connectionCount?: number };
     }
   | { type: "setEquipmentPorts"; objectId: string; inCount?: number; outCount?: number }
+  | { type: "setObjectLinkSide"; objectId: string; side: "top" | "bottom" }
   | {
       type: "connectPointEnd";
       pointId: string;
@@ -927,6 +929,8 @@ export function applyWorkspaceEdit(
       return updateWorksheetPoint(project, edit.objectId, edit.patch);
     case "setEquipmentPorts":
       return setEquipmentPorts(project, edit.objectId, edit.inCount, edit.outCount);
+    case "setObjectLinkSide":
+      return setObjectLinkSide(project, edit.objectId, edit.side);
     case "connectPointEnd":
       return connectPointEnd(
         project,
@@ -1049,6 +1053,25 @@ function setEquipmentPorts(
   };
 }
 
+function setObjectLinkSide(
+  project: ProjectDocument,
+  objectId: string,
+  side: "top" | "bottom",
+): EditResult {
+  if (side !== "top" && side !== "bottom") return noEval(project);
+  if (!project.objects.some((item) => item.id === objectId)) return noEval(project);
+  return {
+    project: {
+      ...project,
+      objects: project.objects.map((item) =>
+        item.id === objectId ? { ...item, objectLinkSide: side } : item,
+      ),
+    },
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
 function connectPointEnd(
   project: ProjectDocument,
   pointId: string,
@@ -1063,17 +1086,13 @@ function connectPointEnd(
   if (index == null || index >= point.connectionCount) return noEval(project);
   let nextEnd: PointEnd | null = null;
   if (targetObjectId && targetPortId) {
-    if (targetObjectId === pointId && targetPortId === `C_${index + 1}`) return noEval(project);
+    if (targetObjectId === pointId) return noEval(project);
     const host = project.objects.find((item) => item.id === targetObjectId);
     if (!host || !isLayoutObject(host) || !layoutPortExists(host, targetPortId)) return noEval(project);
     nextEnd = { objectId: targetObjectId, portId: targetPortId, reversed: reversed === true };
   }
   const connections = [...point.connections];
   connections[index] = nextEnd;
-  if (targetObjectId === pointId && targetPortId) {
-    const targetIndex = parsePointConnectionEnd(targetPortId);
-    if (targetIndex != null && targetIndex !== index) connections[targetIndex] = null;
-  }
   const nextPoint: PointObject = normalizePointObject({ ...point, connections });
   return {
     project: {
@@ -1204,6 +1223,9 @@ function connectObjectLink(
   let resolvedId = linkId;
   const object = next.objects.find((item) => item.id === objectId);
   if (!object || !isCalculationObject(object)) return noEval(project);
+  if (targetObjectId && !canConnectObjectLink(next, objectId, targetObjectId, resolvedId)) {
+    return noEval(project);
+  }
   if (!resolvedId) {
     const empty = (object.links ?? []).find((item) => !item.targetObjectId);
     if (empty) {
@@ -1233,6 +1255,7 @@ function connectCalculationLink(
   if (targetObjectId) {
     const host = project.objects.find((item) => item.id === targetObjectId);
     if (!host || !isLayoutObject(host)) return noEval(project);
+    if (!canConnectObjectLink(project, objectId, targetObjectId, linkId)) return noEval(project);
   }
   const nextPort = targetObjectId ? OBJECT_LINK_HANDLE : null;
   const next = patchObject(project, objectId, (item) => ({

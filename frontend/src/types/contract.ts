@@ -5,6 +5,7 @@
 
 export type VariableStatus = "idle" | "ok" | "mapped" | "error";
 export type RelationType = "value_flow" | "reference" | "association";
+export type ObjectLinkSide = "top" | "bottom";
 
 export interface InputVariable {
   id: string;
@@ -54,6 +55,7 @@ export interface CalculationObject {
   calculations: FormulaVariable[];
   outputs: OutputBinding[];
   links?: CalculationLink[];
+  objectLinkSide?: ObjectLinkSide;
 }
 
 export interface PointEnd {
@@ -71,6 +73,7 @@ export interface EquipmentObject {
   symbolId: string;
   inCount: number;
   outCount: number;
+  objectLinkSide?: ObjectLinkSide;
 }
 
 export interface PointObject {
@@ -80,6 +83,7 @@ export interface PointObject {
   position: { x: number; y: number };
   connectionCount: number;
   connections: Array<PointEnd | null>;
+  objectLinkSide?: ObjectLinkSide;
 }
 
 export type WorksheetObject = CalculationObject | EquipmentObject | PointObject;

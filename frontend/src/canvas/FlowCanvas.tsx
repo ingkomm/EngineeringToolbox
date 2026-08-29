@@ -26,6 +26,7 @@ import type { QuantitySpec } from "../lib/quantities";
 import type { ProjectDocument } from "../types/contract";
 import {
   OBJECT_LINK_HANDLE,
+  canConnectObjectLink,
   isCalculationObject,
   isLayoutObject,
   isLayoutPortId,
@@ -98,7 +99,7 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
   const onConnect = useCallback(
     (connection: Connection) => {
       if (!connection.source || !connection.target) return;
-      if (connection.source === connection.target && connection.sourceHandle === connection.targetHandle) return;
+      if (connection.source === connection.target) return;
       const sourceObject = project.objects.find((item) => item.id === connection.source);
       const targetObject = project.objects.find((item) => item.id === connection.target);
       if (!sourceObject || !targetObject) return;
@@ -111,6 +112,7 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
         if (!isObjectLinkHandle(connection.sourceHandle) || !isObjectLinkHandle(connection.targetHandle)) return;
         const calc = isCalculationObject(sourceObject) ? sourceObject : targetObject;
         const layout = isLayoutObject(sourceObject) ? sourceObject : targetObject;
+        if (!canConnectObjectLink(project, calc.id, layout.id)) return;
         onEdit({
           type: "connectLink",
           objectId: calc.id,
@@ -169,23 +171,30 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
         targetVariableId: target.variableId,
       });
     },
-    [onEdit, project.objects],
+    [onEdit, project],
   );
 
   const isValidConnection = useCallback(
     (connection: Connection | Edge) => {
       if (!connection.source || !connection.target) return false;
-      if (connection.source === connection.target && connection.sourceHandle === connection.targetHandle) return false;
+      if (connection.source === connection.target) return false;
       const sourceObject = project.objects.find((item) => item.id === connection.source);
       const targetObject = project.objects.find((item) => item.id === connection.target);
       if (!sourceObject || !targetObject) return false;
 
       if (isObjectLinkHandle(connection.sourceHandle) || isObjectLinkHandle(connection.targetHandle)) {
         if (!isObjectLinkHandle(connection.sourceHandle) || !isObjectLinkHandle(connection.targetHandle)) return false;
-        return (
-          (isCalculationObject(sourceObject) && isLayoutObject(targetObject)) ||
-          (isLayoutObject(sourceObject) && isCalculationObject(targetObject))
-        );
+        if (
+          !(
+            (isCalculationObject(sourceObject) && isLayoutObject(targetObject)) ||
+            (isLayoutObject(sourceObject) && isCalculationObject(targetObject))
+          )
+        ) {
+          return false;
+        }
+        const calc = isCalculationObject(sourceObject) ? sourceObject : targetObject;
+        const layout = isLayoutObject(sourceObject) ? sourceObject : targetObject;
+        return canConnectObjectLink(project, calc.id, layout.id);
       }
       if (isPointObject(sourceObject) && isLayoutObject(targetObject)) {
         return isLayoutPortHandle(connection.sourceHandle) && Boolean(connection.targetHandle);
@@ -230,6 +239,9 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
       connectionLineType={ConnectionLineType.SmoothStep}
       connectionMode={ConnectionMode.Loose}
       onInit={onInit}
+      onEdgeDoubleClick={(_event, edge) => {
+        onEdit({ type: "deleteEdges", edgeIds: [edge.id] });
+      }}
       onNodeDragStop={(_event, node) => {
         onProjectChange({
           ...project,

@@ -2,6 +2,7 @@ import type { MappingEdge, ProjectDocument, WorksheetObject } from "../types/con
 import { displayName } from "./variables";
 import {
   OBJECT_LINK_HANDLE,
+  canConnectObjectLink,
   isCalculationObject,
   isLayoutObject,
   isPointObject,
@@ -131,13 +132,14 @@ export function searchLayoutTargets(
   for (const object of project.objects) {
     if (!isLayoutObject(object) || !matchesObjectQuery(object, query)) continue;
     const connected = outbound != null && outbound.targetObjectId === object.id;
+    const occupied = !connected && !canConnectObjectLink(project, selfObjectId, object.id, selfVariableId);
     hits.push({
       objectId: object.id,
       objectName: object.name,
       variableId: OBJECT_LINK_HANDLE,
       variableName: displayName(object),
       kind: isPointObject(object) ? "point" : "equipment",
-      status: connected ? "connected" : "available",
+      status: connected ? "connected" : occupied ? "occupied" : "available",
       edgeId: connected ? outbound?.id : undefined,
       relationType: "association",
     });

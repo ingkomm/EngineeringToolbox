@@ -261,7 +261,8 @@ export function App() {
             <p className="side-pane__hint">
               Calculation Object, Equipment, Point를 같은 워크시트에 둡니다. Equipment와 Point는 계통 배치만
               기록하며 계산하지 않습니다. Point는 좌·우·아래 세 점으로 Equipment 또는 다른 Point에 연결하고,
-              선 위의 방향으로 화살표를 뒤집습니다. 객체 간 Link는 각 객체 상단의 노란 점에 점선으로 붙습니다.
+              선 위의 방향으로 화살표를 뒤집습니다. 객체 간 Link는 각 객체의 노란 점에 점선으로 붙고, 상/하단을
+              고를 수 있습니다. 링크를 더블클릭하면 삭제됩니다.
             </p>
             <button
               className="ghost-btn"

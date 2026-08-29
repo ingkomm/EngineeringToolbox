@@ -4,9 +4,12 @@ import type {
   PointObject,
   CalculationObject,
   MappingEdge,
+  ObjectLinkSide,
   ProjectDocument,
   WorksheetObject,
 } from "../types/contract";
+
+export type { ObjectLinkSide };
 
 export function isCalculationObject(object: WorksheetObject): object is CalculationObject {
   return object.kind !== "equipment" && object.kind !== "point";
@@ -30,6 +33,48 @@ export function isValueFlowEdge(edge: MappingEdge): boolean {
 
 /** Object-to-object association (Calculation ↔ Equipment/Point) attaches here. */
 export const OBJECT_LINK_HANDLE = "OBJ";
+
+export function objectLinkSideOf(object: { objectLinkSide?: ObjectLinkSide | null }): ObjectLinkSide {
+  return object.objectLinkSide === "bottom" ? "bottom" : "top";
+}
+
+export function isObjectLinkHandle(portId: string | null | undefined): boolean {
+  return portId === OBJECT_LINK_HANDLE;
+}
+
+export function connectedObjectLinks(project: ProjectDocument): Array<{
+  calcId: string;
+  linkId: string;
+  layoutId: string;
+}> {
+  const links: Array<{ calcId: string; linkId: string; layoutId: string }> = [];
+  for (const object of project.objects) {
+    if (!isCalculationObject(object)) continue;
+    for (const link of object.links ?? []) {
+      if (link.targetObjectId) {
+        links.push({ calcId: object.id, linkId: link.id, layoutId: link.targetObjectId });
+      }
+    }
+  }
+  return links;
+}
+
+/** One yellow object-link per calculation and per layout object. */
+export function canConnectObjectLink(
+  project: ProjectDocument,
+  calcId: string,
+  layoutId: string,
+  linkId?: string | null,
+): boolean {
+  if (!layoutId || calcId === layoutId) return false;
+  const layout = project.objects.find((item) => item.id === layoutId);
+  if (!layout || !isLayoutObject(layout)) return false;
+  for (const item of connectedObjectLinks(project)) {
+    if (linkId && item.calcId === calcId && item.linkId === linkId) continue;
+    if (item.calcId === calcId || item.layoutId === layoutId) return false;
+  }
+  return true;
+}
 
 /** Fixed Point piping ends: left, right, bottom. */
 export const POINT_CONNECTION_IDS = ["C_1", "C_2", "C_3"] as const;
@@ -56,10 +101,6 @@ export function parsePointConnectionEnd(end: string): number | null {
   if (end === "b") return 1;
   const index = POINT_CONNECTION_IDS.indexOf(end as (typeof POINT_CONNECTION_IDS)[number]);
   return index >= 0 ? index : null;
-}
-
-export function isObjectLinkHandle(portId: string | null | undefined): boolean {
-  return portId === OBJECT_LINK_HANDLE;
 }
 
 export function equipmentPortIds(equipment: Pick<EquipmentObject, "inCount" | "outCount">): { ins: string[]; outs: string[] } {
@@ -108,6 +149,7 @@ export function normalizePointObject(point: {
   connections?: Array<PointEnd | null>;
   a?: PointEnd | null;
   b?: PointEnd | null;
+  objectLinkSide?: ObjectLinkSide | null;
 }): PointObject {
   const fromLegacy = point.connections ?? [point.a ?? null, point.b ?? null];
   return {
@@ -117,6 +159,7 @@ export function normalizePointObject(point: {
     position: point.position ?? { x: 80, y: 420 },
     connectionCount: POINT_CONNECTION_COUNT,
     connections: POINT_CONNECTION_IDS.map((_, index) => normalizePointEnd(fromLegacy[index] ?? null)),
+    objectLinkSide: point.objectLinkSide === "bottom" ? "bottom" : "top",
   };
 }
 

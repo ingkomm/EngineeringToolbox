@@ -2,7 +2,7 @@ import { Handle, Position, type Node, type NodeProps, useUpdateNodeInternals } f
 import { useLayoutEffect, type KeyboardEvent } from "react";
 import type { EquipmentObject } from "../types/contract";
 import { OBJECT_ID_RE, type WorkspaceEdit } from "../lib/projectEdits";
-import { equipmentPortIds } from "../lib/worksheet";
+import { equipmentPortIds, objectLinkSideOf } from "../lib/worksheet";
 import { ArrangementSymbol } from "./arrangementSymbols";
 import { ObjectLinkHandle } from "./ObjectLinkHandle";
 
@@ -22,7 +22,7 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
   const { object, onEdit } = data;
   const ports = equipmentPortIds(object);
   const updateNodeInternals = useUpdateNodeInternals();
-  const handleSignature = `${object.inCount}:${object.outCount}`;
+  const handleSignature = `${object.inCount}:${object.outCount}:${objectLinkSideOf(object)}`;
 
   useLayoutEffect(() => {
     updateNodeInternals(id);
@@ -30,7 +30,17 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
 
   return (
     <article className={`ws-eq ${selected ? "ws-eq--selected" : ""}`} data-testid={`object-${id}`}>
-      <ObjectLinkHandle nodeId={id} />
+      <ObjectLinkHandle
+        nodeId={id}
+        side={objectLinkSideOf(object)}
+        onToggleSide={() =>
+          onEdit({
+            type: "setObjectLinkSide",
+            objectId: id,
+            side: objectLinkSideOf(object) === "top" ? "bottom" : "top",
+          })
+        }
+      />
       <header className="ws-eq__header">
         <input
           className="calc-node__id nodrag"

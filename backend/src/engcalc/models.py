@@ -89,6 +89,7 @@ class CalculationObject(BaseModel):
     calculations: list[FormulaVariable] = Field(default_factory=list)
     outputs: list[OutputBinding] = Field(default_factory=list)
     links: list[CalculationLink] = Field(default_factory=list)
+    objectLinkSide: Literal["top", "bottom"] = "top"
 
 
 class CalculationLink(BaseModel):
@@ -141,6 +142,7 @@ class EquipmentObject(BaseModel):
     symbolId: str = "generic-equipment"
     inCount: int = Field(default=1, ge=0, le=8)
     outCount: int = Field(default=1, ge=0, le=8)
+    objectLinkSide: Literal["top", "bottom"] = "top"
 
     @model_validator(mode="after")
     def default_name(self) -> EquipmentObject:
@@ -158,6 +160,7 @@ class PointObject(BaseModel):
     position: Position
     connectionCount: int = Field(default=3, ge=2, le=4)
     connections: list[PointEnd | None] = Field(default_factory=list)
+    objectLinkSide: Literal["top", "bottom"] = "top"
 
     @model_validator(mode="before")
     @classmethod
@@ -334,7 +337,7 @@ class ProjectDocument(BaseModel):
                     raise ValueError(f"UNKNOWN_ELEMENT: point {item.id} end {end.objectId}")
                 if end.portId == OBJECT_LINK_HANDLE or end.portId not in layout_port_ids(host):
                     raise ValueError(f"UNKNOWN_POINT: point {item.id} port {end.portId}")
-                if end.objectId == item.id and end.portId == f"C_{index + 1}":
+                if end.objectId == item.id:
                     raise ValueError(f"SELF_POINT_LINK: point {item.id} {end.portId}")
         for edge in self.edges:
             if is_value_flow_edge(edge):

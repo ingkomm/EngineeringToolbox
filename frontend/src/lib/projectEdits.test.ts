@@ -569,6 +569,20 @@ describe("worksheet equipment and points", () => {
     });
   });
 
+  it("rejects a loop inside the same point", () => {
+    const project = applyAll([
+      { type: "addPoint" },
+      {
+        type: "connectPointEnd",
+        pointId: "PT_1",
+        end: "C_1",
+        targetObjectId: "PT_1",
+        targetPortId: "C_2",
+      },
+    ]);
+    expect(project.objects.find(isPointObject)?.connections).toEqual([null, null, null]);
+  });
+
   it("adds a dashed calculation link to a point or equipment object", () => {
     let project = applyAll([{ type: "addPoint" }, { type: "addEquipment" }, { type: "addLink", objectId: "obj_1" }]);
     expect(calc(project).links?.[0]).toMatchObject({ id: "LINK_1", targetObjectId: null });
@@ -599,5 +613,59 @@ describe("worksheet equipment and points", () => {
     expect(project.edges).toHaveLength(1);
     expect(project.edges[0]?.targetObjectId).toBe("EQ_1");
     expect(project.edges[0]?.targetVariableId).toBe("OBJ");
+  });
+
+  it("does not create a second yellow object link while one already exists", () => {
+    let project = applyAll([{ type: "addPoint" }, { type: "addEquipment" }, { type: "addObject" }]);
+    project = applyWorkspaceEdit(
+      project,
+      { type: "connectLink", objectId: "obj_1", targetObjectId: "PT_1" },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(calc(project).links).toHaveLength(1);
+
+    const afterSecond = applyWorkspaceEdit(
+      project,
+      { type: "connectLink", objectId: "obj_1", targetObjectId: "EQ_1" },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(calc(afterSecond).links).toHaveLength(1);
+    expect(calc(afterSecond).links?.[0]?.targetObjectId).toBe("PT_1");
+    expect(afterSecond.edges).toHaveLength(1);
+
+    const afterOtherCalc = applyWorkspaceEdit(
+      afterSecond,
+      { type: "connectLink", objectId: "obj_2", targetObjectId: "PT_1" },
+      FALLBACK_QUANTITIES,
+    ).project;
+    const other = afterOtherCalc.objects.find((item) => item.id === "obj_2");
+    expect(other && isCalculationObject(other) ? other.links ?? [] : undefined).toEqual([]);
+    expect(afterOtherCalc.edges).toHaveLength(1);
+  });
+
+  it("moves the yellow object-link handle between top and bottom", () => {
+    let project = applyAll([{ type: "addPoint" }]);
+    expect(calc(project).objectLinkSide).toBeUndefined();
+    project = applyWorkspaceEdit(
+      project,
+      { type: "setObjectLinkSide", objectId: "obj_1", side: "bottom" },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(calc(project).objectLinkSide).toBe("bottom");
+    project = applyWorkspaceEdit(
+      project,
+      { type: "setObjectLinkSide", objectId: "PT_1", side: "bottom" },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(project.objects.find(isPointObject)?.objectLinkSide).toBe("bottom");
+  });
+
+  it("deletes a yellow object link", () => {
+    let project = applyAll([{ type: "addPoint" }, { type: "connectLink", objectId: "obj_1", targetObjectId: "PT_1" }]);
+    const edgeId = project.edges[0]?.id;
+    expect(edgeId).toBeTruthy();
+    project = applyWorkspaceEdit(project, { type: "deleteEdges", edgeIds: [edgeId!] }, FALLBACK_QUANTITIES).project;
+    expect(project.edges).toHaveLength(0);
+    expect(calc(project).links?.[0]?.targetObjectId).toBeNull();
   });
 });
