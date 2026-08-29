@@ -58,8 +58,6 @@ export function ArrangementObjectNode({ id, data }: NodeProps<ArrangementObjectN
     updateNodeInternals(id);
   }, [id, pointSignature, object.view.elements, updateNodeInternals]);
 
-  const selectedPoint = object.domain.points.find((item) => item.id === selectedId);
-
   const placed = useMemo(() => {
     return [
       ...object.domain.equipment.map((item) => ({ ...item, kind: "equipment" as const })),
@@ -369,40 +367,44 @@ export function ArrangementObjectNode({ id, data }: NodeProps<ArrangementObjectN
         })}
       </div>
 
-      {selectedPoint ? (
-        <div className="arr-inspector nodrag nopan">
-          <span>Point</span>
-          <input
-            className="calc-node__id nodrag"
-            key={`${selectedPoint.id}-id`}
-            defaultValue={selectedPoint.id}
-            data-testid={`object-${id}-point-${selectedPoint.id}-id`}
-            onKeyDown={stopKeys}
-            onBlur={(event) => {
-              const nextId = event.target.value.trim();
-              if (!VARIABLE_ID_RE.test(nextId) || nextId === selectedPoint.id) {
-                event.target.value = selectedPoint.id;
-                return;
-              }
-              onEdit({ type: "updatePoint", objectId: id, pointId: selectedPoint.id, patch: { id: nextId } });
-              setSelectedId(nextId);
-            }}
-          />
-          <input
-            className="calc-row__name-input nodrag"
-            key={`${selectedPoint.id}-name`}
-            defaultValue={selectedPoint.name}
-            data-testid={`object-${id}-point-${selectedPoint.id}-name`}
-            onKeyDown={stopKeys}
-            onBlur={(event) => {
-              const name = event.target.value.trim();
-              if (!name || name === selectedPoint.name) {
-                event.target.value = selectedPoint.name;
-                return;
-              }
-              onEdit({ type: "updatePoint", objectId: id, pointId: selectedPoint.id, patch: { name } });
-            }}
-          />
+      {object.domain.points.length > 0 ? (
+        <div className="arr-inspector nodrag nopan" data-testid={`object-${id}-points`}>
+          {object.domain.points.map((point) => (
+            <div className="arr-inspector__row" key={point.id}>
+              <span>Point</span>
+              <input
+                className="calc-node__id nodrag"
+                defaultValue={point.id}
+                data-testid={`object-${id}-point-${point.id}-id`}
+                onKeyDown={stopKeys}
+                onFocus={() => setSelectedId(point.id)}
+                onBlur={(event) => {
+                  const nextId = event.target.value.trim();
+                  if (!VARIABLE_ID_RE.test(nextId) || nextId === point.id) {
+                    event.target.value = point.id;
+                    return;
+                  }
+                  onEdit({ type: "updatePoint", objectId: id, pointId: point.id, patch: { id: nextId } });
+                  setSelectedId(nextId);
+                }}
+              />
+              <input
+                className="calc-row__name-input nodrag"
+                defaultValue={point.name}
+                data-testid={`object-${id}-point-${point.id}-name`}
+                onKeyDown={stopKeys}
+                onFocus={() => setSelectedId(point.id)}
+                onBlur={(event) => {
+                  const name = event.target.value.trim();
+                  if (!name || name === point.name) {
+                    event.target.value = point.name;
+                    return;
+                  }
+                  onEdit({ type: "updatePoint", objectId: id, pointId: point.id, patch: { name } });
+                }}
+              />
+            </div>
+          ))}
         </div>
       ) : (
         <p className="arr-inspector arr-inspector--hint nodrag">Equipment를 선택한 뒤 Point를 추가하거나, 빈 공간 Point를 배치하세요. 계산은 수행하지 않습니다.</p>
