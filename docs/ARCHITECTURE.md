@@ -290,7 +290,7 @@ Object A의 PIN/POUT만 바꾸면 Object A와 B가 갱신된다. 매핑되지 �
 | `btn-load-example` | 우측 사이드바 | `loadExample` |
 | `object-{id}-id` | Node 헤더 | Object ID, blur로 commit. 전역 유일. 기본 숨김, hover/선택 시 표시 |
 | `object-{id}-name` | Node 헤더 | Object 이름, blur로 commit. 전역 유일 |
-| `object-{id}-expand` | Calculation 헤더 | compact/expanded 토글. 선택해도 Input/Calculation/Output/Link가 펼쳐짐 |
+| `object-{id}-expand` | Calculation 헤더 | compact/expanded 토글. 클릭 선택만으로는 펼치지 않음 |
 | `object-{id}-add-input` | Node Input 헤더 | `addInput` |
 | `object-{id}-add-calc` | Node Calculation 헤더 | `addCalculation` |
 | `object-{id}-add-output` | Node Output 헤더 | `addOutput` |
@@ -332,6 +332,12 @@ Arrangement:
 ## 10. Equipment and Point
 
 Equipment와 Point는 Calculation Object와 **같은 공용 워크시트**에 놓인다. 별도의 Arrangement 창/노드로 감싸지 않는다. 내부에서 공학 계산을 하지 않는다.
+
+Arrangement 기본 화면은 P&ID 도면이다. Equipment는 SVG 심볼과 Tag만 보이고, Point는 작은 연결점이다. ID/입력창/삭제 버튼은 더블클릭 팝오버나 선택 툴바에 둔다. Calculation Object는 기존 카드 UI를 유지하며, 펼치기 버튼으로만 Input/Calculation/Output/Link를 연다.
+
+심볼은 `frontend/src/canvas/symbols/registry.tsx`에 등록한다. `symbolId`를 키로 Generic / Pump / Fan-Compressor / Heat Exchanger / Tank / Turbine / Valve를 고른다. 알 수 없는 `symbolId`는 Generic으로 그린다.
+
+선택 필드(`tag`, `rotation`, `width`, `height`, `linkKind`, `showArrow`, `waypoints`)는 없어도 예전 JSON을 로드한다. Pipe/Signal은 `Point.connections`에만 있고, Calculation 값 연결(`value_flow`)과 섞지 않는다.
 
 이 프로토타입 범위:
 

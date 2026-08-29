@@ -123,11 +123,18 @@ export function normalizePointEnd(end: {
   equipmentId?: string;
   portId?: string;
   reversed?: boolean;
+  linkKind?: "pipe" | "signal";
+  showArrow?: boolean;
+  waypoints?: Array<{ x: number; y: number }>;
 } | null | undefined): PointEnd | null {
   if (!end) return null;
   const objectId = end.objectId ?? end.equipmentId;
   if (!objectId || !end.portId) return null;
-  return { objectId, portId: end.portId, reversed: end.reversed === true };
+  const next: PointEnd = { objectId, portId: end.portId, reversed: end.reversed === true };
+  if (end.linkKind === "signal" || end.linkKind === "pipe") next.linkKind = end.linkKind;
+  if (end.showArrow === true) next.showArrow = true;
+  if (end.waypoints?.length) next.waypoints = end.waypoints;
+  return next;
 }
 
 export function layoutPortExists(object: WorksheetObject, portId: string): boolean {

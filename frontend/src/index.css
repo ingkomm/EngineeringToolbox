@@ -1360,3 +1360,266 @@ label.ghost-btn {
   background: var(--accent) !important;
   border-color: var(--accent) !important;
 }
+
+.react-flow__node-equipmentObject,
+.react-flow__node-pointObject {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0;
+}
+
+.pid-eq {
+  position: relative;
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
+  color: #c5d4e8;
+  overflow: visible;
+}
+
+.pid-eq.is-selected {
+  border: 1px solid var(--accent);
+}
+
+.pid-eq__symbol {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+}
+
+.pid-symbol-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.pid-eq__tag {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: #d7e3f2;
+  pointer-events: none;
+}
+
+.pid-pt {
+  width: 22px;
+  height: 22px;
+  position: relative;
+  background: transparent;
+  border: 0;
+  overflow: visible;
+}
+
+.pid-pt__dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid #9aa8b8;
+  background: transparent;
+  transform: translate(-50%, -50%);
+}
+
+.pid-pt__dot.is-on,
+.pid-pt.is-linked .pid-pt__dot {
+  background: #9aa8b8;
+}
+
+.pid-pt.is-selected .pid-pt__dot,
+.pid-pt.is-hot .pid-pt__dot {
+  box-shadow: 0 0 0 3px rgba(62, 207, 142, 0.28);
+}
+
+.pid-pt__id {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 4px);
+  transform: translateX(-50%);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 9px;
+  color: var(--muted);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.pid-port {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px;
+  opacity: 0;
+  pointer-events: all;
+  border-radius: 50% !important;
+  background: #0b1220 !important;
+  border: 1px solid #7f93a8 !important;
+}
+
+.pid-port.is-visible,
+.pid-eq.is-hot .pid-port,
+.pid-pt.is-hot .pid-port {
+  opacity: 1;
+}
+
+.pid-port__label {
+  display: none;
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  transform: translateY(-50%);
+  font-size: 8px;
+  color: #9ec0df;
+  white-space: nowrap;
+}
+
+.pid-eq.is-hot .pid-port__label,
+.pid-eq.is-selected .pid-port__label {
+  display: block;
+}
+
+.obj-link-handle {
+  opacity: 0;
+}
+
+.obj-link-handle.is-visible,
+.ws-node:hover .obj-link-handle,
+.ws-node.is-selected .obj-link-handle {
+  opacity: 1;
+}
+
+.pid-pop {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 0;
+  z-index: 20;
+  width: 220px;
+  padding: 8px;
+  background: #101826;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 6px;
+}
+
+.pid-pop header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+}
+
+.pid-pop label {
+  display: grid;
+  gap: 2px;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.pid-pop__input {
+  width: 100%;
+  height: 24px;
+  border: 1px solid var(--line);
+  background: var(--input);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 0 6px;
+  font-size: 11px;
+}
+
+.pid-pop__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.pid-pop__link {
+  display: grid;
+  gap: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+  font-size: 10px;
+}
+
+.pid-pop__check {
+  display: flex !important;
+  align-items: center;
+  gap: 6px;
+}
+
+.pid-symbol-bar {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.pid-symbol-btn {
+  width: 36px;
+  height: 28px;
+  padding: 2px;
+  color: #c5d4e8;
+}
+
+.pid-symbol-btn .pid-symbol-svg {
+  display: block;
+}
+
+.pid-selection-bar,
+.canvas-panel--pid {
+  flex-wrap: wrap;
+}
+
+.pid-menu {
+  position: fixed;
+  z-index: 40;
+  min-width: 120px;
+  padding: 4px;
+  background: #101826;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  display: grid;
+}
+
+.pid-menu button {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.pid-menu button:hover {
+  background: #16324a;
+}
+
+.pid-waypoint {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid #d7e3f2;
+  background: #101826;
+  pointer-events: all;
+}
+
+.react-flow__edge.arr-point-link--pipe .react-flow__edge-path,
+.arr-point-link--pipe {
+  stroke: #7f93a8;
+  stroke-width: 2.2;
+}
+
+.react-flow__edge.arr-point-link--signal .react-flow__edge-path,
+.arr-point-link--signal {
+  stroke: #9aa8b8;
+  stroke-width: 1.3;
+  stroke-dasharray: 5 4;
+}
+
+.react-flow__resize-control {
+  border-color: var(--accent) !important;
+}

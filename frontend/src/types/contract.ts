@@ -6,6 +6,8 @@
 export type VariableStatus = "idle" | "ok" | "mapped" | "error";
 export type RelationType = "value_flow" | "reference" | "association";
 export type ObjectLinkSide = "top" | "bottom";
+export type ArrangementLinkKind = "pipe" | "signal";
+export type EquipmentRotation = 0 | 90 | 180 | 270;
 
 export interface InputVariable {
   id: string;
@@ -63,6 +65,9 @@ export interface PointEnd {
   portId: string;
   reversed?: boolean;
   equipmentId?: string;
+  linkKind?: ArrangementLinkKind;
+  showArrow?: boolean;
+  waypoints?: Array<{ x: number; y: number }>;
 }
 
 export interface EquipmentObject {
@@ -74,6 +79,10 @@ export interface EquipmentObject {
   inCount: number;
   outCount: number;
   objectLinkSide?: ObjectLinkSide;
+  tag?: string;
+  rotation?: EquipmentRotation;
+  width?: number;
+  height?: number;
 }
 
 export interface PointObject {

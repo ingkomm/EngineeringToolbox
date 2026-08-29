@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Background,
   BackgroundVariant,
@@ -7,10 +7,12 @@ import {
   Controls,
   Panel,
   ReactFlow,
+  SelectionMode,
   useEdgesState,
   useNodesState,
   type Connection,
   type Edge,
+  type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -20,8 +22,9 @@ import { EquipmentObjectNode } from "./EquipmentObjectNode";
 import { MappingEdge } from "./MappingEdge";
 import { PointObjectNode } from "./PointObjectNode";
 import { mergeFlowNodes, toFlowEdges, toFlowNodeRecords } from "./flowModel";
+import { SYMBOL_REGISTRY } from "./symbols/registry";
 import { parseHandleId } from "../lib/display";
-import type { WorkspaceEdit } from "../lib/projectEdits";
+import { type WorkspaceEdit } from "../lib/projectEdits";
 import type { QuantitySpec } from "../lib/quantities";
 import type { ProjectDocument } from "../types/contract";
 import {
@@ -53,21 +56,19 @@ interface FlowCanvasProps {
   quantities: QuantitySpec[];
   onProjectChange: (project: ProjectDocument) => void;
   onEdit: (edit: WorkspaceEdit) => void;
-}
-
-function toFlowNodes(
-  project: ProjectDocument,
-  quantities: QuantitySpec[],
-  onEdit: (edit: WorkspaceEdit) => void,
-) {
-  return toFlowNodeRecords(project, quantities, onEdit);
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 function isLayoutPortHandle(handleId: string | null | undefined): boolean {
   return isLayoutPortId(handleId);
 }
 
-export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: FlowCanvasProps) {
+function isTypingTarget(target: EventTarget | null) {
+  return target instanceof HTMLElement && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable);
+}
+
+export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUndo, onRedo }: FlowCanvasProps) {
   const onToggle = useCallback((edgeId: string) => {
     onEdit({ type: "toggleEdge", edgeId });
   }, [onEdit]);
@@ -78,17 +79,24 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
     onEdit({ type: "togglePointLink", pointId, end });
   }, [onEdit]);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(toFlowNodes(project, quantities, onEdit));
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(toFlowNodeRecords(project, quantities, onEdit) as Node[]);
   const [edges, setEdges, onEdgesChange] = useEdgesState(
-    toFlowEdges(project, onToggle, onToggleCollapsed, onToggleDirection),
+    toFlowEdges(project, onToggle, onToggleCollapsed, onToggleDirection, onEdit),
   );
+  const [snap, setSnap] = useState(true);
+  const [selectMode, setSelectMode] = useState(false);
+  const [menu, setMenu] = useState<{ x: number; y: number; ids: string[] } | null>(null);
+  const clipboard = useRef<string[]>([]);
   const didFit = useRef(false);
 
   useEffect(() => {
-    const nextNodes = toFlowNodes(project, quantities, onEdit);
-    setNodes((current) => mergeFlowNodes(current, nextNodes));
-    setEdges(toFlowEdges(project, onToggle, onToggleCollapsed, onToggleDirection));
+    const nextNodes = toFlowNodeRecords(project, quantities, onEdit);
+    setNodes((current) => mergeFlowNodes(current, nextNodes as Node[]));
+    setEdges(toFlowEdges(project, onToggle, onToggleCollapsed, onToggleDirection, onEdit));
   }, [onEdit, onToggle, onToggleCollapsed, onToggleDirection, project, quantities, setEdges, setNodes]);
+
+  const selectedIds = nodes.filter((node) => node.selected).map((node) => node.id);
+  const selectedLayoutIds = selectedIds.filter((id) => project.objects.some((item) => item.id === id && isLayoutObject(item)));
 
   const onInit = useCallback((instance: { fitView: (options?: { padding?: number }) => void }) => {
     if (didFit.current) return;
@@ -225,6 +233,32 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
     [project],
   );
 
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) return;
+      const meta = event.metaKey || event.ctrlKey;
+      if (meta && event.key.toLowerCase() === "c") {
+        clipboard.current = selectedIds;
+        return;
+      }
+      if (meta && event.key.toLowerCase() === "v") {
+        if (clipboard.current.length) onEdit({ type: "duplicateObjects", objectIds: clipboard.current });
+        return;
+      }
+      if (meta && event.key.toLowerCase() === "z" && !event.shiftKey) {
+        event.preventDefault();
+        onUndo?.();
+        return;
+      }
+      if ((meta && event.key.toLowerCase() === "y") || (meta && event.shiftKey && event.key.toLowerCase() === "z")) {
+        event.preventDefault();
+        onRedo?.();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onEdit, onRedo, onUndo, selectedIds]);
+
   return (
     <ReactFlow
       nodes={nodes}
@@ -239,14 +273,20 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
       connectionLineType={ConnectionLineType.SmoothStep}
       connectionMode={ConnectionMode.Loose}
       onInit={onInit}
+      onPaneClick={() => setMenu(null)}
+      onNodeContextMenu={(event, node) => {
+        event.preventDefault();
+        setMenu({ x: event.clientX, y: event.clientY, ids: node.selected ? selectedIds : [node.id] });
+      }}
       onEdgeDoubleClick={(_event, edge) => {
         onEdit({ type: "deleteEdges", edgeIds: [edge.id] });
       }}
-      onNodeDragStop={(_event, node) => {
+      onNodeDragStop={(_event, _node, dragged) => {
+        const moved = new Map(dragged.map((node) => [node.id, node.position]));
         onProjectChange({
           ...project,
           objects: project.objects.map((object) =>
-            object.id === node.id ? { ...object, position: node.position } : object,
+            moved.has(object.id) ? { ...object, position: moved.get(object.id)! } : object,
           ),
         });
       }}
@@ -254,11 +294,20 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
       onEdgesDelete={(deleted) => {
         onEdit({ type: "deleteEdges", edgeIds: deleted.map((edge) => edge.id) });
       }}
+      onNodesDelete={(deleted) => {
+        deleted.forEach((node) => onEdit({ type: "deleteObject", objectId: node.id }));
+      }}
+      multiSelectionKeyCode="Shift"
+      selectionOnDrag={selectMode}
+      selectionMode={SelectionMode.Partial}
+      panOnDrag={selectMode ? [1] : true}
+      snapToGrid={snap}
+      snapGrid={[11, 11]}
       proOptions={{ hideAttribution: true }}
     >
       <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} color="#243044" />
       <Controls />
-      <Panel position="top-left" className="canvas-panel">
+      <Panel position="top-left" className="canvas-panel canvas-panel--pid">
         <button
           type="button"
           className="ghost-btn"
@@ -267,6 +316,20 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
         >
           + 객체 추가
         </button>
+        <div className="pid-symbol-bar">
+          {SYMBOL_REGISTRY.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className="ghost-btn pid-symbol-btn"
+              title={item.label}
+              data-testid={`btn-add-equipment-${item.id}`}
+              onClick={() => onEdit({ type: "addEquipment", symbolId: item.id })}
+            >
+              {item.render(item.label)}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           className="ghost-btn"
@@ -283,7 +346,65 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit }: Flo
         >
           + Point
         </button>
+        <button
+          type="button"
+          className={`ghost-btn ${selectMode ? "ghost-btn--on" : ""}`}
+          data-testid="btn-select-mode"
+          onClick={() => setSelectMode((value) => !value)}
+        >
+          영역 선택
+        </button>
+        <button
+          type="button"
+          className={`ghost-btn ${snap ? "ghost-btn--on" : ""}`}
+          data-testid="btn-grid-snap"
+          onClick={() => setSnap((value) => !value)}
+        >
+          Grid snap
+        </button>
       </Panel>
+      {selectedLayoutIds.length > 0 ? (
+        <Panel position="top-center" className="canvas-panel pid-selection-bar">
+          <button type="button" className="ghost-btn" onClick={() => onEdit({ type: "duplicateObjects", objectIds: selectedIds })}>
+            복제
+          </button>
+          <button type="button" className="ghost-btn" onClick={() => onEdit({ type: "rotateEquipment", objectIds: selectedLayoutIds, delta: 90 })}>
+            회전
+          </button>
+          <button type="button" className="ghost-btn" onClick={() => onEdit({ type: "alignObjects", objectIds: selectedLayoutIds, mode: "left" })}>
+            정렬
+          </button>
+          <button type="button" className="ghost-btn" onClick={() => onEdit({ type: "alignObjects", objectIds: selectedLayoutIds, mode: "h-gap" })}>
+            간격
+          </button>
+          <button
+            type="button"
+            className="ghost-btn"
+            onClick={() => selectedIds.forEach((objectId) => onEdit({ type: "deleteObject", objectId }))}
+          >
+            삭제
+          </button>
+        </Panel>
+      ) : null}
+      {menu ? (
+        <div className="pid-menu" style={{ left: menu.x, top: menu.y }}>
+          <button type="button" onClick={() => { onEdit({ type: "duplicateObjects", objectIds: menu.ids }); setMenu(null); }}>
+            복제
+          </button>
+          <button type="button" onClick={() => { onEdit({ type: "rotateEquipment", objectIds: menu.ids, delta: 90 }); setMenu(null); }}>
+            90° 회전
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              menu.ids.forEach((objectId) => onEdit({ type: "deleteObject", objectId }));
+              setMenu(null);
+            }}
+          >
+            삭제
+          </button>
+        </div>
+      ) : null}
     </ReactFlow>
   );
 }

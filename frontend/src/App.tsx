@@ -17,6 +17,8 @@ export function App() {
   const [backendUp, setBackendUp] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("변수와 수식을 직접 정의하세요");
+  const pastRef = useRef<ProjectDocument[]>([]);
+  const futureRef = useRef<ProjectDocument[]>([]);
   const debounceRef = useRef<number | null>(null);
   const busyTimerRef = useRef<number | null>(null);
   const projectRef = useRef(project);
@@ -92,9 +94,16 @@ export function App() {
     };
   }, []);
 
+  const remember = useCallback((previous: ProjectDocument) => {
+    pastRef.current = [...pastRef.current.slice(-79), previous];
+    futureRef.current = [];
+  }, []);
+
   const onEdit = useCallback(
     (edit: WorkspaceEdit) => {
-      const result = applyWorkspaceEdit(projectRef.current, edit, quantities);
+      const previous = projectRef.current;
+      const result = applyWorkspaceEdit(previous, edit, quantities);
+      if (result.project !== previous) remember(previous);
       setProject(result.project);
       if (result.shouldEvaluate) {
         scheduleEvaluate(result.project, result.dirtyObjectIds);
@@ -104,8 +113,30 @@ export function App() {
         setEvaluated([]);
       }
     },
-    [quantities, scheduleEvaluate],
+    [quantities, remember, scheduleEvaluate],
   );
+
+  const onProjectChange = useCallback(
+    (next: ProjectDocument) => {
+      remember(projectRef.current);
+      setProject(next);
+    },
+    [remember],
+  );
+
+  const onUndo = useCallback(() => {
+    const previous = pastRef.current.pop();
+    if (!previous) return;
+    futureRef.current.push(projectRef.current);
+    setProject(previous);
+  }, []);
+
+  const onRedo = useCallback(() => {
+    const next = futureRef.current.pop();
+    if (!next) return;
+    pastRef.current.push(projectRef.current);
+    setProject(next);
+  }, []);
 
   const mappingJson = useMemo(
     () =>
@@ -117,6 +148,9 @@ export function App() {
                 kind: "equipment",
                 id: object.id,
                 name: object.name,
+                tag: object.tag ?? "",
+                symbolId: object.symbolId,
+                rotation: object.rotation ?? 0,
                 position: object.position,
                 inCount: object.inCount,
                 outCount: object.outCount,
@@ -250,8 +284,10 @@ export function App() {
             <FlowCanvas
               project={project}
               quantities={quantities}
-              onProjectChange={setProject}
+              onProjectChange={onProjectChange}
               onEdit={onEdit}
+              onUndo={onUndo}
+              onRedo={onRedo}
             />
           </ReactFlowProvider>
         </section>
@@ -259,10 +295,9 @@ export function App() {
           <section>
             <h2>워크시트</h2>
             <p className="side-pane__hint">
-              Calculation Object, Equipment, Point를 같은 워크시트에 둡니다. Equipment와 Point는 계통 배치만
-              기록하며 계산하지 않습니다. Point는 좌·우·아래 세 점으로 Equipment 또는 다른 Point에 연결하고,
-              선 위의 방향으로 화살표를 뒤집습니다. 객체 간 Link는 각 객체의 노란 점에 점선으로 붙고, 상/하단을
-              고를 수 있습니다. 링크를 더블클릭하면 삭제됩니다.
+              Calculation Object는 카드 UI를 유지합니다. Equipment와 Point는 P&ID 도면 심볼이며 계산하지
+              않습니다. Equipment는 더블클릭으로 Tag/속성을 편집하고, Point는 작은 연결점입니다. Pipe/Signal은
+              Point 연결이며 값 연동(value flow)과 섞이지 않습니다.
             </p>
             <button
               className="ghost-btn"

@@ -117,6 +117,9 @@ class PointEnd(BaseModel):
     objectId: str
     portId: str
     reversed: bool = False
+    linkKind: Literal["pipe", "signal"] = "pipe"
+    showArrow: bool = False
+    waypoints: list[Position] = Field(default_factory=list)
 
     @model_validator(mode="before")
     @classmethod
@@ -143,6 +146,10 @@ class EquipmentObject(BaseModel):
     inCount: int = Field(default=1, ge=0, le=8)
     outCount: int = Field(default=1, ge=0, le=8)
     objectLinkSide: Literal["top", "bottom"] = "top"
+    tag: str = ""
+    rotation: Literal[0, 90, 180, 270] = 0
+    width: float | None = Field(default=None, ge=32)
+    height: float | None = Field(default=None, ge=24)
 
     @model_validator(mode="after")
     def default_name(self) -> EquipmentObject:

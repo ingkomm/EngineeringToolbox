@@ -81,12 +81,38 @@ export type WorkspaceEdit =
   | { type: "toggleEdge"; edgeId: string }
   | { type: "toggleEdgeCollapsed"; edgeId: string }
   | { type: "deleteEdges"; edgeIds: string[] }
-  | { type: "addEquipment" }
+  | { type: "addEquipment"; symbolId?: string }
   | { type: "addPoint" }
   | {
       type: "updatePoint";
       objectId: string;
       patch: { id?: string; name?: string; connectionCount?: number };
+    }
+  | {
+      type: "updateEquipment";
+      objectId: string;
+      patch: {
+        id?: string;
+        name?: string;
+        tag?: string;
+        symbolId?: string;
+        rotation?: 0 | 90 | 180 | 270;
+        width?: number;
+        height?: number;
+      };
+    }
+  | {
+      type: "updatePointEnd";
+      pointId: string;
+      end: string;
+      patch: Partial<PointEnd>;
+    }
+  | { type: "duplicateObjects"; objectIds: string[] }
+  | { type: "rotateEquipment"; objectIds: string[]; delta?: 90 | -90 }
+  | {
+      type: "alignObjects";
+      objectIds: string[];
+      mode: "left" | "center" | "right" | "top" | "middle" | "bottom" | "h-gap" | "v-gap";
     }
   | { type: "setEquipmentPorts"; objectId: string; inCount?: number; outCount?: number }
   | { type: "setObjectLinkSide"; objectId: string; side: "top" | "bottom" }
@@ -922,9 +948,19 @@ export function applyWorkspaceEdit(
       };
     }
     case "addEquipment":
-      return addWorksheetEquipment(project);
+      return addWorksheetEquipment(project, edit.symbolId);
     case "addPoint":
       return addWorksheetPoint(project);
+    case "updateEquipment":
+      return updateWorksheetEquipment(project, edit.objectId, edit.patch);
+    case "updatePointEnd":
+      return updateWorksheetPointEnd(project, edit.pointId, edit.end, edit.patch);
+    case "duplicateObjects":
+      return duplicateWorksheetObjects(project, edit.objectIds);
+    case "rotateEquipment":
+      return rotateWorksheetEquipment(project, edit.objectIds, edit.delta ?? 90);
+    case "alignObjects":
+      return alignWorksheetObjects(project, edit.objectIds, edit.mode);
     case "updatePoint":
       return updateWorksheetPoint(project, edit.objectId, edit.patch);
     case "setEquipmentPorts":
@@ -966,18 +1002,203 @@ function noEval(project: ProjectDocument): EditResult {
   return { project, dirtyObjectIds: [], shouldEvaluate: false };
 }
 
-function addWorksheetEquipment(project: ProjectDocument): EditResult {
+function addWorksheetEquipment(project: ProjectDocument, symbolId?: string): EditResult {
   const id = nextPrefixedObjectId(project, "EQ");
   const object: EquipmentObject = {
     kind: "equipment",
     id,
     name: nextEquipmentName(project),
     position: nextLayoutPosition(project),
-    symbolId: "generic-equipment",
+    symbolId: symbolId?.trim() || "generic-equipment",
     inCount: 1,
     outCount: 1,
+    rotation: 0,
   };
   return { project: { ...project, objects: [...project.objects, object] }, dirtyObjectIds: [], shouldEvaluate: false };
+}
+
+function snapRotation(value: number): 0 | 90 | 180 | 270 {
+  const snapped = ((Math.round(value / 90) * 90) % 360 + 360) % 360;
+  return snapped as 0 | 90 | 180 | 270;
+}
+
+function updateWorksheetEquipment(
+  project: ProjectDocument,
+  objectId: string,
+  patch: {
+    id?: string;
+    name?: string;
+    tag?: string;
+    symbolId?: string;
+    rotation?: 0 | 90 | 180 | 270;
+    width?: number;
+    height?: number;
+  },
+): EditResult {
+  const current = project.objects.find((item) => item.id === objectId);
+  if (!current || !isEquipmentObject(current)) return noEval(project);
+  const nextId = patch.id ?? current.id;
+  const nextName = (patch.name ?? current.name).trim() || nextId;
+  if (!OBJECT_ID_RE.test(nextId)) return noEval(project);
+  if (nextId !== current.id && project.objects.some((item) => item.id === nextId)) return noEval(project);
+  let next = project;
+  if (nextId !== current.id) next = rekeyObject(next, current.id, nextId);
+  const updated: EquipmentObject = {
+    ...current,
+    id: nextId,
+    name: nextName,
+    tag: patch.tag !== undefined ? patch.tag : current.tag,
+    symbolId: patch.symbolId?.trim() || current.symbolId,
+    rotation: patch.rotation !== undefined ? snapRotation(patch.rotation) : current.rotation,
+    width: patch.width !== undefined ? Math.max(32, patch.width) : current.width,
+    height: patch.height !== undefined ? Math.max(24, patch.height) : current.height,
+  };
+  return {
+    project: {
+      ...next,
+      objects: next.objects.map((item) => (item.id === nextId ? updated : item)),
+    },
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
+function updateWorksheetPointEnd(
+  project: ProjectDocument,
+  pointId: string,
+  end: string,
+  patch: Partial<PointEnd>,
+): EditResult {
+  const point = project.objects.find((item) => item.id === pointId);
+  if (!point || !isPointObject(point)) return noEval(project);
+  const index = parsePointConnectionEnd(end);
+  if (index == null) return noEval(project);
+  const current = point.connections[index];
+  if (!current) return noEval(project);
+  const nextEnd: PointEnd = { ...current, ...patch, objectId: current.objectId, portId: current.portId };
+  const connections = [...point.connections];
+  connections[index] = nextEnd;
+  return {
+    project: {
+      ...project,
+      objects: project.objects.map((item) =>
+        item.id === pointId ? normalizePointObject({ ...point, connections }) : item,
+      ),
+    },
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
+function nextAvailableId(used: Set<string>, prefix: string): string {
+  let n = 1;
+  while (used.has(`${prefix}_${n}`)) n += 1;
+  const id = `${prefix}_${n}`;
+  used.add(id);
+  return id;
+}
+
+function duplicateWorksheetObjects(project: ProjectDocument, objectIds: string[]): EditResult {
+  const selected = project.objects.filter((item) => objectIds.includes(item.id));
+  if (selected.length === 0) return noEval(project);
+  const used = new Set(project.objects.map((item) => item.id));
+  const idMap = new Map<string, string>();
+  for (const item of selected) {
+    const prefix = isEquipmentObject(item) ? "EQ" : isPointObject(item) ? "PT" : "obj";
+    idMap.set(item.id, nextAvailableId(used, prefix));
+  }
+  const clones = selected.map((item) => {
+    const id = idMap.get(item.id) ?? item.id;
+    const position = { x: item.position.x + 36, y: item.position.y + 36 };
+    if (isEquipmentObject(item)) {
+      return { ...item, id, name: `${item.name} copy`, position };
+    }
+    if (isPointObject(item)) {
+      return normalizePointObject({
+        ...item,
+        id,
+        name: item.name === item.id ? id : `${item.name} copy`,
+        position,
+        connections: item.connections.map((end) => {
+          if (!end) return null;
+          const remapped = idMap.get(end.objectId);
+          return remapped ? { ...end, objectId: remapped } : { ...end };
+        }),
+      });
+    }
+    return {
+      ...item,
+      id,
+      name: `${item.name} copy`,
+      position,
+      links: (item.links ?? []).map((link) => ({
+        ...link,
+        targetObjectId: link.targetObjectId ? idMap.get(link.targetObjectId) ?? link.targetObjectId : null,
+      })),
+    };
+  });
+  return {
+    project: { ...project, objects: [...project.objects, ...clones] },
+    dirtyObjectIds: clones.filter(isCalculationObject).map((item) => item.id),
+    shouldEvaluate: clones.some(isCalculationObject),
+  };
+}
+
+function rotateWorksheetEquipment(project: ProjectDocument, objectIds: string[], delta: 90 | -90): EditResult {
+  return {
+    project: {
+      ...project,
+      objects: project.objects.map((item) => {
+        if (!isEquipmentObject(item) || !objectIds.includes(item.id)) return item;
+        return { ...item, rotation: snapRotation((item.rotation ?? 0) + delta) };
+      }),
+    },
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
+function alignWorksheetObjects(
+  project: ProjectDocument,
+  objectIds: string[],
+  mode: "left" | "center" | "right" | "top" | "middle" | "bottom" | "h-gap" | "v-gap",
+): EditResult {
+  const targets = project.objects.filter((item) => objectIds.includes(item.id) && isLayoutObject(item));
+  if (targets.length < 2) return noEval(project);
+  const xs = targets.map((item) => item.position.x);
+  const ys = targets.map((item) => item.position.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const midX = (minX + maxX) / 2;
+  const midY = (minY + maxY) / 2;
+  const sortedX = [...targets].sort((a, b) => a.position.x - b.position.x);
+  const sortedY = [...targets].sort((a, b) => a.position.y - b.position.y);
+  const stepX = sortedX.length > 1 ? (maxX - minX) / (sortedX.length - 1) : 0;
+  const stepY = sortedY.length > 1 ? (maxY - minY) / (sortedY.length - 1) : 0;
+  return {
+    project: {
+      ...project,
+      objects: project.objects.map((item) => {
+        if (!objectIds.includes(item.id) || !isLayoutObject(item)) return item;
+        if (mode === "left") return { ...item, position: { ...item.position, x: minX } };
+        if (mode === "right") return { ...item, position: { ...item.position, x: maxX } };
+        if (mode === "center") return { ...item, position: { ...item.position, x: midX } };
+        if (mode === "top") return { ...item, position: { ...item.position, y: minY } };
+        if (mode === "bottom") return { ...item, position: { ...item.position, y: maxY } };
+        if (mode === "middle") return { ...item, position: { ...item.position, y: midY } };
+        if (mode === "h-gap") {
+          const index = sortedX.findIndex((entry) => entry.id === item.id);
+          return { ...item, position: { ...item.position, x: minX + stepX * index } };
+        }
+        const index = sortedY.findIndex((entry) => entry.id === item.id);
+        return { ...item, position: { ...item.position, y: minY + stepY * index } };
+      }),
+    },
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
 }
 
 function addWorksheetPoint(project: ProjectDocument): EditResult {

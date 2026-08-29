@@ -15,6 +15,7 @@ import {
   pointConnectionIds,
 } from "../lib/worksheet";
 import { mappedInputsForObject } from "./mappedInputs";
+import { equipmentBounds } from "../lib/arrangementView";
 
 export { mappedInputsForObject } from "./mappedInputs";
 
@@ -25,12 +26,17 @@ export function toFlowNodeRecords(
 ) {
   return project.objects.map((object) => {
     if (isLayoutObject(object) && !isCalculationObject(object)) {
+      const bounds = object.kind === "equipment" ? equipmentBounds(object) : { width: 22, height: 22 };
+      const height = object.kind === "equipment" ? bounds.height + 16 : 22;
       return {
         id: object.id,
         type: object.kind === "equipment" ? ("equipmentObject" as const) : ("pointObject" as const),
         position: object.position,
         data: { object, onEdit },
         draggable: true,
+        style: { width: bounds.width, height, background: "transparent" },
+        width: bounds.width,
+        height,
       };
     }
     return {
@@ -82,6 +88,7 @@ export function toFlowEdges(
   onToggle: (edgeId: string) => void,
   onToggleCollapsed: (edgeId: string) => void,
   onToggleDirection?: (pointId: string, end: string) => void,
+  onEdit?: (edit: WorkspaceEdit) => void,
 ) {
   const objects = new Map(project.objects.map((item) => [item.id, item]));
   const mapping = project.edges.map((edge) => {
@@ -146,19 +153,25 @@ export function toFlowEdges(
           sourceHandle,
           targetHandle,
           type: "arrangementLink" as const,
-          className: "arr-point-link-edge",
+          className: `arr-point-link-edge arr-point-link-edge--${end.linkKind === "signal" ? "signal" : "pipe"}`,
           interactionWidth: 20,
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            width: 16,
-            height: 16,
-            color: "#6cb6ff",
-          },
+          markerEnd: end.showArrow
+            ? {
+                type: MarkerType.ArrowClosed,
+                width: 16,
+                height: 16,
+                color: end.linkKind === "signal" ? "#9aa8b8" : "#7f93a8",
+              }
+            : undefined,
           data: {
             pointId: object.id,
             end: endId,
             reversed,
+            linkKind: end.linkKind === "signal" ? "signal" : "pipe",
+            showArrow: end.showArrow === true,
+            waypoints: end.waypoints ?? [],
             onToggleDirection,
+            onEdit,
           },
         },
       ];

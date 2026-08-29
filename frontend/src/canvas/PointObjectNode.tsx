@@ -1,9 +1,10 @@
-import { Handle, Position, type Node, type NodeProps, useUpdateNodeInternals } from "@xyflow/react";
-import { useLayoutEffect, type KeyboardEvent } from "react";
+import { Handle, Position, useConnection, useUpdateNodeInternals, type Node, type NodeProps } from "@xyflow/react";
+import { useLayoutEffect, useState } from "react";
 import type { PointObject } from "../types/contract";
-import { OBJECT_ID_RE, type WorkspaceEdit } from "../lib/projectEdits";
+import type { WorkspaceEdit } from "../lib/projectEdits";
 import { POINT_CONNECTION_IDS, objectLinkSideOf, pointConnectionSide } from "../lib/worksheet";
 import { ObjectLinkHandle } from "./ObjectLinkHandle";
+import { PointPopover } from "./ArrangementPopover";
 
 export type PointObjectNodeType = Node<
   {
@@ -12,10 +13,6 @@ export type PointObjectNodeType = Node<
   },
   "pointObject"
 >;
-
-function stopKeys(event: KeyboardEvent) {
-  event.stopPropagation();
-}
 
 const SIDE_POSITION: Record<"left" | "right" | "bottom", Position> = {
   left: Position.Left,
@@ -26,6 +23,11 @@ const SIDE_POSITION: Record<"left" | "right" | "bottom", Position> = {
 export function PointObjectNode({ id, selected, data }: NodeProps<PointObjectNodeType>) {
   const { object, onEdit } = data;
   const side = objectLinkSideOf(object);
+  const linked = object.connections.some(Boolean);
+  const [hovered, setHovered] = useState(false);
+  const [inspect, setInspect] = useState(false);
+  const connecting = Boolean(useConnection().inProgress);
+  const hot = Boolean(selected || hovered || connecting);
   const updateNodeInternals = useUpdateNodeInternals();
 
   useLayoutEffect(() => {
@@ -34,12 +36,19 @@ export function PointObjectNode({ id, selected, data }: NodeProps<PointObjectNod
 
   return (
     <article
-      className={`ws-node ws-node--point ws-point ${selected ? "is-selected ws-point--selected" : ""}`}
+      className={`pid-pt ${selected ? "is-selected" : ""} ${linked ? "is-linked" : ""} ${hot ? "is-hot" : ""}`}
       data-testid={`object-${id}`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onDoubleClick={(event) => {
+        event.stopPropagation();
+        setInspect(true);
+      }}
     >
       <ObjectLinkHandle
         nodeId={id}
         side={side}
+        hidden={!hot}
         onToggleSide={() =>
           onEdit({
             type: "setObjectLinkSide",
@@ -54,43 +63,16 @@ export function PointObjectNode({ id, selected, data }: NodeProps<PointObjectNod
           type="source"
           position={SIDE_POSITION[pointConnectionSide(endId)]}
           id={endId}
-          className={`ws-port ws-point-handle ws-point-handle--${pointConnectionSide(endId)} ${
-            object.connections[index] ? "ws-point-handle--on" : ""
-          }`}
+          className={`pid-port pid-port--pt pid-port--${pointConnectionSide(endId)} ${
+            object.connections[index] ? "is-on" : ""
+          } ${hot ? "is-visible" : ""}`}
           data-testid={`object-${id}-${endId}`}
           title={`${id}.${endId}`}
-        >
-          <span className="ws-port__label">{endId}</span>
-        </Handle>
+        />
       ))}
-      <div className="ws-point__core nodrag nopan">
-        <span className="ws-node__name ws-point__name">{object.name}</span>
-        <div className="ws-node__tools ws-reveal">
-          <input
-            className="ws-node__id ws-point__id nodrag"
-            defaultValue={object.id}
-            data-testid={`object-${id}-id`}
-            onKeyDown={stopKeys}
-            onBlur={(event) => {
-              const nextId = event.target.value.trim();
-              if (!OBJECT_ID_RE.test(nextId) || nextId === object.id) {
-                event.target.value = object.id;
-                return;
-              }
-              onEdit({ type: "updatePoint", objectId: id, patch: { id: nextId } });
-            }}
-          />
-          <button
-            type="button"
-            className="icon-btn nodrag"
-            title="객체 삭제"
-            data-testid={`object-${id}-delete`}
-            onClick={() => onEdit({ type: "deleteObject", objectId: id })}
-          >
-            ×
-          </button>
-        </div>
-      </div>
+      <span className={`pid-pt__dot ${linked ? "is-on" : ""}`} />
+      {hot ? <span className="pid-pt__id">{object.id}</span> : null}
+      {inspect ? <PointPopover object={object} onEdit={onEdit} onClose={() => setInspect(false)} /> : null}
     </article>
   );
 }

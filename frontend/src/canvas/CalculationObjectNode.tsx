@@ -37,7 +37,7 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
   const { object, project, mappedInputIds, quantities, onEdit } = data;
   const mapped = new Set(mappedInputIds);
   const [expanded, setExpanded] = useState(false);
-  const open = Boolean(selected) || expanded;
+  const open = expanded;
   const updateNodeInternals = useUpdateNodeInternals();
   const handleSignature = [
     ...object.inputs.map((item) => item.id),

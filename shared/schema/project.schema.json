@@ -133,7 +133,13 @@
         "objectId": { "$ref": "#/$defs/variableId" },
         "portId": { "$ref": "#/$defs/variableId" },
         "reversed": { "type": "boolean" },
-        "equipmentId": { "$ref": "#/$defs/variableId" }
+        "equipmentId": { "$ref": "#/$defs/variableId" },
+        "linkKind": { "type": "string", "enum": ["pipe", "signal"] },
+        "showArrow": { "type": "boolean" },
+        "waypoints": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/position" }
+        }
       }
     },
     "equipmentObject": {
@@ -148,7 +154,11 @@
         "symbolId": { "type": "string", "minLength": 1 },
         "inCount": { "type": "integer", "minimum": 0, "maximum": 8 },
         "outCount": { "type": "integer", "minimum": 0, "maximum": 8 },
-        "objectLinkSide": { "type": "string", "enum": ["top", "bottom"] }
+        "objectLinkSide": { "type": "string", "enum": ["top", "bottom"] },
+        "tag": { "type": "string" },
+        "rotation": { "type": "integer", "enum": [0, 90, 180, 270] },
+        "width": { "type": "number", "minimum": 32 },
+        "height": { "type": "number", "minimum": 24 }
       }
     },
     "pointObject": {

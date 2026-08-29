@@ -660,6 +660,54 @@ describe("worksheet equipment and points", () => {
     expect(project.objects.find(isPointObject)?.objectLinkSide).toBe("bottom");
   });
 
+  it("rotates and retags equipment without dropping old JSON fields", () => {
+    let project = applyAll([{ type: "addEquipment", symbolId: "pump" }]);
+    const equipment = project.objects.find(isEquipmentObject);
+    expect(equipment?.symbolId).toBe("pump");
+    project = applyWorkspaceEdit(
+      project,
+      { type: "updateEquipment", objectId: "EQ_1", patch: { tag: "P-101", rotation: 90 } },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(project.objects.find(isEquipmentObject)).toMatchObject({
+      id: "EQ_1",
+      tag: "P-101",
+      rotation: 90,
+      symbolId: "pump",
+    });
+    project = applyWorkspaceEdit(project, { type: "rotateEquipment", objectIds: ["EQ_1"], delta: 90 }, FALLBACK_QUANTITIES).project;
+    expect(project.objects.find(isEquipmentObject)?.rotation).toBe(180);
+  });
+
+  it("keeps pipe/signal metadata on a point end and duplicates layout objects", () => {
+    let project = applyAll([{ type: "addEquipment" }, { type: "addPoint" }]);
+    project = applyWorkspaceEdit(
+      project,
+      { type: "connectPointEnd", pointId: "PT_1", end: "C_1", targetObjectId: "EQ_1", targetPortId: "OUT_1" },
+      FALLBACK_QUANTITIES,
+    ).project;
+    project = applyWorkspaceEdit(
+      project,
+      { type: "updatePointEnd", pointId: "PT_1", end: "C_1", patch: { linkKind: "signal", showArrow: true } },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(project.objects.find(isPointObject)?.connections[0]).toMatchObject({
+      objectId: "EQ_1",
+      portId: "OUT_1",
+      linkKind: "signal",
+      showArrow: true,
+    });
+    project = applyWorkspaceEdit(project, { type: "duplicateObjects", objectIds: ["EQ_1", "PT_1"] }, FALLBACK_QUANTITIES).project;
+    expect(project.objects.filter(isEquipmentObject).map((item) => item.id)).toEqual(["EQ_1", "EQ_2"]);
+    expect(project.objects.filter(isPointObject).map((item) => item.id)).toEqual(["PT_1", "PT_2"]);
+    const copy = project.objects.find((item) => item.id === "PT_2");
+    expect(copy && isPointObject(copy) ? copy.connections[0] : null).toMatchObject({
+      objectId: "EQ_2",
+      portId: "OUT_1",
+      linkKind: "signal",
+    });
+  });
+
   it("deletes a yellow object link", () => {
     let project = applyAll([{ type: "addPoint" }, { type: "connectLink", objectId: "obj_1", targetObjectId: "PT_1" }]);
     const edgeId = project.edges[0]?.id;
