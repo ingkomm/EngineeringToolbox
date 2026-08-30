@@ -14,7 +14,7 @@ export type MemoLinkTargetKind =
   | "calc-output"
   | "arrangement-edge";
 export type MemoLinkRelation = "attachment" | "reference" | "association";
-export type MemoBlockType = "text" | "object-link";
+export type MemoBlockType = "text" | "status" | "table" | "object-link";
 export type ObjectLinkSide = "top" | "bottom";
 export type ArrangementLinkKind = "pipe" | "signal";
 export type EquipmentRotation = 0 | 90 | 180 | 270;
@@ -154,7 +154,49 @@ export interface ObjectLinkBlock extends MemoBlockBase {
   linkIds: string[];
 }
 
-export type MemoBlock = TextBlock | ObjectLinkBlock;
+export interface StatusItem {
+  id: string;
+  label?: string;
+  value: string;
+  color?: string;
+}
+
+export interface StatusBlock extends MemoBlockBase {
+  type: "status";
+  items: StatusItem[];
+}
+
+export interface TableColumn {
+  id: string;
+  name: string;
+  width?: number;
+}
+
+export interface TableRow {
+  id: string;
+  cells: Record<string, TableCell>;
+}
+
+export type TableCell =
+  | { type: "text"; value: string }
+  | { type: "number"; value: number | null }
+  | { type: "boolean"; value: boolean }
+  | { type: "object-reference"; reference: ObjectValueReference };
+
+export interface ObjectValueReference {
+  objectId: string;
+  subId?: string;
+  targetKind: "calc-input" | "calc-output" | "object";
+  displayMode: "value" | "name" | "name-and-value";
+}
+
+export interface TableBlock extends MemoBlockBase {
+  type: "table";
+  columns: TableColumn[];
+  rows: TableRow[];
+}
+
+export type MemoBlock = TextBlock | StatusBlock | TableBlock | ObjectLinkBlock;
 
 export interface MemoObject {
   kind: "memo";

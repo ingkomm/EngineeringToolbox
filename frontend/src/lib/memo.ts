@@ -6,6 +6,8 @@ import type {
   ObjectKind,
   ObjectLinkBlock,
   ProjectDocument,
+  StatusBlock,
+  TableBlock,
   TagRef,
   TextBlock,
   WorksheetObject,
@@ -77,8 +79,20 @@ export function cloneMemo(memo: MemoObject, position: { x: number; y: number }):
 
 function cloneBlock(block: MemoBlock, linkIdMap: Map<string, string>): MemoBlock {
   const id = newStableId("b");
-  if (block.type === "text") {
-    return { ...block, id };
+  if (block.type === "text") return { ...block, id };
+  if (block.type === "status") {
+    return { ...block, id, items: block.items.map((item) => ({ ...item, id: newStableId("s") })) };
+  }
+  if (block.type === "table") {
+    const colMap = new Map(block.columns.map((column) => [column.id, newStableId("c")]));
+    const columns = block.columns.map((column) => ({ ...column, id: colMap.get(column.id) ?? column.id }));
+    const rows = block.rows.map((row) => ({
+      id: newStableId("r"),
+      cells: Object.fromEntries(
+        Object.entries(row.cells).map(([key, cell]) => [colMap.get(key) ?? key, cell]),
+      ),
+    }));
+    return { ...block, id, columns, rows };
   }
   return {
     ...block,
@@ -151,6 +165,33 @@ export function nextBlockOrder(memo: MemoObject): number {
 
 export function newObjectLinkBlock(order: number): ObjectLinkBlock {
   return { id: newStableId("b"), type: "object-link", order, collapsed: false, linkIds: [] };
+}
+
+export function newStatusBlock(order: number): StatusBlock {
+  return {
+    id: newStableId("b"),
+    type: "status",
+    order,
+    collapsed: false,
+    items: [{ id: newStableId("s"), label: "", value: "", color: "#94a3b8" }],
+  };
+}
+
+export function newTableBlock(order: number): TableBlock {
+  const colA = newStableId("c");
+  const colB = newStableId("c");
+  const rowId = newStableId("r");
+  return {
+    id: newStableId("b"),
+    type: "table",
+    order,
+    collapsed: false,
+    columns: [
+      { id: colA, name: "A" },
+      { id: colB, name: "B" },
+    ],
+    rows: [{ id: rowId, cells: { [colA]: { type: "text", value: "" }, [colB]: { type: "text", value: "" } } }],
+  };
 }
 
 export function newTextBlock(order: number): TextBlock {

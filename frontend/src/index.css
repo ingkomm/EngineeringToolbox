@@ -2404,7 +2404,27 @@ label.ghost-btn {
   margin-bottom: 4px;
 }
 
-.memo-link-row.is-missing {
-  color: #f0b429;
+.memo-status__row,
+.memo-table__tools {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.memo-table {
+  overflow: auto;
+}
+
+.memo-table input,
+.memo-table select {
+  background: #0d121a;
+  border: 1px solid #334155;
+  color: inherit;
+  max-width: 120px;
+}
+
+.memo-table__ref {
+  color: #6cb6ff;
+  font-size: 11px;
 }
 

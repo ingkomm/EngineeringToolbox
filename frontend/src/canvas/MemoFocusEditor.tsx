@@ -1,7 +1,7 @@
-import { sortedBlocks, childrenOf, memosOf, memoTitleOf } from "../lib/memo";
+import { childrenOf, memosOf, memoTitleOf, objectKindOf, sortedBlocks } from "../lib/memo";
 import type { MemoObject, ProjectDocument, WorksheetObject } from "../types/contract";
 import type { WorkspaceEdit } from "../lib/projectEdits";
-import { objectKindOf } from "../lib/memo";
+import { StatusBlockEditor, TableBlockEditor } from "./MemoStructuredBlocks";
 
 export function MemoFocusEditor({
   memo,
@@ -93,7 +93,15 @@ export function MemoFocusEditor({
           {blocks.map((block) => (
             <section key={block.id} className={`memo-block ${block.collapsed ? "is-collapsed" : ""}`}>
               <div className="memo-block__bar">
-                <strong>{block.type === "text" ? "Text" : "Object Link"}</strong>
+                <strong>
+                  {block.type === "text"
+                    ? "Text"
+                    : block.type === "status"
+                      ? "Status"
+                      : block.type === "table"
+                        ? "Table"
+                        : "Object Link"}
+                </strong>
                 <button type="button" onClick={() => onEdit({ type: "moveMemoBlock", objectId: memo.id, blockId: block.id, direction: -1 })}>
                   ↑
                 </button>
@@ -121,6 +129,10 @@ export function MemoFocusEditor({
                     })
                   }
                 />
+              ) : block.type === "status" ? (
+                <StatusBlockEditor memoId={memo.id} block={block} onEdit={onEdit} />
+              ) : block.type === "table" ? (
+                <TableBlockEditor memoId={memo.id} block={block} project={project} onEdit={onEdit} />
               ) : (
                 <ObjectLinkBlockView
                   memo={memo}
@@ -138,6 +150,12 @@ export function MemoFocusEditor({
           <span>/ Add block</span>
           <button type="button" data-testid={`memo-${memo.id}-add-text`} onClick={() => onEdit({ type: "addMemoBlock", objectId: memo.id, blockType: "text" })}>
             Text
+          </button>
+          <button type="button" data-testid={`memo-${memo.id}-add-status`} onClick={() => onEdit({ type: "addMemoBlock", objectId: memo.id, blockType: "status" })}>
+            Status
+          </button>
+          <button type="button" data-testid={`memo-${memo.id}-add-table`} onClick={() => onEdit({ type: "addMemoBlock", objectId: memo.id, blockType: "table" })}>
+            Table
           </button>
           <button
             type="button"

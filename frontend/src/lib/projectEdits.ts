@@ -32,6 +32,8 @@ import {
   emptyMemo,
   isMemoObject,
   newObjectLinkBlock,
+  newStatusBlock,
+  newTableBlock,
   newTextBlock,
   nextBlockOrder,
   normalizeTagLabel,
@@ -183,7 +185,7 @@ export type WorkspaceEdit =
         position?: { x: number; y: number };
       };
     }
-  | { type: "addMemoBlock"; objectId: string; blockType: "text" | "object-link" }
+  | { type: "addMemoBlock"; objectId: string; blockType: "text" | "status" | "table" | "object-link" }
   | { type: "updateMemoBlock"; objectId: string; blockId: string; patch: Partial<MemoBlock> }
   | { type: "removeMemoBlock"; objectId: string; blockId: string }
   | { type: "moveMemoBlock"; objectId: string; blockId: string; direction: -1 | 1 }
@@ -2037,10 +2039,21 @@ function updateWorksheetMemo(
   });
 }
 
-function addMemoBlock(project: ProjectDocument, objectId: string, blockType: "text" | "object-link"): EditResult {
+function addMemoBlock(
+  project: ProjectDocument,
+  objectId: string,
+  blockType: "text" | "status" | "table" | "object-link",
+): EditResult {
   return patchMemo(project, objectId, (memo) => {
     const order = nextBlockOrder(memo);
-    const block = blockType === "text" ? newTextBlock(order) : newObjectLinkBlock(order);
+    const block =
+      blockType === "text"
+        ? newTextBlock(order)
+        : blockType === "status"
+          ? newStatusBlock(order)
+          : blockType === "table"
+            ? newTableBlock(order)
+            : newObjectLinkBlock(order);
     return { ...memo, blocks: [...memo.blocks, block] };
   });
 }

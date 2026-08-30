@@ -300,7 +300,85 @@ class ObjectLinkBlock(BaseModel):
     linkIds: list[str] = Field(default_factory=list)
 
 
-MemoBlock = Annotated[Union[TextBlock, ObjectLinkBlock], Field(discriminator="type")]
+class StatusItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str
+    label: str | None = None
+    value: str = ""
+    color: str | None = None
+
+
+class StatusBlock(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    type: Literal["status"]
+    id: str
+    order: int = 0
+    collapsed: bool = False
+    items: list[StatusItem] = Field(default_factory=list)
+
+
+class ObjectValueReference(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    objectId: str
+    subId: str | None = None
+    targetKind: Literal["calc-input", "calc-output", "object"]
+    displayMode: Literal["value", "name", "name-and-value"] = "name-and-value"
+
+
+class TableTextCell(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    type: Literal["text"]
+    value: str = ""
+
+
+class TableNumberCell(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    type: Literal["number"]
+    value: float | None = None
+
+
+class TableBooleanCell(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    type: Literal["boolean"]
+    value: bool = False
+
+
+class TableReferenceCell(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    type: Literal["object-reference"]
+    reference: ObjectValueReference
+
+
+TableCell = Annotated[
+    Union[TableTextCell, TableNumberCell, TableBooleanCell, TableReferenceCell],
+    Field(discriminator="type"),
+]
+
+
+class TableColumn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str
+    name: str = ""
+    width: float | None = None
+
+
+class TableRow(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str
+    cells: dict[str, TableCell] = Field(default_factory=dict)
+
+
+class TableBlock(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    type: Literal["table"]
+    id: str
+    order: int = 0
+    collapsed: bool = False
+    columns: list[TableColumn] = Field(default_factory=list)
+    rows: list[TableRow] = Field(default_factory=list)
+
+
+MemoBlock = Annotated[Union[TextBlock, StatusBlock, TableBlock, ObjectLinkBlock], Field(discriminator="type")]
 
 
 class MemoObject(BaseModel):

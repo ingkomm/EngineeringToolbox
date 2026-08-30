@@ -114,6 +114,43 @@ describe("memo core", () => {
     expect(project.objects.filter(isMemoObject)).toHaveLength(1);
   });
 
+  it("table object references display calc values without changing them", () => {
+    let project = applyAll([{ type: "addMemo" }]);
+    const calc = project.objects.find(isCalculationObject)!;
+    const memoId = memoOf(project).id;
+    project = applyWorkspaceEdit(project, { type: "addMemoBlock", objectId: memoId, blockType: "table" }, FALLBACK_QUANTITIES).project;
+    const table = memoOf(project).blocks.find((item) => item.type === "table");
+    if (!table || table.type !== "table") throw new Error("table");
+    const col = table.columns[0]!.id;
+    const row = table.rows[0]!;
+    project = applyWorkspaceEdit(
+      project,
+      {
+        type: "updateMemoBlock",
+        objectId: memoId,
+        blockId: table.id,
+        patch: {
+          rows: [
+            {
+              ...row,
+              cells: {
+                ...row.cells,
+                [col]: {
+                  type: "object-reference",
+                  reference: { objectId: calc.id, subId: calc.outputs[0]?.id, targetKind: "calc-output", displayMode: "value" },
+                },
+              },
+            },
+          ],
+        },
+      },
+      FALLBACK_QUANTITIES,
+    ).project;
+    const after = project.objects.find(isCalculationObject)!;
+    expect(after.outputs.map((item) => item.value)).toEqual(calc.outputs.map((item) => item.value));
+    expect(after.inputs.map((item) => item.value)).toEqual(calc.inputs.map((item) => item.value));
+  });
+
   it("loads a worksheet that has no memos", () => {
     const loaded = normalizeLoadedProject(JSON.parse(JSON.stringify(blankProject)));
     expect(loaded.objects.filter(isMemoObject)).toEqual([]);
