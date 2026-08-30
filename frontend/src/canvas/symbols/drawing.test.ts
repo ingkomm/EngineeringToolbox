@@ -42,7 +42,7 @@ describe("symbol drawings", () => {
     ]);
   });
 
-  it("starts a blank drawing on a 9×7 line grid whose center is a grid dot", () => {
+  it("starts a blank drawing on a 9×7 line grid", () => {
     const drawing = blankDrawing();
     expect(drawing.primitives).toEqual([]);
     expect(sizeToGridLines(drawing.width)).toBe(9);
@@ -50,8 +50,6 @@ describe("symbol drawings", () => {
     expect(gridLinesToSize(9)).toBe(88);
     expect(drawing.width).toBe(88);
     expect(drawing.height).toBe(66);
-    expect(drawing.width / 2 % CANVAS_GRID).toBe(0);
-    expect(drawing.height / 2 % CANVAS_GRID).toBe(0);
   });
 
   it("keeps interior port positions when in/out counts change", () => {

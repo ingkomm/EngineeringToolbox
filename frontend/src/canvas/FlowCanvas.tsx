@@ -8,12 +8,14 @@ import {
   Panel,
   ReactFlow,
   SelectionMode,
+  applyNodeChanges,
   useEdgesState,
   useNodesState,
   useReactFlow,
   type Connection,
   type Edge,
   type Node,
+  type NodeChange,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -23,7 +25,7 @@ import { EquipmentObjectNode } from "./EquipmentObjectNode";
 import { MappingEdge } from "./MappingEdge";
 import { PointObjectNode } from "./PointObjectNode";
 import { mergeFlowNodes, toFlowEdges, toFlowNodeRecords } from "./flowModel";
-import { CANVAS_GRID, POINT_NODE_SIZE, snapToGrid, toTopLeftPosition } from "./symbols/grid";
+import { CANVAS_GRID, POINT_NODE_SIZE, snapPositionToGrid, toTopLeftPosition } from "./symbols/grid";
 import { parseHandleId } from "../lib/display";
 import { type WorkspaceEdit } from "../lib/projectEdits";
 import { equipmentBounds } from "../lib/arrangementView";
@@ -97,7 +99,7 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
     onEdit({ type: "togglePointLink", pointId, end });
   }, [onEdit]);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(toFlowNodeRecords(project, quantities, onEdit) as Node[]);
+  const [nodes, setNodes] = useNodesState<Node>(toFlowNodeRecords(project, quantities, onEdit) as Node[]);
   const [edges, setEdges, onEdgesChange] = useEdgesState(
     toFlowEdges(project, onToggle, onToggleCollapsed, onToggleDirection, onEdit),
   );
@@ -115,6 +117,23 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
 
   const selectedIds = nodes.filter((node) => node.selected).map((node) => node.id);
   const selectedLayoutIds = selectedIds.filter((id) => project.objects.some((item) => item.id === id && isLayoutObject(item)));
+
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      setNodes((current) => {
+        const next = applyNodeChanges(changes, current);
+        if (!snap) return next;
+        const moved = new Set(
+          changes.filter((change) => change.type === "position").map((change) => change.id),
+        );
+        if (moved.size === 0) return next;
+        return next.map((node) =>
+          moved.has(node.id) ? { ...node, position: snapPositionToGrid(node.position) } : node,
+        );
+      });
+    },
+    [setNodes, snap],
+  );
 
   const onInit = useCallback((instance: { fitView: (options?: { padding?: number }) => void }) => {
     if (didFit.current) return;
@@ -289,10 +308,10 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
                 object.kind === "equipment"
                   ? equipmentBounds(object)
                   : { width: POINT_NODE_SIZE, height: POINT_NODE_SIZE };
-              const center = { x: snapToGrid(node.position.x), y: snapToGrid(node.position.y) };
+              const center = snap ? snapPositionToGrid(node.position) : node.position;
               return [node.id, toTopLeftPosition(center, bounds.width, bounds.height)] as const;
             }
-            return [node.id, node.position] as const;
+            return [node.id, snap ? snapPositionToGrid(node.position) : node.position] as const;
           }),
         );
         onProjectChange({
@@ -313,8 +332,8 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
       selectionOnDrag={selectMode}
       selectionMode={SelectionMode.Partial}
       panOnDrag={selectMode ? [1] : true}
-      snapToGrid={snap}
-      snapGrid={[CANVAS_GRID, CANVAS_GRID]}
+      snapToGrid={false}
+      nodeOrigin={[0.5, 0.5]}
       proOptions={{ hideAttribution: true }}
     >
       <Background variant={BackgroundVariant.Dots} gap={CANVAS_GRID} size={1.4} color="#243044" />

@@ -9,7 +9,13 @@ export function snapToGrid(value: number, grid = CANVAS_GRID): number {
   return Math.round(value / grid) * grid;
 }
 
-/** Snap a box so its visual center sits on a grid intersection. */
+export function snapPositionToGrid(
+  position: { x: number; y: number },
+  grid = CANVAS_GRID,
+): { x: number; y: number } {
+  return { x: snapToGrid(position.x, grid), y: snapToGrid(position.y, grid) };
+}
+
 export function snapCenteredTopLeft(
   topLeft: { x: number; y: number },
   width: number,
@@ -17,14 +23,13 @@ export function snapCenteredTopLeft(
   grid = CANVAS_GRID,
 ): { x: number; y: number } {
   const center = toCenterPosition(topLeft, width, height);
-  return toTopLeftPosition({ x: snapToGrid(center.x, grid), y: snapToGrid(center.y, grid) }, width, height);
+  return toTopLeftPosition(snapPositionToGrid(center, grid), width, height);
 }
 
-/** Even cell count so the box center sits on a canvas grid dot. */
+/** Integer cell size. Center snap, not even/odd cells, puts the origin on a grid dot. */
 export function snapGridSize(value: number, minCells = 2): number {
   const cells = Math.max(minCells, Math.round(value / CANVAS_GRID));
-  const even = cells % 2 === 0 ? cells : cells + 1;
-  return even * CANVAS_GRID;
+  return cells * CANVAS_GRID;
 }
 
 export function evenGridSize(value: number, minCells = 4): number {
@@ -35,7 +40,7 @@ export function gridCenter(size: number): number {
   return size / 2;
 }
 
-/** Border-inclusive line count. 9 lines = 8 cells = 88px; center (44) is a grid dot. */
+/** Border-inclusive line count. Size can be odd or even cells; snap always uses the center. */
 export const MIN_GRID_LINES = 3;
 export const MAX_GRID_LINES = 21;
 
