@@ -20,13 +20,13 @@ export function snapCenteredTopLeft(
   return toTopLeftPosition({ x: snapToGrid(center.x, grid), y: snapToGrid(center.y, grid) }, width, height);
 }
 
-/** Integer grid cells. Odd counts (9×7) put the box center on a grid point when origin is centered. */
+/** Even cell count so the box center sits on a canvas grid dot. */
 export function snapGridSize(value: number, minCells = 2): number {
   const cells = Math.max(minCells, Math.round(value / CANVAS_GRID));
-  return cells * CANVAS_GRID;
+  const even = cells % 2 === 0 ? cells : cells + 1;
+  return even * CANVAS_GRID;
 }
 
-/** Even number of grid cells so the mid-axis lands on the grid. */
 export function evenGridSize(value: number, minCells = 4): number {
   return snapGridSize(value, minCells);
 }
@@ -35,17 +35,17 @@ export function gridCenter(size: number): number {
   return size / 2;
 }
 
-/** Cell count shown in the editor. 9 cells → 99px so the center cell sits on a grid point. */
+/** Border-inclusive line count. 9 lines = 8 cells = 88px; center (44) is a grid dot. */
 export const MIN_GRID_LINES = 3;
 export const MAX_GRID_LINES = 21;
 
 export function sizeToGridLines(px: number): number {
-  return Math.max(MIN_GRID_LINES, Math.round(px / CANVAS_GRID));
+  return Math.max(MIN_GRID_LINES, Math.round(px / CANVAS_GRID) + 1);
 }
 
 export function gridLinesToSize(lines: number): number {
   const clamped = Math.max(MIN_GRID_LINES, Math.min(MAX_GRID_LINES, Math.round(lines) || MIN_GRID_LINES));
-  return clamped * CANVAS_GRID;
+  return (clamped - 1) * CANVAS_GRID;
 }
 
 export function toCenterPosition(

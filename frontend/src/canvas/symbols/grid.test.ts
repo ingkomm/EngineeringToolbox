@@ -10,13 +10,14 @@ describe("layout snap helpers", () => {
     expect(toTopLeftPosition(center, size.width, size.height)).toEqual(topLeft);
   });
 
-  it("snaps a 9×7 symbol so the visual center sits on a grid point", () => {
-    const size = { width: 99, height: 77 };
+  it("snaps a 9×7 symbol so the visual center sits on a grid dot", () => {
+    const size = { width: 88, height: 66 };
+    expect(size.width / 2 % CANVAS_GRID).toBe(0);
+    expect(size.height / 2 % CANVAS_GRID).toBe(0);
     const snapped = snapCenteredTopLeft({ x: 520, y: 88 }, size.width, size.height);
     const center = toCenterPosition(snapped, size.width, size.height);
     expect(center.x % CANVAS_GRID).toBe(0);
     expect(center.y % CANVAS_GRID).toBe(0);
-    expect(size.width / 2).toBe(49.5);
   });
 
   it("snaps a calculation card width to the canvas grid", () => {

@@ -852,4 +852,14 @@ describe("user symbol library", () => {
     expect(project.symbolLibrary?.map((item) => item.id)).toEqual(["valve", "pump", "point"]);
     expect(project.symbolLibrary?.find((item) => item.id === "pump")?.category).toBe("Rotating");
   });
+
+  it("deletes a library folder and returns symbols to the parent", () => {
+    let project = applyAll([
+      { type: "addLibraryCategory", path: "Rotating" },
+      { type: "updateLibrarySymbol", symbolId: "pump", patch: { category: "Rotating" } },
+      { type: "deleteLibraryCategory", path: "Rotating" },
+    ]);
+    expect(project.symbolCategories).toEqual([]);
+    expect(project.symbolLibrary?.find((item) => item.id === "pump")?.category).toBeUndefined();
+  });
 });

@@ -50,7 +50,7 @@ function drawing(
 }
 
 export function blankDrawing(): SymbolDrawing {
-  return drawing(99, 77, []);
+  return drawing(88, 66, []);
 }
 
 const EXAMPLES: Record<string, SymbolDrawing> = {

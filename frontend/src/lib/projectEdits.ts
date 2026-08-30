@@ -10,7 +10,7 @@ import type {
   ProjectDocument,
   RelationType,
 } from "../types/contract";
-import { firstEquipmentSymbol, findLibrarySymbol, libraryOf, moveLibrarySymbol, newBlankEquipmentSymbol, normalizeCategory, uniqueCategory } from "../canvas/symbols/library";
+import { firstEquipmentSymbol, findLibrarySymbol, libraryOf, moveLibrarySymbol, newBlankEquipmentSymbol, normalizeCategory, uniqueCategory, deleteLibraryFolder } from "../canvas/symbols/library";
 import { POINT_NODE_SIZE, snapCalcWidth, snapCenteredTopLeft, snapGridSize } from "../canvas/symbols/grid";
 import { resolveDrawing, withPorts } from "../canvas/symbols/drawing";
 import { blankProject } from "../example/blankProject";
@@ -93,6 +93,7 @@ export type WorkspaceEdit =
   | { type: "deleteLibrarySymbol"; symbolId: string }
   | { type: "moveLibrarySymbol"; symbolId: string; direction: -1 | 1 }
   | { type: "addLibraryCategory"; path: string }
+  | { type: "deleteLibraryCategory"; path: string }
   | {
       type: "updateLibrarySymbol";
       symbolId: string;
@@ -1010,6 +1011,8 @@ export function applyWorkspaceEdit(
       return moveLibrarySymbolEdit(project, edit.symbolId, edit.direction);
     case "addLibraryCategory":
       return addLibraryCategoryEdit(project, edit.path);
+    case "deleteLibraryCategory":
+      return deleteLibraryCategoryEdit(project, edit.path);
     case "updateLibrarySymbol":
       return updateLibrarySymbol(project, edit.symbolId, edit.patch);
     case "updateEquipment":
@@ -1116,6 +1119,15 @@ function addLibraryCategoryEdit(project: ProjectDocument, path: string): EditRes
   if (!next) return noEval(project);
   return {
     project: { ...project, symbolCategories: [...(project.symbolCategories ?? []), next] },
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
+function deleteLibraryCategoryEdit(project: ProjectDocument, path: string): EditResult {
+  const next = deleteLibraryFolder(libraryOf(project), project.symbolCategories ?? [], path);
+  return {
+    project: { ...project, symbolLibrary: next.library, symbolCategories: next.symbolCategories },
     dirtyObjectIds: [],
     shouldEvaluate: false,
   };

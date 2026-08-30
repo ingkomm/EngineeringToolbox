@@ -1638,12 +1638,40 @@ label.ghost-btn {
 .pid-port__label {
   display: none;
   position: absolute;
-  top: 50%;
-  left: 10px;
-  transform: translateY(-50%);
   font-size: 8px;
   color: #9ec0df;
   white-space: nowrap;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.pid-port--in .pid-port__label,
+.pid-port--left .pid-port__label {
+  right: calc(100% + 5px);
+  left: auto;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.pid-port--out .pid-port__label,
+.pid-port--right .pid-port__label {
+  left: calc(100% + 5px);
+  right: auto;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.pid-port--top .pid-port__label {
+  left: 50%;
+  top: auto;
+  bottom: calc(100% + 5px);
+  transform: translateX(-50%);
+}
+
+.pid-port--bottom .pid-port__label {
+  left: 50%;
+  top: calc(100% + 5px);
+  transform: translateX(-50%);
 }
 
 .pid-eq.is-hot .pid-port__label,

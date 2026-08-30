@@ -63,6 +63,29 @@ export function libraryFolders(library: LibrarySymbol[], extra: string[] = []): 
   return [...folders].sort((a, b) => a.localeCompare(b, "en"));
 }
 
+export function deleteLibraryFolder(
+  library: LibrarySymbol[],
+  categories: string[],
+  path: string,
+): { library: LibrarySymbol[]; symbolCategories: string[] } {
+  const folder = normalizeCategory(path);
+  if (!folder) return { library, symbolCategories: categories };
+  const parent = folder.includes("/") ? folder.split("/").slice(0, -1).join("/") : "";
+  return {
+    library: library.map((item) => {
+      const cat = categoryOf(item);
+      if (cat === folder || cat.startsWith(`${folder}/`)) {
+        return { ...item, category: parent || undefined };
+      }
+      return item;
+    }),
+    symbolCategories: categories.filter((item) => {
+      const name = normalizeCategory(item);
+      return name !== folder && !name.startsWith(`${folder}/`);
+    }),
+  };
+}
+
 export function symbolsInFolder(library: LibrarySymbol[], folder: string): LibrarySymbol[] {
   const path = normalizeCategory(folder);
   return library.filter((item) => categoryOf(item) === path);

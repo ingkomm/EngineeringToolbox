@@ -13,6 +13,11 @@ import { resolveDrawing, withPorts } from "./symbols/drawing";
 import { renderLibrarySymbol } from "./symbols/registry";
 import { SymbolEditor } from "./symbols/SymbolEditor";
 
+function parentFolder(path: string): string {
+  if (!path.includes("/")) return "";
+  return path.split("/").slice(0, -1).join("/");
+}
+
 export function IsoSymbolSidebar({
   project,
   onEdit,
@@ -167,6 +172,47 @@ function FolderTree({
         <button type="button" className="iso-sidebar__folder-name" onClick={() => setActiveFolder(path)}>
           {title}
         </button>
+        {pendingDelete === `folder:${path}` ? (
+          <>
+            <button
+              type="button"
+              className="iso-sidebar__mini"
+              data-testid={`btn-cancel-delete-folder-${path}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                setPendingDelete(null);
+              }}
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              className="iso-sidebar__mini iso-sidebar__mini--danger"
+              data-testid={`btn-confirm-delete-folder-${path}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                setPendingDelete(null);
+                if (activeFolder === path || activeFolder.startsWith(`${path}/`)) setActiveFolder(parentFolder(path));
+                onEdit({ type: "deleteLibraryCategory", path });
+              }}
+            >
+              확인
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            className="iso-sidebar__mini iso-sidebar__mini--danger"
+            data-testid={`btn-delete-folder-${path}`}
+            title="폴더 삭제"
+            onClick={(event) => {
+              event.stopPropagation();
+              setPendingDelete(`folder:${path}`);
+            }}
+          >
+            삭제
+          </button>
+        )}
       </div>
       {isOpen ? (
         <>
