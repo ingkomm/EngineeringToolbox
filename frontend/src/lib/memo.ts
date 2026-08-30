@@ -2,7 +2,7 @@ import type { MemoLink, MemoObject, MemoSection, WorksheetObject } from "../type
 import { newStableId } from "./ids";
 
 export const MEMO_ATTACHMENT_HANDLE = "MEMO";
-export const MEMO_DEFAULT_SIZE = { width: 220, height: 148 };
+export const MEMO_DEFAULT_SIZE = { width: 240, height: 220 };
 
 export function isMemoObject(object: WorksheetObject): object is MemoObject {
   return object.kind === "memo";

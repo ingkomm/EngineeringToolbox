@@ -7,6 +7,10 @@ import { renderMemoMarkdown } from "../lib/memoMarkdown";
 import { objectLinkSideOf } from "../lib/worksheet";
 import { snapGridSize } from "./symbols/grid";
 
+function stopKeys(event: { stopPropagation: () => void }) {
+  event.stopPropagation();
+}
+
 export type MemoObjectNodeType = Node<
   {
     object: MemoObject;
@@ -102,6 +106,7 @@ export function MemoObjectNode({ id, selected, data }: NodeProps<MemoObjectNodeT
             placeholder="제목"
             data-testid={`memo-${id}-title`}
             onPointerDown={(event) => event.stopPropagation()}
+            onKeyDown={stopKeys}
             onChange={(event) => onEdit({ type: "updateMemo", objectId: id, patch: { title: event.target.value } })}
             onFocus={() => setSelectedSectionId(null)}
           />
@@ -185,6 +190,7 @@ function TextSection({
         placeholder="마크다운 본문"
         data-testid={`memo-${memoId}-text-${section.id}`}
         onPointerDown={(event) => event.stopPropagation()}
+        onKeyDown={stopKeys}
         onFocus={onSelect}
         onChange={(event) =>
           onEdit({ type: "updateMemoSection", objectId: memoId, sectionId: section.id, patch: { content: event.target.value } })
@@ -236,6 +242,7 @@ function TableSection({
                       className="nodrag nopan nowheel"
                       value={cell}
                       onPointerDown={(event) => event.stopPropagation()}
+                      onKeyDown={stopKeys}
                       onFocus={onSelect}
                       onChange={(event) =>
                         setCells(

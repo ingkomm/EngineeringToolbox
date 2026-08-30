@@ -2405,8 +2405,8 @@ label.ghost-btn {
   opacity: 0;
 }
 
-.react-flow__node-memoObject .react-flow__resize-control.handle.right:not(.top):not(.bottom),
-.react-flow__node-memoObject .react-flow__resize-control.line.right {
+.react-flow__node-memoObject .react-flow__resize-control.line,
+.react-flow__node-memoObject .react-flow__resize-control.handle.right:not(.top):not(.bottom) {
   display: none;
 }
 

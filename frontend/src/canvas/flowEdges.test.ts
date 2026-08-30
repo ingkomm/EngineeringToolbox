@@ -213,3 +213,34 @@ describe("layout node origin", () => {
     });
   });
 });
+
+describe("memo visual links", () => {
+  it("draws a memo link from the right-edge MEMO handle to the target OBJ handle", () => {
+    const withMemo: ProjectDocument = {
+      ...project,
+      objects: [
+        ...project.objects,
+        {
+          kind: "memo",
+          id: "m_1",
+          title: "Note",
+          sections: [
+            { id: "s1", type: "text", content: "**bold**" },
+            { id: "s2", type: "table", cells: [["a"]] },
+          ],
+          links: [{ id: "l1", memoId: "m_1", targetObjectId: "obj_1" }],
+          position: { x: 0, y: 0 },
+          size: { width: 220, height: 148 },
+        },
+      ],
+    };
+    const edges = toFlowEdges(withMemo, () => undefined, () => undefined, () => undefined);
+    expect(edges.find((item) => item.id === "memolink:l1")).toMatchObject({
+      source: "m_1",
+      target: "obj_1",
+      sourceHandle: "MEMO",
+      targetHandle: "OBJ",
+      type: "memoLink",
+    });
+  });
+});

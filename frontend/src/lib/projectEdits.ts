@@ -1040,7 +1040,13 @@ export function applyWorkspaceEdit(
       return addWorksheetPoint(project, edit.position);
     case "addMemo":
       return {
-        project: { ...project, objects: [...project.objects, emptyMemo(edit.position)] },
+        project: {
+          ...project,
+          objects: [
+            ...project.objects,
+            emptyMemo(edit.position ?? { x: 80 + project.objects.length * 240, y: 88 }),
+          ],
+        },
         dirtyObjectIds: [],
         shouldEvaluate: false,
       };
