@@ -2230,7 +2230,7 @@ label.ghost-btn {
   padding: 10px 10px 12px;
   color: #e8f2fb;
   font-size: 12px;
-  overflow: auto;
+  overflow: visible;
 }
 
 .memo-node.is-selected {
@@ -2272,6 +2272,8 @@ label.ghost-btn {
   color: #c5d8ea;
   line-height: 1.35;
   font-size: 11px;
+  overflow: auto;
+  min-height: 0;
 }
 
 .memo-node__preview--empty {
