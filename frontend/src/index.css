@@ -165,6 +165,33 @@ label.ghost-btn {
   max-height: 420px;
 }
 
+.dev-panel {
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.dev-panel summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.dev-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.dev-panel[open] summary {
+  margin-bottom: 10px;
+}
+
+.dev-panel section + section {
+  margin-top: 14px;
+}
+
 .ok-text {
   color: var(--accent);
 }
@@ -574,6 +601,28 @@ label.ghost-btn {
   margin: 0 0 8px;
   font-size: 11px;
   color: var(--muted);
+}
+
+.calc-bare {
+  padding: 8px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.calc-bare__hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.calc-bare__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ws-node--calc.is-bare {
+  min-height: 0;
 }
 
 .calc-row {
@@ -2221,13 +2270,18 @@ label.ghost-btn {
 
 .react-flow__node-memoObject {
   overflow: visible !important;
+  height: auto !important;
+  width: auto !important;
 }
 
 .memo-node {
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  width: 360px;
+  min-width: 360px;
+  min-height: 180px;
+  height: auto;
   padding: 0;
   font-size: 12px;
   overflow: visible;
@@ -2260,18 +2314,17 @@ label.ghost-btn {
 }
 
 .memo-node__stack {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 8px 10px 10px;
+  overflow: visible;
 }
 
 .memo-node__body {
   min-height: 52px;
   resize: none;
+  overflow: hidden;
 }
 
 .memo-node__preview,
@@ -2311,7 +2364,7 @@ label.ghost-btn {
   background: var(--input);
   border: 1px solid var(--line);
   border-radius: 6px;
-  overflow: auto;
+  overflow: visible;
 }
 
 .memo-md code {
@@ -2333,7 +2386,8 @@ label.ghost-btn {
 
 .memo-node__table td {
   border: 1px solid var(--line);
-  padding: 2px 4px;
+  padding: 6px 8px;
+  min-height: 28px;
 }
 
 .memo-node__add,
@@ -2410,16 +2464,13 @@ label.ghost-btn {
 }
 
 .memo-md {
-  border: 1px solid var(--line);
-  border-radius: 6px;
   padding: 6px 8px;
-  background: var(--input);
 }
 
 .memo-node__table-wrap {
   border: 1px solid var(--line);
   border-radius: 6px;
-  overflow: auto;
+  overflow: visible;
 }
 
 .memo-attach-side {
@@ -2461,9 +2512,15 @@ label.ghost-btn {
   opacity: 0;
 }
 
+.memo-node:not(:hover):not(.is-selected) .memo-attach-cluster {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .react-flow:has(.react-flow__connection) .memo-attach-cluster,
 .react-flow:has(.react-flow__connectionline) .memo-attach-cluster {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .memo-link-edge {

@@ -3,7 +3,7 @@ import { newStableId } from "./ids";
 
 export const MEMO_ATTACHMENT_HANDLE = "MEMO";
 export const MEMO_RECEIVE_HANDLE = `${MEMO_ATTACHMENT_HANDLE}-in`;
-export const MEMO_DEFAULT_SIZE = { width: 240, height: 220 };
+export const MEMO_DEFAULT_SIZE = { width: 360, height: 180 };
 
 export function isMemoObject(object: WorksheetObject): object is MemoObject {
   return object.kind === "memo";

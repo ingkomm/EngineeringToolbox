@@ -36,9 +36,8 @@ export function toFlowNodeRecords(
         position: object.position,
         data: { object, onEdit },
         draggable: true,
-        style: { width: object.size.width, height: object.size.height },
+        style: { width: object.size.width },
         width: object.size.width,
-        height: object.size.height,
       };
     }
     if (isLayoutObject(object) && !isCalculationObject(object)) {

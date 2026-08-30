@@ -334,25 +334,28 @@ export function App() {
               ))}
             </ul>
           </section>
-          <section>
-            <h2>Mapping JSON</h2>
-            <pre data-testid="mapping-json">{mappingJson}</pre>
-          </section>
-          <section>
-            <h2>마지막 계산</h2>
-            <p>대상: {evaluated.length ? evaluated.join(", ") : "—"}</p>
-            {errors.length === 0 ? (
-              <p className="ok-text">오류 없음</p>
-            ) : (
-              <ul className="error-list">
-                {errors.map((error, index) => (
-                  <li key={`${error.code}-${index}`}>
-                    <strong>{error.code}</strong> {error.objectId}/{error.variableId}: {error.message}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <details className="dev-panel">
+            <summary>Developer</summary>
+            <section>
+              <h2>Mapping JSON</h2>
+              <pre data-testid="mapping-json">{mappingJson}</pre>
+            </section>
+            <section>
+              <h2>마지막 계산</h2>
+              <p>대상: {evaluated.length ? evaluated.join(", ") : "—"}</p>
+              {errors.length === 0 ? (
+                <p className="ok-text">오류 없음</p>
+              ) : (
+                <ul className="error-list">
+                  {errors.map((error, index) => (
+                    <li key={`${error.code}-${index}`}>
+                      <strong>{error.code}</strong> {error.objectId}/{error.variableId}: {error.message}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </details>
         </aside>
       </main>
     </div>

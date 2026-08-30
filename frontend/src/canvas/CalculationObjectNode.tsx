@@ -39,9 +39,10 @@ function stopKeys(event: KeyboardEvent) {
 export function CalculationObjectNode({ id, selected, data }: NodeProps<CalculationObjectNodeType>) {
   const { object, project, mappedInputIds, quantities, onEdit } = data;
   const mapped = new Set(mappedInputIds);
+  const isBare = object.inputs.length === 0 && object.calculations.length === 0 && object.outputs.length === 0;
   const [expanded, setExpanded] = useState(false);
   const [resizeWidth, setResizeWidth] = useState<number | null>(null);
-  const open = expanded;
+  const open = isBare ? false : expanded;
   const cardWidth = resizeWidth ?? calcCardWidth(open, object.width);
   const { setNodes, getZoom } = useReactFlow();
   const resizeDrag = useRef<{
@@ -76,6 +77,10 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
     );
     updateNodeInternals(id);
   }, [cardWidth, handleSignature, id, setNodes, updateNodeInternals]);
+
+  useEffect(() => {
+    if (!isBare) setExpanded(true);
+  }, [isBare]);
 
   useEffect(() => {
     if (resizeWidth == null || object.width == null) return;
@@ -146,7 +151,7 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
 
   return (
     <article
-      className={`ws-node ws-node--calc calc-node ${selected ? "is-selected" : ""} ${open ? "is-expanded" : ""}`}
+      className={`ws-node ws-node--calc calc-node ${selected ? "is-selected" : ""} ${open ? "is-expanded" : ""} ${isBare ? "is-bare" : ""}`}
       data-testid={`object-${id}`}
       style={{ width: cardWidth }}
     >
@@ -210,6 +215,7 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
               ×
             </button>
           </div>
+          {!isBare ? (
           <button
             type="button"
             className="icon-btn ws-node__expand nodrag"
@@ -222,10 +228,35 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
           >
             {open && expanded ? "▴" : "▾"}
           </button>
+          ) : null}
         </div>
       </header>
 
-      {!open ? (
+      {isBare ? (
+        <div className="calc-bare">
+          <p className="calc-bare__hint">비어 있음</p>
+          <div className="calc-bare__actions">
+            <button
+              type="button"
+              className="link-btn nodrag"
+              data-testid={`object-${id}-add-input`}
+              onClick={() => onEdit({ type: "addInput", objectId: id })}
+            >
+              + 변수
+            </button>
+            <button
+              type="button"
+              className="link-btn nodrag"
+              data-testid={`object-${id}-add-calc`}
+              onClick={() => onEdit({ type: "addCalculation", objectId: id })}
+            >
+              + 수식
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {!open && !isBare ? (
         <div className="ws-node__compact">
           <div className="ws-node__values">
             {object.outputs.length === 0 ? <span className="ws-node__muted">값 없음</span> : null}

@@ -33,26 +33,22 @@ export function MemoObjectNode({ id, selected, data }: NodeProps<MemoObjectNodeT
     }
   }, [selected]);
 
-  useEffect(() => {
-    if (!editing) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setEditing(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [editing]);
-
   useLayoutEffect(() => {
     updateNodeInternals(id);
-  }, [id, side, object.size.width, object.size.height, updateNodeInternals]);
+  }, [id, side, editing, object.sections, object.title, object.size.width, updateNodeInternals]);
 
   return (
     <article
-      className={`memo-node ws-node ${selected ? "is-selected" : ""} ${editing ? "is-editing" : ""}`}
+      className={`memo-node ws-node ${selected ? "is-selected" : ""} ${editing ? "is-editing" : "is-view"}`}
       data-testid={`object-${id}`}
-      style={{ width: object.size.width, height: object.size.height }}
+      style={{ width: object.size.width }}
       onKeyDownCapture={(event) => {
-        if (editing) event.stopPropagation();
+        if (!editing) return;
+        event.stopPropagation();
+        if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+          event.preventDefault();
+          setEditing(false);
+        }
       }}
       onDoubleClick={(event) => {
         event.stopPropagation();
@@ -61,8 +57,8 @@ export function MemoObjectNode({ id, selected, data }: NodeProps<MemoObjectNodeT
     >
       <NodeResizer
         isVisible={selected}
-        minWidth={160}
-        minHeight={110}
+        minWidth={360}
+        minHeight={180}
         onResizeEnd={(_event, params) =>
           onEdit({
             type: "updateMemo",
@@ -99,7 +95,7 @@ export function MemoObjectNode({ id, selected, data }: NodeProps<MemoObjectNodeT
           <h3 className="memo-node__title">{object.title.trim() || "제목 없음"}</h3>
         )}
       </header>
-      <div className="memo-node__stack nowheel">
+      <div className="memo-node__stack">
         {object.sections.length === 0 && !editing ? <p className="memo-node__preview memo-node__preview--empty">빈 기록</p> : null}
         {object.sections.map((section) =>
           section.type === "text" ? (
