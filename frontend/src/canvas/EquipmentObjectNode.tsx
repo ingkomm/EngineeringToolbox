@@ -85,6 +85,7 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
           className={`pid-port pid-port--free pid-port--${port.side} pid-port--${port.id.startsWith("IN_") ? "in" : "out"} ${showPorts ? "is-visible" : ""}`}
           style={port.style}
           data-testid={`object-${id}-${port.id}`}
+          data-port-category="arrangement-point"
           title={`${id}.${port.id}`}
         >
           <span className="pid-port__label">{port.id}</span>

@@ -76,6 +76,16 @@ const EXAMPLES: Record<string, SymbolDrawing> = {
       [22, 44],
     ]),
   ]),
+  vessel: drawing(66, 77, [
+    line("l", 11, 22, 11, 55),
+    line("r", 55, 22, 55, 55),
+    line("t1", 11, 22, 22, 11),
+    line("t2", 22, 11, 44, 11),
+    line("t3", 44, 11, 55, 22),
+    line("b1", 11, 55, 22, 66),
+    line("b2", 22, 66, 44, 66),
+    line("b3", 44, 66, 55, 55),
+  ]),
 };
 
 export function defaultDrawing(symbolId: string | undefined): SymbolDrawing {

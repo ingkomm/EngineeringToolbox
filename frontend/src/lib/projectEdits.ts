@@ -45,7 +45,7 @@ export const VARIABLE_ID_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 export const OBJECT_ID_RE = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 
 export type WorkspaceEdit =
-  | { type: "addObject" }
+  | { type: "addObject"; position?: { x: number; y: number } }
   | { type: "deleteObject"; objectId: string }
   | { type: "renameObject"; objectId: string; name: string }
   | { type: "updateObject"; objectId: string; patch: { id?: string; name?: string; width?: number; position?: { x: number; y: number } } }
@@ -87,8 +87,8 @@ export type WorkspaceEdit =
   | { type: "toggleEdge"; edgeId: string }
   | { type: "toggleEdgeCollapsed"; edgeId: string }
   | { type: "deleteEdges"; edgeIds: string[] }
-  | { type: "addEquipment"; symbolId?: string }
-  | { type: "addPoint" }
+  | { type: "addEquipment"; symbolId?: string; position?: { x: number; y: number } }
+  | { type: "addPoint"; position?: { x: number; y: number } }
   | { type: "addLibrarySymbol"; category?: string }
   | { type: "deleteLibrarySymbol"; symbolId: string }
   | { type: "moveLibrarySymbol"; symbolId: string; direction: -1 | 1 }
@@ -503,7 +503,7 @@ export function applyWorkspaceEdit(
         kind: "calculation",
         id,
         name: nextObjectName(project),
-        position: { x: 80 + index * 980, y: 88 },
+        position: edit.position ?? { x: 80 + index * 980, y: 88 },
         inputs: [],
         calculations: [],
         outputs: [],
@@ -1000,9 +1000,9 @@ export function applyWorkspaceEdit(
       };
     }
     case "addEquipment":
-      return addWorksheetEquipment(project, edit.symbolId);
+      return addWorksheetEquipment(project, edit.symbolId, edit.position);
     case "addPoint":
-      return addWorksheetPoint(project);
+      return addWorksheetPoint(project, edit.position);
     case "addLibrarySymbol":
       return addLibrarySymbol(project, edit.category);
     case "deleteLibrarySymbol":
@@ -1068,7 +1068,11 @@ function noEval(project: ProjectDocument): EditResult {
   return { project, dirtyObjectIds: [], shouldEvaluate: false };
 }
 
-function addWorksheetEquipment(project: ProjectDocument, symbolId?: string): EditResult {
+function addWorksheetEquipment(
+  project: ProjectDocument,
+  symbolId?: string,
+  position?: { x: number; y: number },
+): EditResult {
   const template = symbolId ? findLibrarySymbol(project, symbolId) : firstEquipmentSymbol(project);
   if (!template || template.kind !== "equipment") return noEval(project);
   const id = nextPrefixedObjectId(project, "EQ");
@@ -1079,7 +1083,7 @@ function addWorksheetEquipment(project: ProjectDocument, symbolId?: string): Edi
     kind: "equipment",
     id,
     name: nextEquipmentName(project, template.id),
-    position: nextLayoutPosition(project, width, height),
+    position: position ?? nextLayoutPosition(project, width, height),
     symbolId: template.id,
     inCount: template.inCount ?? 1,
     outCount: template.outCount ?? 1,
@@ -1481,12 +1485,12 @@ function alignWorksheetObjects(
   };
 }
 
-function addWorksheetPoint(project: ProjectDocument): EditResult {
+function addWorksheetPoint(project: ProjectDocument, position?: { x: number; y: number }): EditResult {
   const id = nextPrefixedObjectId(project, "PT");
   const object = normalizePointObject({
     id,
     name: id,
-    position: nextLayoutPosition(project),
+    position: position ?? nextLayoutPosition(project),
     connectionCount: 4,
   });
   return { project: { ...project, objects: [...project.objects, object] }, dirtyObjectIds: [], shouldEvaluate: false };

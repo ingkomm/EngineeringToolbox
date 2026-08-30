@@ -231,6 +231,7 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
                 type="target"
                 position={Position.Left}
                 className="ws-port calc-handle calc-handle--in calc-handle--rail"
+                portCategory="calc-input"
                 style={{ top: `${((index + 1) / (object.inputs.length + 1)) * 100}%` }}
                 label={item.id}
               />
@@ -245,6 +246,7 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
                 type="source"
                 position={Position.Right}
                 className="ws-port calc-handle calc-handle--out calc-handle--rail"
+                portCategory="calc-output"
                 style={{ top: `${((index + 1) / (object.outputs.length + 1)) * 100}%` }}
                 label={item.id}
               />
@@ -286,6 +288,7 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
                 type="target"
                 position={Position.Left}
                 className="ws-port calc-handle calc-handle--in"
+                portCategory="calc-input"
                 label={item.id}
               />
               <div className="port-tools ws-reveal">
@@ -508,6 +511,7 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
               type="source"
               position={Position.Right}
               className="ws-port calc-handle calc-handle--out"
+              portCategory="calc-output"
               label={item.id}
             />
           </div>

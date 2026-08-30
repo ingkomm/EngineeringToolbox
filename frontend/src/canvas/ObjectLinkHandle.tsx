@@ -19,6 +19,7 @@ export function ObjectLinkHandle({
         position={side === "bottom" ? Position.Bottom : Position.Top}
         id={OBJECT_LINK_HANDLE}
         className={`obj-link-handle obj-link-handle--${side}`}
+        data-port-category="arrangement-point"
         data-testid={`object-${nodeId}-obj`}
         title="객체 링크"
         isConnectable

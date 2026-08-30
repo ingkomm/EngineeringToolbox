@@ -839,7 +839,7 @@ describe("user symbol library", () => {
     expect(project.symbolLibrary?.find((item) => item.id === "pump")?.name).toBe("Main Pump");
     expect(project.objects.find(isEquipmentObject)?.drawing?.primitives).toEqual([]);
     project = applyWorkspaceEdit(project, { type: "deleteLibrarySymbol", symbolId: "valve" }, FALLBACK_QUANTITIES).project;
-    expect(project.symbolLibrary?.map((item) => item.id)).toEqual(["pump", "point", "sym_1"]);
+    expect(project.symbolLibrary?.map((item) => item.id)).toEqual(["pump", "vessel", "sym_1"]);
   });
 
   it("reorders library symbols and assigns a category", () => {
@@ -849,7 +849,7 @@ describe("user symbol library", () => {
       { type: "updateLibrarySymbol", symbolId: "pump", patch: { category: "Rotating" } },
     ]);
     expect(project.symbolCategories).toEqual(["Rotating"]);
-    expect(project.symbolLibrary?.map((item) => item.id)).toEqual(["valve", "pump", "point"]);
+    expect(project.symbolLibrary?.map((item) => item.id)).toEqual(["valve", "pump", "vessel"]);
     expect(project.symbolLibrary?.find((item) => item.id === "pump")?.category).toBe("Rotating");
   });
 

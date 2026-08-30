@@ -4,15 +4,16 @@ import {
   deleteLibraryFolder,
   moveLibrarySymbol,
   newBlankEquipmentSymbol,
+  symbolsInFolder,
   uniqueCategory,
 } from "./library";
 
 describe("user symbol library", () => {
-  it("starts with pump, valve, and point", () => {
+  it("starts with pump, valve, and vessel as arrangement symbols", () => {
     expect(defaultSymbolLibrary().map((item) => [item.id, item.kind])).toEqual([
       ["pump", "equipment"],
       ["valve", "equipment"],
-      ["point", "point"],
+      ["vessel", "equipment"],
     ]);
   });
 
@@ -24,8 +25,8 @@ describe("user symbol library", () => {
 
   it("reorders siblings inside a category", () => {
     const library = defaultSymbolLibrary();
-    expect(moveLibrarySymbol(library, "pump", 1).map((item) => item.id)).toEqual(["valve", "pump", "point"]);
-    expect(moveLibrarySymbol(library, "pump", -1).map((item) => item.id)).toEqual(["pump", "valve", "point"]);
+    expect(moveLibrarySymbol(library, "pump", 1).map((item) => item.id)).toEqual(["valve", "pump", "vessel"]);
+    expect(moveLibrarySymbol(library, "pump", -1).map((item) => item.id)).toEqual(["pump", "valve", "vessel"]);
   });
 
   it("keeps unique folder names", () => {
@@ -41,5 +42,10 @@ describe("user symbol library", () => {
     const result = deleteLibraryFolder(library, ["Rotating", "Rotating/Pumps"], "Rotating/Pumps");
     expect(result.symbolCategories).toEqual(["Rotating"]);
     expect(result.library.find((item) => item.id === "pump")?.category).toBe("Rotating");
+  });
+
+  it("hides a legacy point template from arrangement folders", () => {
+    const library = [...defaultSymbolLibrary(), { id: "point", name: "Point", kind: "point" as const }];
+    expect(symbolsInFolder(library, "").map((item) => item.id)).toEqual(["pump", "valve", "vessel"]);
   });
 });

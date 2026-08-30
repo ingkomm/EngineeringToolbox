@@ -4,7 +4,7 @@ import { CANVAS_GRID, gridLinesToSize, sizeToGridLines } from "./grid";
 
 describe("symbol drawings", () => {
   it("keeps pump and valve vertices on the canvas grid", () => {
-    for (const id of ["pump", "valve"]) {
+    for (const id of ["pump", "valve", "vessel"]) {
       const drawing = defaultDrawing(id);
       expect(drawing.width % CANVAS_GRID).toBe(0);
       expect(drawing.height % CANVAS_GRID).toBe(0);

@@ -86,9 +86,17 @@ export function deleteLibraryFolder(
   };
 }
 
+export function isArrangementSymbol(item: Pick<LibrarySymbol, "kind">): boolean {
+  return item.kind === "equipment";
+}
+
+export function arrangementSymbols(library: LibrarySymbol[]): LibrarySymbol[] {
+  return library.filter(isArrangementSymbol);
+}
+
 export function symbolsInFolder(library: LibrarySymbol[], folder: string): LibrarySymbol[] {
   const path = normalizeCategory(folder);
-  return library.filter((item) => categoryOf(item) === path);
+  return library.filter((item) => isArrangementSymbol(item) && categoryOf(item) === path);
 }
 
 export function defaultSymbolLibrary(): LibrarySymbol[] {
@@ -109,7 +117,14 @@ export function defaultSymbolLibrary(): LibrarySymbol[] {
       outCount: 1,
       drawing: defaultDrawing("valve"),
     },
-    { id: "point", name: "Point", kind: "point" },
+    {
+      id: "vessel",
+      name: "Vessel",
+      kind: "equipment",
+      inCount: 1,
+      outCount: 1,
+      drawing: defaultDrawing("vessel"),
+    },
   ];
 }
 

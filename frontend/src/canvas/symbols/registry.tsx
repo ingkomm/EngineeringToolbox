@@ -4,14 +4,28 @@ import type { LibrarySymbol } from "./library";
 import { resolveDrawing } from "./drawing";
 import { DrawingSvg } from "./DrawingSvg";
 
-export function renderLibrarySymbol(item: LibrarySymbol, title?: string): ReactElement {
-  if (item.kind === "point") {
+export function renderSystemLibraryTile(kind: "point" | "calculation", title?: string): ReactElement {
+  if (kind === "point") {
     return (
-      <svg viewBox="0 0 44 44" className="pid-symbol-svg" aria-label={title ?? item.name}>
+      <svg viewBox="0 0 44 44" className="pid-symbol-svg" aria-label={title ?? "Point"}>
         <circle cx="22" cy="22" r="4" fill="none" stroke="currentColor" strokeWidth="1.7" />
         <circle cx="22" cy="22" r="2" fill="currentColor" stroke="none" />
       </svg>
     );
+  }
+  return (
+    <svg viewBox="0 0 44 44" className="pid-symbol-svg" aria-label={title ?? "Calculation"}>
+      <rect x="6" y="10" width="32" height="24" rx="3" fill="none" stroke="currentColor" strokeWidth="1.7" />
+      <line x1="11" y1="18" x2="27" y2="18" stroke="currentColor" strokeWidth="1.5" />
+      <line x1="11" y1="24" x2="33" y2="24" stroke="currentColor" strokeWidth="1.5" />
+      <line x1="11" y1="30" x2="22" y2="30" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+export function renderLibrarySymbol(item: LibrarySymbol, title?: string): ReactElement {
+  if (item.kind === "point") {
+    return renderSystemLibraryTile("point", title ?? item.name);
   }
   const drawing = resolveDrawing(item.id, item.drawing);
   return <DrawingSvg drawing={drawing} title={title ?? item.name} />;

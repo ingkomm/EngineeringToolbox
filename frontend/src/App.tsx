@@ -297,9 +297,10 @@ export function App() {
           <section>
             <h2>워크시트</h2>
             <p className="side-pane__hint">
-              Calculation Object는 카드 UI를 유지합니다. Equipment와 Point는 P&ID 도면 심볼이며 계산하지
-              않습니다. Equipment는 더블클릭으로 Tag/속성을 편집하고, Point는 작은 연결점입니다. Pipe/Signal은
-              Point 연결이며 값 연동(value flow)과 섞이지 않습니다.
+              Calculation Object는 카드 UI를 유지합니다. Point와 Calculation은 SYSTEM 고정 항목입니다.
+              Pump/Valve/Vessel과 사용자 SVG는 Arrangement Symbol이며 라이브러리에서 편집·삭제합니다.
+              Equipment와 Point는 P&ID 도면 심볼이며 계산하지 않습니다. Calc Input은 하늘색, Calc Output은
+              초록색, Arrangement Point는 노란색입니다. Pipe/Signal은 값 연동(value flow)과 섞이지 않습니다.
             </p>
             <button
               className="ghost-btn"

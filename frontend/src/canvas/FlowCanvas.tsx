@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import {
   Background,
   BackgroundVariant,
@@ -28,17 +28,18 @@ import { mergeFlowNodes, toFlowEdges, toFlowNodeRecords } from "./flowModel";
 import { CANVAS_GRID, POINT_NODE_SIZE, snapPositionToGrid, toTopLeftPosition } from "./symbols/grid";
 import { parseHandleId } from "../lib/display";
 import { type WorkspaceEdit } from "../lib/projectEdits";
+import { parseLibraryDrag, libraryPlaceEdit } from "../lib/libraryPlace";
+import { associationConnectTargets, isValidCanvasConnection } from "../lib/connectionRules";
+import { findLibrarySymbol } from "./symbols/library";
 import { equipmentBounds } from "../lib/arrangementView";
 import type { QuantitySpec } from "../lib/quantities";
 import type { ProjectDocument } from "../types/contract";
 import {
   OBJECT_LINK_HANDLE,
-  canConnectObjectLink,
   isCalculationObject,
   isLayoutObject,
   isLayoutPortId,
   isObjectLinkHandle,
-  isValueFlowEdge,
 } from "../lib/worksheet";
 
 const nodeTypes = {
@@ -99,6 +100,7 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
     onEdit({ type: "togglePointLink", pointId, end });
   }, [onEdit]);
 
+  const { screenToFlowPosition } = useReactFlow();
   const [nodes, setNodes] = useNodesState<Node>(toFlowNodeRecords(project, quantities, onEdit) as Node[]);
   const [edges, setEdges, onEdgesChange] = useEdgesState(
     toFlowEdges(project, onToggle, onToggleCollapsed, onToggleDirection, onEdit),
@@ -143,24 +145,19 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
 
   const onConnect = useCallback(
     (connection: Connection) => {
+      if (!isValidCanvasConnection(project, connection)) return;
       if (!connection.source || !connection.target) return;
-      if (connection.source === connection.target) return;
       const sourceObject = project.objects.find((item) => item.id === connection.source);
       const targetObject = project.objects.find((item) => item.id === connection.target);
       if (!sourceObject || !targetObject) return;
 
-      if (
-        (isObjectLinkHandle(connection.sourceHandle) || isObjectLinkHandle(connection.targetHandle)) &&
-        ((isCalculationObject(sourceObject) && isLayoutObject(targetObject)) ||
-          (isLayoutObject(sourceObject) && isCalculationObject(targetObject)))
-      ) {
-        const calc = isCalculationObject(sourceObject) ? sourceObject : targetObject;
-        const layout = isLayoutObject(sourceObject) ? sourceObject : targetObject;
-        if (!canConnectObjectLink(project, calc.id, layout.id)) return;
+      if (isObjectLinkHandle(connection.sourceHandle) || isObjectLinkHandle(connection.targetHandle)) {
+        const assoc = associationConnectTargets(project, connection.source, connection.target);
+        if (!assoc) return;
         onEdit({
           type: "connectLink",
-          objectId: calc.id,
-          targetObjectId: layout.id,
+          objectId: assoc.calcId,
+          targetObjectId: assoc.layoutId,
           targetPortId: OBJECT_LINK_HANDLE,
         });
         return;
@@ -198,50 +195,34 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
   );
 
   const isValidConnection = useCallback(
-    (connection: Connection | Edge) => {
-      if (!connection.source || !connection.target) return false;
-      if (connection.source === connection.target) return false;
-      const sourceObject = project.objects.find((item) => item.id === connection.source);
-      const targetObject = project.objects.find((item) => item.id === connection.target);
-      if (!sourceObject || !targetObject) return false;
-
-      if (isObjectLinkHandle(connection.sourceHandle) || isObjectLinkHandle(connection.targetHandle)) {
-        if (
-          !(
-            (isCalculationObject(sourceObject) && isLayoutObject(targetObject)) ||
-            (isLayoutObject(sourceObject) && isCalculationObject(targetObject))
-          )
-        ) {
-          return false;
-        }
-        const calc = isCalculationObject(sourceObject) ? sourceObject : targetObject;
-        const layout = isLayoutObject(sourceObject) ? sourceObject : targetObject;
-        return canConnectObjectLink(project, calc.id, layout.id);
-      }
-      if (isLayoutObject(sourceObject) && isLayoutObject(targetObject)) {
-        return isLayoutPortId(connection.sourceHandle) && isLayoutPortId(connection.targetHandle);
-      }
-
-      const source = parseHandleId(connection.sourceHandle);
-      const target = parseHandleId(connection.targetHandle);
-      if (source?.kind !== "out" || target?.kind !== "in") return false;
-      if (!isCalculationObject(sourceObject) || !isCalculationObject(targetObject)) return false;
-      if (targetObject.calculations.some((item) => item.id === source.variableId)) return false;
-      const sourceBusy = project.edges.some(
-        (edge) =>
-          isValueFlowEdge(edge) &&
-          edge.sourceObjectId === connection.source &&
-          edge.sourceVariableId === source.variableId,
-      );
-      const targetBusy = project.edges.some(
-        (edge) =>
-          isValueFlowEdge(edge) &&
-          edge.targetObjectId === connection.target &&
-          edge.targetVariableId === target.variableId,
-      );
-      return !sourceBusy && !targetBusy;
-    },
+    (connection: Connection | Edge) => isValidCanvasConnection(project, connection),
     [project],
+  );
+
+  const onDragOver = useCallback((event: DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  }, []);
+
+  const onDrop = useCallback(
+    (event: DragEvent) => {
+      event.preventDefault();
+      const payload = parseLibraryDrag(event.dataTransfer.getData("text/plain"));
+      if (!payload) return;
+      const flow = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      const snapped = snap ? snapPositionToGrid(flow) : flow;
+      let position = snapped;
+      if (payload.place === "point") {
+        position = toTopLeftPosition(snapped, POINT_NODE_SIZE, POINT_NODE_SIZE);
+      } else if (payload.place === "equipment") {
+        const template = findLibrarySymbol(project, payload.symbolId);
+        const width = template?.drawing?.width ?? 99;
+        const height = template?.drawing?.height ?? 77;
+        position = toTopLeftPosition(snapped, width, height);
+      }
+      onEdit(libraryPlaceEdit(payload, position));
+    },
+    [onEdit, project, screenToFlowPosition, snap],
   );
 
   const copySelected = useCallback(() => {
@@ -287,6 +268,8 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
       isValidConnection={isValidConnection}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
       defaultEdgeOptions={defaultEdgeOptions}
       connectionLineType={ConnectionLineType.SmoothStep}
       connectionMode={ConnectionMode.Loose}
@@ -339,14 +322,6 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
       <Controls className="ws-zoom-controls" />
       <CanvasZoomHotkeys />
       <Panel position="top-left" className="canvas-panel canvas-panel--pid">
-        <button
-          type="button"
-          className="ghost-btn"
-          data-testid="btn-add-object"
-          onClick={() => onEdit({ type: "addObject" })}
-        >
-          Cal. 추가
-        </button>
         <button
           type="button"
           className={`ghost-btn ${selectMode ? "ghost-btn--on" : ""}`}

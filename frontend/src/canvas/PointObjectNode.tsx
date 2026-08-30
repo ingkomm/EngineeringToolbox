@@ -69,6 +69,7 @@ export function PointObjectNode({ id, selected, data }: NodeProps<PointObjectNod
             object.connections[index] ? "is-on" : ""
           } ${hot ? "is-visible" : ""}`}
           data-testid={`object-${id}-${endId}`}
+          data-port-category="arrangement-point"
           title={`${id}.${endId}`}
         />
       ))}

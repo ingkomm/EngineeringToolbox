@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, type DragEvent, type ReactNode } from "react";
 import type { ProjectDocument } from "../types/contract";
 import type { WorkspaceEdit } from "../lib/projectEdits";
+import { encodeLibraryDrag, libraryPlaceEdit, type LibraryDragPayload } from "../lib/libraryPlace";
 import {
   categoryOf,
   libraryFolders,
@@ -10,7 +11,7 @@ import {
   type LibrarySymbol,
 } from "./symbols/library";
 import { resolveDrawing, withPorts } from "./symbols/drawing";
-import { renderLibrarySymbol } from "./symbols/registry";
+import { renderLibrarySymbol, renderSystemLibraryTile } from "./symbols/registry";
 import { SymbolEditor } from "./symbols/SymbolEditor";
 
 function parentFolder(path: string): string {
@@ -78,6 +79,26 @@ export function IsoSymbolSidebar({
         </div>
       </header>
       <div className="iso-sidebar__groups">
+        <section className="iso-sidebar__system" data-testid="library-system">
+          <p className="iso-sidebar__section">SYSTEM</p>
+          <SystemTile
+            testId="btn-add-point"
+            name="Point"
+            payload={{ place: "point" }}
+            onEdit={onEdit}
+          >
+            {renderSystemLibraryTile("point")}
+          </SystemTile>
+          <SystemTile
+            testId="btn-add-calculation"
+            name="Calculation"
+            payload={{ place: "calculation" }}
+            onEdit={onEdit}
+          >
+            {renderSystemLibraryTile("calculation")}
+          </SystemTile>
+        </section>
+        <p className="iso-sidebar__section">ARRANGEMENT SYMBOLS</p>
         <FolderBlock
           title="라이브러리"
           folder=""
@@ -251,6 +272,42 @@ function FolderTree({
   );
 }
 
+function startLibraryDrag(event: DragEvent, payload: LibraryDragPayload) {
+  event.dataTransfer.setData("text/plain", encodeLibraryDrag(payload));
+  event.dataTransfer.effectAllowed = "copy";
+}
+
+function SystemTile({
+  testId,
+  name,
+  payload,
+  onEdit,
+  children,
+}: {
+  testId: string;
+  name: string;
+  payload: LibraryDragPayload;
+  onEdit: (edit: WorkspaceEdit) => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="iso-sidebar__row iso-sidebar__row--system">
+      <button
+        type="button"
+        className="iso-sidebar__tile"
+        title={name}
+        data-testid={testId}
+        draggable
+        onDragStart={(event) => startLibraryDrag(event, payload)}
+        onClick={() => onEdit(libraryPlaceEdit(payload))}
+      >
+        <span className="iso-sidebar__icon">{children}</span>
+        <span className="iso-sidebar__name">{name}</span>
+      </button>
+    </div>
+  );
+}
+
 function FolderBlock({
   title,
   allFolders,
@@ -289,10 +346,10 @@ function FolderBlock({
             type="button"
             className="iso-sidebar__tile"
             title={item.name}
-            data-testid={item.kind === "point" ? "btn-add-point" : `btn-add-equipment-${item.id}`}
-            onClick={() =>
-              onEdit(item.kind === "point" ? { type: "addPoint" } : { type: "addEquipment", symbolId: item.id })
-            }
+            data-testid={`btn-add-equipment-${item.id}`}
+            draggable
+            onDragStart={(event) => startLibraryDrag(event, { place: "equipment", symbolId: item.id })}
+            onClick={() => onEdit(libraryPlaceEdit({ place: "equipment", symbolId: item.id }))}
           >
             <span className="iso-sidebar__icon">{renderLibrarySymbol(item)}</span>
             <span className="iso-sidebar__name">{item.name}</span>
@@ -338,20 +395,18 @@ function FolderBlock({
                 </option>
               ))}
             </select>
-            {item.kind === "equipment" ? (
-              <button
-                type="button"
-                className="iso-sidebar__mini"
-                data-testid={`btn-edit-symbol-${item.id}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setPendingDelete(null);
-                  setEditingId(item.id === editingId ? null : item.id);
-                }}
-              >
-                편집
-              </button>
-            ) : null}
+            <button
+              type="button"
+              className="iso-sidebar__mini"
+              data-testid={`btn-edit-symbol-${item.id}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                setPendingDelete(null);
+                setEditingId(item.id === editingId ? null : item.id);
+              }}
+            >
+              편집
+            </button>
             {pendingDelete === item.id ? (
               <>
                 <button

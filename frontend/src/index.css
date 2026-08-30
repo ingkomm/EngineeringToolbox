@@ -813,7 +813,7 @@ label.ghost-btn {
 }
 
 .calc-handle--in {
-  background: var(--warn);
+  background: #38bdf8;
   left: -12px !important;
 }
 
@@ -1623,8 +1623,8 @@ label.ghost-btn {
   z-index: 4;
   cursor: crosshair;
   border-radius: 50% !important;
-  background: #0b1220 !important;
-  border: 1px solid #7f93a8 !important;
+  background: #f0b429 !important;
+  border: 1px solid #071018 !important;
 }
 
 .pid-port.is-visible,
@@ -1886,7 +1886,27 @@ label.ghost-btn {
   overflow: auto;
   padding: 8px;
   flex: 0 1 auto;
-  max-height: 42%;
+  max-height: 48%;
+}
+
+.iso-sidebar__section {
+  margin: 4px 0 6px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.iso-sidebar__system {
+  margin-bottom: 10px;
+}
+
+.iso-sidebar__row--system {
+  display: flex;
+}
+
+.iso-sidebar__row--system .iso-sidebar__tile {
+  flex: 1;
 }
 
 .iso-sidebar__group {

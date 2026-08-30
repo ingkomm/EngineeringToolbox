@@ -282,8 +282,9 @@ Object A의 PIN/POUT만 바꾸면 Object A와 B가 갱신된다. 매핑되지 �
 |---|---|---|
 | `btn-new-worksheet` | 상단 바 | `newWorkspace` |
 | `btn-evaluate` | 상단 바 | `POST /api/v1/evaluate` |
-| `btn-add-object` | Canvas Panel top-left | `addObject` (Cal. 추가) |
-| `iso-sidebar` | 왼쪽 심볼 라이브러리 | Pump / Valve / Point. Create로 커스텀 심볼 추가 |
+| `btn-add-calculation` | 왼쪽 Library SYSTEM | `addObject` (Calculation 생성) |
+| `iso-sidebar` | 왼쪽 심볼 라이브러리 | SYSTEM(Point, Calculation) / ARRANGEMENT(Pump, Valve, Vessel, 사용자 심볼) |
+| `library-system` | 왼쪽 라이브러리 상단 | Point·Calculation 고정 항목. 편집·삭제 없음 |
 | `btn-create-symbol` | 왼쪽 라이브러리 | 빈 Equipment 심볼 추가 후 편집기 열기 |
 | `btn-add-equipment-{symbolId}` | 왼쪽 라이브러리 | 해당 심볼 Equipment를 캔버스에 추가 |
 | `btn-add-point` | 왼쪽 라이브러리 | Point 추가 |
