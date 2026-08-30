@@ -83,6 +83,15 @@ export interface EquipmentObject {
   rotation?: EquipmentRotation;
   width?: number;
   height?: number;
+  drawing?: {
+    width: number;
+    height: number;
+    primitives: Array<
+      | { id: string; kind: "line"; x1: number; y1: number; x2: number; y2: number }
+      | { id: string; kind: "circle"; cx: number; cy: number; r: number }
+      | { id: string; kind: "polygon"; points: Array<{ x: number; y: number }> }
+    >;
+  } | null;
 }
 
 export interface PointObject {

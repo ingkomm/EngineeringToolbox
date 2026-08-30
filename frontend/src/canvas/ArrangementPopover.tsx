@@ -13,10 +13,12 @@ export function EquipmentPopover({
   object,
   onEdit,
   onClose,
+  onEditSymbol,
 }: {
   object: EquipmentObject;
   onEdit: (edit: WorkspaceEdit) => void;
   onClose: () => void;
+  onEditSymbol?: () => void;
 }) {
   return (
     <div className="pid-pop nodrag nopan" data-testid={`object-${object.id}-popover`} onMouseDown={(event) => event.stopPropagation()}>
@@ -122,6 +124,9 @@ export function EquipmentPopover({
           />
         </label>
       </div>
+      <button type="button" className="ghost-btn" data-testid={`object-${object.id}-edit-symbol`} onClick={onEditSymbol}>
+        심볼 편집
+      </button>
     </div>
   );
 }

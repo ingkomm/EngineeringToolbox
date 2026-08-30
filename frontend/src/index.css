@@ -1846,3 +1846,67 @@ label.ghost-btn {
   padding: 6px 10px;
   font-size: 12px;
 }
+
+.symbol-editor {
+  position: absolute;
+  z-index: 30;
+  left: calc(100% + 12px);
+  top: 0;
+  width: 320px;
+  padding: 8px;
+  background: #101826;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  color: var(--text);
+}
+
+.symbol-editor header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.symbol-editor header span {
+  flex: 1;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.symbol-editor__tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.symbol-editor__canvas {
+  width: 100%;
+  height: 220px;
+  background: #070c14;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: crosshair;
+}
+
+.symbol-editor__grid {
+  stroke: #1c2738;
+  stroke-width: 0.6;
+}
+
+.symbol-editor__axis {
+  stroke: #3ecf8e;
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.symbol-editor__pending {
+  fill: #6cb6ff;
+}
+
+.symbol-editor__hint {
+  margin: 6px 0 0;
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.4;
+}

@@ -23,6 +23,7 @@ import { EquipmentObjectNode } from "./EquipmentObjectNode";
 import { MappingEdge } from "./MappingEdge";
 import { PointObjectNode } from "./PointObjectNode";
 import { mergeFlowNodes, toFlowEdges, toFlowNodeRecords } from "./flowModel";
+import { CANVAS_GRID } from "./symbols/grid";
 import { parseHandleId } from "../lib/display";
 import { type WorkspaceEdit } from "../lib/projectEdits";
 import type { QuantitySpec } from "../lib/quantities";
@@ -299,10 +300,10 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
       selectionMode={SelectionMode.Partial}
       panOnDrag={selectMode ? [1] : true}
       snapToGrid={snap}
-      snapGrid={[11, 11]}
+      snapGrid={[CANVAS_GRID, CANVAS_GRID]}
       proOptions={{ hideAttribution: true }}
     >
-      <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} color="#243044" />
+      <Background variant={BackgroundVariant.Dots} gap={CANVAS_GRID} size={1.4} color="#243044" />
       <Controls className="ws-zoom-controls" />
       <CanvasZoomHotkeys />
       <Panel position="top-left" className="canvas-panel canvas-panel--pid">

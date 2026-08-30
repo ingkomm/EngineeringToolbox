@@ -9,13 +9,13 @@ describe("ISO 14084-2 symbol catalog", () => {
     expect(catalogEntry("unknown-symbol").id).toBe("generic-equipment");
   });
 
-  it("assigns every symbol to an ISO 14084-2 group", () => {
+  it("uses even grid sizes so the flow axis sits on the 11px grid", () => {
     const groupIds = new Set(SYMBOL_GROUPS.map((group) => group.id));
     expect(SYMBOL_CATALOG.length).toBeGreaterThan(20);
     for (const item of SYMBOL_CATALOG) {
       expect(groupIds.has(item.group)).toBe(true);
-      expect(item.width).toBeGreaterThan(0);
-      expect(item.height).toBeGreaterThan(0);
+      expect(item.width % 22).toBe(0);
+      expect(item.height % 22).toBe(0);
     }
   });
 

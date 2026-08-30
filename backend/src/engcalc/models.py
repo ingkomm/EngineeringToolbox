@@ -133,6 +133,39 @@ class PointEnd(BaseModel):
         return payload
 
 
+class SymbolLine(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["line"]
+    id: str = ""
+    x1: float
+    y1: float
+    x2: float
+    y2: float
+
+
+class SymbolCircle(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["circle"]
+    id: str = ""
+    cx: float
+    cy: float
+    r: float = Field(ge=0)
+
+
+class SymbolPolygon(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["polygon"]
+    id: str = ""
+    points: list[Position]
+
+
+class SymbolDrawing(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    width: float = Field(ge=22)
+    height: float = Field(ge=22)
+    primitives: list[SymbolLine | SymbolCircle | SymbolPolygon] = Field(default_factory=list)
+
+
 class EquipmentObject(BaseModel):
     """Worksheet equipment. Port identities are IN_1..IN_n and OUT_1..OUT_n from the counts."""
 
@@ -148,8 +181,9 @@ class EquipmentObject(BaseModel):
     objectLinkSide: Literal["top", "bottom"] = "top"
     tag: str = ""
     rotation: Literal[0, 90, 180, 270] = 0
-    width: float | None = Field(default=None, ge=32)
-    height: float | None = Field(default=None, ge=24)
+    width: float | None = Field(default=None, ge=22)
+    height: float | None = Field(default=None, ge=22)
+    drawing: SymbolDrawing | None = None
 
     @model_validator(mode="after")
     def default_name(self) -> EquipmentObject:

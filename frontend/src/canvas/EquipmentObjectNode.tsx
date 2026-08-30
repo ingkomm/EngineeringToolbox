@@ -1,10 +1,13 @@
-import { Handle, NodeResizer, Position, useConnection, useUpdateNodeInternals, type Node, type NodeProps } from "@xyflow/react";
+import { Handle, NodeResizer, useConnection, useUpdateNodeInternals, type Node, type NodeProps } from "@xyflow/react";
 import { useLayoutEffect, useState } from "react";
 import type { EquipmentObject } from "../types/contract";
 import type { WorkspaceEdit } from "../lib/projectEdits";
-import { equipmentPortIds, objectLinkSideOf } from "../lib/worksheet";
-import { equipmentBounds, equipmentTag, portSide } from "../lib/arrangementView";
-import { resolveSymbol } from "./symbols/registry";
+import { objectLinkSideOf } from "../lib/worksheet";
+import { equipmentBounds, equipmentPortLayout, equipmentTag } from "../lib/arrangementView";
+import { resolveDrawing } from "./symbols/drawing";
+import { DrawingSvg } from "./symbols/DrawingSvg";
+import { evenGridSize } from "./symbols/grid";
+import { SymbolEditor } from "./symbols/SymbolEditor";
 import { ObjectLinkHandle } from "./ObjectLinkHandle";
 import { EquipmentPopover } from "./ArrangementPopover";
 
@@ -18,15 +21,16 @@ export type EquipmentObjectNodeType = Node<
 
 export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentObjectNodeType>) {
   const { object, onEdit } = data;
-  const ports = equipmentPortIds(object);
   const bounds = equipmentBounds(object);
-  const symbol = resolveSymbol(object.symbolId);
+  const drawing = resolveDrawing(object.symbolId, object.drawing);
+  const ports = equipmentPortLayout(object);
   const [hovered, setHovered] = useState(false);
   const [inspect, setInspect] = useState(false);
+  const [editing, setEditing] = useState(false);
   const connecting = Boolean(useConnection().inProgress);
   const showPorts = Boolean(selected || hovered || connecting);
   const updateNodeInternals = useUpdateNodeInternals();
-  const handleSignature = `${object.inCount}:${object.outCount}:${objectLinkSideOf(object)}:${bounds.rotation}:${bounds.width}x${bounds.height}`;
+  const handleSignature = `${object.inCount}:${object.outCount}:${objectLinkSideOf(object)}:${bounds.rotation}:${bounds.width}x${bounds.height}:${object.drawing?.primitives.length ?? 0}`;
 
   useLayoutEffect(() => {
     updateNodeInternals(id);
@@ -46,13 +50,13 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
     >
       <NodeResizer
         isVisible={selected}
-        minWidth={48}
-        minHeight={32}
+        minWidth={44}
+        minHeight={44}
         onResizeEnd={(_event, params) =>
           onEdit({
             type: "updateEquipment",
             objectId: id,
-            patch: { width: Math.round(params.width), height: Math.round(Math.max(24, params.height)) },
+            patch: { width: evenGridSize(params.width), height: evenGridSize(params.height) },
           })
         }
       />
@@ -72,42 +76,48 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
         className="pid-eq__symbol"
         style={{ width: bounds.size.width, height: bounds.size.height, transform: `rotate(${bounds.rotation}deg)` }}
       >
-        {symbol.render(equipmentTag(object))}
+        <DrawingSvg drawing={drawing} title={equipmentTag(object)} />
       </div>
       <span className="pid-eq__tag">{equipmentTag(object)}</span>
-      {ports.ins.map((portId, index) => (
+      {ports.map((port) => (
         <Handle
-          key={portId}
+          key={port.id}
           type="source"
-          position={portSide("in", bounds.rotation)}
-          id={portId}
-          className={`pid-port pid-port--in ${showPorts ? "is-visible" : ""}`}
-          style={{ [axisFor(portSide("in", bounds.rotation))]: `${((index + 1) / (ports.ins.length + 1)) * 100}%` }}
-          data-testid={`object-${id}-${portId}`}
-          title={`${id}.${portId}`}
+          position={port.position}
+          id={port.id}
+          className={`pid-port pid-port--${port.id.startsWith("IN_") ? "in" : "out"} ${showPorts ? "is-visible" : ""}`}
+          style={port.style}
+          data-testid={`object-${id}-${port.id}`}
+          title={`${id}.${port.id}`}
         >
-          <span className="pid-port__label">{portId}</span>
+          <span className="pid-port__label">{port.id}</span>
         </Handle>
       ))}
-      {ports.outs.map((portId, index) => (
-        <Handle
-          key={portId}
-          type="source"
-          position={portSide("out", bounds.rotation)}
-          id={portId}
-          className={`pid-port pid-port--out ${showPorts ? "is-visible" : ""}`}
-          style={{ [axisFor(portSide("out", bounds.rotation))]: `${((index + 1) / (ports.outs.length + 1)) * 100}%` }}
-          data-testid={`object-${id}-${portId}`}
-          title={`${id}.${portId}`}
-        >
-          <span className="pid-port__label">{portId}</span>
-        </Handle>
-      ))}
-      {inspect ? <EquipmentPopover object={object} onEdit={onEdit} onClose={() => setInspect(false)} /> : null}
+      {inspect ? (
+        <EquipmentPopover
+          object={object}
+          onEdit={onEdit}
+          onClose={() => setInspect(false)}
+          onEditSymbol={() => {
+            setInspect(false);
+            setEditing(true);
+          }}
+        />
+      ) : null}
+      {editing ? (
+        <SymbolEditor
+          symbolId={object.symbolId}
+          drawing={drawing}
+          onChange={(next) =>
+            onEdit({
+              type: "updateEquipment",
+              objectId: id,
+              patch: { drawing: next, width: next.width, height: next.height },
+            })
+          }
+          onClose={() => setEditing(false)}
+        />
+      ) : null}
     </article>
   );
-}
-
-function axisFor(position: Position): "top" | "left" {
-  return position === Position.Left || position === Position.Right ? "top" : "left";
 }

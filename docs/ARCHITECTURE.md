@@ -337,7 +337,7 @@ Equipment와 Point는 Calculation Object와 **같은 공용 워크시트**에 �
 
 Arrangement 기본 화면은 P&ID 도면이다. Equipment는 SVG 심볼과 Tag만 보이고, Point는 작은 연결점이다. ID/입력창/삭제 버튼은 더블클릭 팝오버나 선택 툴바에 둔다. Calculation Object는 기존 카드 UI를 유지하며, 펼치기 버튼으로만 Input/Calculation/Output/Link를 연다.
 
-심볼은 `frontend/src/canvas/symbols/`에 ISO 14084-2 절 구조로 등록한다. 화면 심볼은 ISO 14617 관례를 따른 자체 도면이며 표준 PDF를 복제하지 않는다. 알 수 없는 `symbolId`는 Generic으로 그린다. 종류가 많으므로 왼쪽 `iso-sidebar`에서 고른다.
+심볼은 `frontend/src/canvas/symbols/`에 ISO 14084-2 절 구조로 등록한다. 크기는 11px 그리드의 짝수 칸이라 중심선이 그리드에 붙는다. 화면 심볼은 직선·원·다각형이며, Equipment 팝오버의 심볼 편집으로 바꿀 수 있다. 열교환기는 인/아웃이 대각으로 교차한다.
 
 선택 필드(`tag`, `rotation`, `width`, `height`, `linkKind`, `showArrow`, `waypoints`)는 없어도 예전 JSON을 로드한다. Pipe/Signal은 `Point.connections`에만 있고, Calculation 값 연결(`value_flow`)과 섞지 않는다.
 

@@ -142,6 +142,61 @@
         }
       }
     },
+    "symbolDrawing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height", "primitives"],
+      "properties": {
+        "width": { "type": "number", "minimum": 22 },
+        "height": { "type": "number", "minimum": 22 },
+        "primitives": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "x1", "y1", "x2", "y2"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "kind": { "type": "string", "const": "line" },
+                  "x1": { "type": "number" },
+                  "y1": { "type": "number" },
+                  "x2": { "type": "number" },
+                  "y2": { "type": "number" }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "cx", "cy", "r"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "kind": { "type": "string", "const": "circle" },
+                  "cx": { "type": "number" },
+                  "cy": { "type": "number" },
+                  "r": { "type": "number", "minimum": 0 }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "points"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "kind": { "type": "string", "const": "polygon" },
+                  "points": {
+                    "type": "array",
+                    "minItems": 3,
+                    "items": { "$ref": "#/$defs/position" }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
     "equipmentObject": {
       "type": "object",
       "additionalProperties": false,
@@ -157,8 +212,9 @@
         "objectLinkSide": { "type": "string", "enum": ["top", "bottom"] },
         "tag": { "type": "string" },
         "rotation": { "type": "integer", "enum": [0, 90, 180, 270] },
-        "width": { "type": "number", "minimum": 32 },
-        "height": { "type": "number", "minimum": 24 }
+        "width": { "type": "number", "minimum": 22 },
+        "height": { "type": "number", "minimum": 22 },
+        "drawing": { "$ref": "#/$defs/symbolDrawing" }
       }
     },
     "pointObject": {

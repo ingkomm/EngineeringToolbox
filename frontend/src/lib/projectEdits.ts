@@ -11,6 +11,7 @@ import type {
   RelationType,
 } from "../types/contract";
 import { catalogEntry, symbolPortDefaults } from "../canvas/symbols/catalog";
+import { evenGridSize } from "../canvas/symbols/grid";
 import { blankProject } from "../example/blankProject";
 import { prototypeProject } from "../example/prototypeProject";
 import { siUnitFor, type QuantitySpec } from "./quantities";
@@ -103,6 +104,7 @@ export type WorkspaceEdit =
         rotation?: 0 | 90 | 180 | 270;
         width?: number;
         height?: number;
+        drawing?: EquipmentObject["drawing"];
       };
     }
   | {
@@ -1050,6 +1052,7 @@ function updateWorksheetEquipment(
     rotation?: 0 | 90 | 180 | 270;
     width?: number;
     height?: number;
+    drawing?: EquipmentObject["drawing"];
   },
 ): EditResult {
   const current = project.objects.find((item) => item.id === objectId);
@@ -1060,15 +1063,17 @@ function updateWorksheetEquipment(
   if (nextId !== current.id && project.objects.some((item) => item.id === nextId)) return noEval(project);
   let next = project;
   if (nextId !== current.id) next = rekeyObject(next, current.id, nextId);
+  const nextSymbol = patch.symbolId?.trim() || current.symbolId;
   const updated: EquipmentObject = {
     ...current,
     id: nextId,
     name: nextName,
     tag: patch.tag !== undefined ? patch.tag : current.tag,
-    symbolId: patch.symbolId?.trim() || current.symbolId,
+    symbolId: nextSymbol,
     rotation: patch.rotation !== undefined ? snapRotation(patch.rotation) : current.rotation,
-    width: patch.width !== undefined ? Math.max(32, patch.width) : current.width,
-    height: patch.height !== undefined ? Math.max(24, patch.height) : current.height,
+    width: patch.width !== undefined ? evenGridSize(patch.width) : current.width,
+    height: patch.height !== undefined ? evenGridSize(patch.height) : current.height,
+    drawing: patch.symbolId && patch.drawing === undefined ? null : patch.drawing !== undefined ? patch.drawing : current.drawing,
   };
   return {
     project: {
