@@ -246,9 +246,21 @@ class PointObject(BaseModel):
         return self
 
 
-class SimpleTable(BaseModel):
+class MemoTextSection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    type: Literal["text"]
+    id: str
+    content: str = ""
+
+
+class MemoTableSection(BaseModel):
     model_config = ConfigDict(extra="forbid")
     cells: list[list[str]] = Field(default_factory=list)
+    type: Literal["table"]
+    id: str
+
+
+MemoSection = Annotated[Union[MemoTextSection, MemoTableSection], Field(discriminator="type")]
 
 
 class MemoLink(BaseModel):
@@ -264,26 +276,39 @@ class MemoObject(BaseModel):
     kind: Literal["memo"]
     id: str
     title: str = ""
-    content: str = ""
-    table: SimpleTable | None = None
+    sections: list[MemoSection] = Field(default_factory=list)
     links: list[MemoLink] = Field(default_factory=list)
     position: Position
-    size: Size = Field(default_factory=lambda: Size(width=200, height=140))
+    size: Size = Field(default_factory=lambda: Size(width=220, height=148))
     objectLinkSide: Literal["top", "bottom"] = "top"
 
     @model_validator(mode="before")
     @classmethod
-    def migrate_tables(cls, data: object) -> object:
+    def migrate_sections(cls, data: object) -> object:
         if not isinstance(data, dict):
             return data
         payload = dict(data)
-        legacy = payload.pop("tables", None)
-        if payload.get("table") is None and isinstance(legacy, list) and legacy:
-            first = legacy[0]
-            cells = first.get("cells") if isinstance(first, dict) else None
-            payload["table"] = {"cells": stringify_table_cells(cells)}
-        elif isinstance(payload.get("table"), dict):
-            payload["table"] = {"cells": stringify_table_cells(payload["table"].get("cells"))}
+        content = payload.pop("content", None)
+        table = payload.pop("table", None)
+        tables = payload.pop("tables", None)
+        sections = payload.get("sections")
+        if not isinstance(sections, list) or not sections:
+            migrated: list[object] = []
+            if isinstance(content, str) and content.strip():
+                migrated.append({"type": "text", "id": "s_legacy_text", "content": content})
+            if isinstance(table, dict):
+                migrated.append({"type": "table", "id": "s_legacy_table", "cells": stringify_table_cells(table.get("cells"))})
+            if isinstance(tables, list):
+                for index, item in enumerate(tables):
+                    if isinstance(item, dict):
+                        migrated.append(
+                            {
+                                "type": "table",
+                                "id": f"s_legacy_table_{index}",
+                                "cells": stringify_table_cells(item.get("cells")),
+                            }
+                        )
+            payload["sections"] = migrated
         return payload
 
 

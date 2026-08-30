@@ -1,15 +1,15 @@
-import type { MemoLink, MemoObject, WorksheetObject } from "../types/contract";
+import type { MemoLink, MemoObject, MemoSection, WorksheetObject } from "../types/contract";
 import { newStableId } from "./ids";
 
 export const MEMO_ATTACHMENT_HANDLE = "MEMO";
-export const MEMO_DEFAULT_SIZE = { width: 200, height: 140 };
+export const MEMO_DEFAULT_SIZE = { width: 220, height: 148 };
 
 export function isMemoObject(object: WorksheetObject): object is MemoObject {
   return object.kind === "memo";
 }
 
 export function isMemoAttachmentHandle(portId: string | null | undefined): boolean {
-  return portId === MEMO_ATTACHMENT_HANDLE;
+  return portId === MEMO_ATTACHMENT_HANDLE || portId === `${MEMO_ATTACHMENT_HANDLE}-in`;
 }
 
 export function emptyMemo(position?: { x: number; y: number }): MemoObject {
@@ -17,11 +17,25 @@ export function emptyMemo(position?: { x: number; y: number }): MemoObject {
     kind: "memo",
     id: newStableId("m"),
     title: "",
-    content: "",
-    table: null,
+    sections: [],
     links: [],
     position: position ?? { x: 80, y: 88 },
     size: { ...MEMO_DEFAULT_SIZE },
+  };
+}
+
+export function newMemoTextSection(content = ""): MemoSection {
+  return { id: newStableId("s"), type: "text", content };
+}
+
+export function newMemoTableSection(): MemoSection {
+  return {
+    id: newStableId("s"),
+    type: "table",
+    cells: [
+      ["", ""],
+      ["", ""],
+    ],
   };
 }
 
@@ -31,21 +45,16 @@ export function cloneMemo(memo: MemoObject, position?: { x: number; y: number })
     ...memo,
     id,
     position: position ?? { x: memo.position.x + 36, y: memo.position.y + 36 },
-    table: memo.table ? { cells: memo.table.cells.map((row) => row.map((cell) => cell)) } : null,
+    sections: memo.sections.map((section) =>
+      section.type === "text"
+        ? { ...section, id: newStableId("s") }
+        : { ...section, id: newStableId("s"), cells: section.cells.map((row) => [...row]) },
+    ),
     links: memo.links.map((link) => ({
       ...link,
       id: newStableId("l"),
       memoId: id,
     })),
-  };
-}
-
-export function emptyMemoTable(): { cells: string[][] } {
-  return {
-    cells: [
-      ["", ""],
-      ["", ""],
-    ],
   };
 }
 
@@ -69,14 +78,11 @@ export function normalizeMemo(object: MemoObject, objectIds: Set<string>): MemoO
     (link): link is MemoLink =>
       Boolean(link?.id && link.targetObjectId && objectIds.has(link.targetObjectId) && link.targetObjectId !== object.id),
   );
-  const legacy = (object as MemoObject & { tables?: Array<{ cells?: unknown }> }).tables;
-  const rawTable = object.table ?? (legacy?.[0] ? { cells: legacy[0].cells } : null);
   return {
     kind: "memo",
     id: object.id,
     title: object.title ?? "",
-    content: object.content ?? "",
-    table: rawTable ? { cells: stringifyCells(rawTable.cells) } : null,
+    sections: migrateSections(object),
     links: links.map((link) => ({ ...link, memoId: object.id })),
     position: object.position ?? { x: 80, y: 88 },
     size: {
@@ -85,4 +91,30 @@ export function normalizeMemo(object: MemoObject, objectIds: Set<string>): MemoO
     },
     objectLinkSide: object.objectLinkSide === "bottom" ? "bottom" : "top",
   };
+}
+
+function migrateSections(object: MemoObject): MemoSection[] {
+  if (Array.isArray(object.sections) && object.sections.length) {
+    const sections: MemoSection[] = [];
+    for (const [index, section] of object.sections.entries()) {
+      if (section?.type === "table") {
+        sections.push({ id: section.id || `s_t${index}`, type: "table", cells: stringifyCells(section.cells) });
+      } else if (section?.type === "text") {
+        sections.push({ id: section.id || `s_x${index}`, type: "text", content: section.content ?? "" });
+      }
+    }
+    return sections;
+  }
+  const legacy = object as MemoObject & {
+    content?: string;
+    table?: { cells?: unknown } | null;
+    tables?: Array<{ cells?: unknown }>;
+  };
+  const sections: MemoSection[] = [];
+  if (legacy.content?.trim()) sections.push(newMemoTextSection(legacy.content));
+  if (legacy.table?.cells) sections.push({ id: newStableId("s"), type: "table", cells: stringifyCells(legacy.table.cells) });
+  for (const table of legacy.tables ?? []) {
+    sections.push({ id: newStableId("s"), type: "table", cells: stringifyCells(table.cells) });
+  }
+  return sections;
 }

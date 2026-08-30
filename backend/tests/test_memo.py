@@ -14,8 +14,10 @@ def test_memo_is_not_evaluated():
             "kind": "memo",
             "id": "m_testmemo",
             "title": "Note",
-            "content": "remember this",
-            "table": {"cells": [["a", "b"], ["1", "2"]]},
+            "sections": [
+                {"type": "text", "id": "s1", "content": "**remember**"},
+                {"type": "table", "id": "s2", "cells": [["a", "b"], ["1", "2"]]},
+            ],
             "links": [{"id": "l1", "memoId": "m_testmemo", "targetObjectId": "obj-a"}],
             "position": {"x": 10, "y": 10},
             "size": {"width": 200, "height": 140},

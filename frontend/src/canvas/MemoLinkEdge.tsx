@@ -9,7 +9,7 @@ export function MemoLinkEdge({ id, sourceX, sourceY, targetX, targetY, sourcePos
       id={id}
       path={edgePath}
       className="memo-link-edge"
-      style={{ ...style, stroke: "#94a3b8", strokeWidth: 1.2, strokeDasharray: "4 3" }}
+      style={{ ...style, stroke: "#e7eef8", strokeWidth: 1.15, strokeDasharray: "4 3" }}
     />
   );
 }

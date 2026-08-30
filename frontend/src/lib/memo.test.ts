@@ -29,35 +29,45 @@ describe("simple memo", () => {
     const memo = memoOf(project);
     expect(memo.kind).toBe("memo");
     expect(memo.title).toBe("");
-    expect(memo.content).toBe("");
-    expect(memo.table).toBeNull();
+    expect(memo.sections).toEqual([]);
     expect(memo.links).toEqual([]);
     expect(isCalculationObject(memo)).toBe(false);
   });
 
-  it("keeps title, content, and a simple table through save and load", () => {
+  it("keeps title, markdown text, and tables through save and load", () => {
     let project = applyAll([{ type: "addMemo" }]);
     const id = memoOf(project).id;
-    project = applyWorkspaceEdit(project, { type: "updateMemo", objectId: id, patch: { title: "Note", content: "line 1\nline 2" } }, FALLBACK_QUANTITIES).project;
-    project = applyWorkspaceEdit(project, { type: "addMemoTable", objectId: id }, FALLBACK_QUANTITIES).project;
+    project = applyWorkspaceEdit(project, { type: "updateMemo", objectId: id, patch: { title: "Note" } }, FALLBACK_QUANTITIES).project;
+    project = applyWorkspaceEdit(project, { type: "addMemoSection", objectId: id, sectionType: "text" }, FALLBACK_QUANTITIES).project;
+    project = applyWorkspaceEdit(project, { type: "addMemoSection", objectId: id, sectionType: "table" }, FALLBACK_QUANTITIES).project;
+    const text = memoOf(project).sections.find((item) => item.type === "text");
+    const table = memoOf(project).sections.find((item) => item.type === "table");
+    if (!text || !table || table.type !== "table") throw new Error("sections");
     project = applyWorkspaceEdit(
       project,
-      { type: "updateMemoTable", objectId: id, cells: [["a", "b"], ["1", "2"]] },
+      { type: "updateMemoSection", objectId: id, sectionId: text.id, patch: { content: "**bold** note" } },
+      FALLBACK_QUANTITIES,
+    ).project;
+    project = applyWorkspaceEdit(
+      project,
+      { type: "updateMemoSection", objectId: id, sectionId: table.id, patch: { cells: [["a", "b"], ["1", "2"]] } },
       FALLBACK_QUANTITIES,
     ).project;
     const loaded = applyWorkspaceEdit(blankProject, { type: "loadProject", project: JSON.parse(JSON.stringify(project)) }, FALLBACK_QUANTITIES).project;
     const memo = loaded.objects.find(isMemoObject)!;
     expect(memo.id).toBe(id);
     expect(memo.title).toBe("Note");
-    expect(memo.content).toBe("line 1\nline 2");
-    expect(memo.table?.cells).toEqual([["a", "b"], ["1", "2"]]);
+    expect(memo.sections).toHaveLength(2);
+    expect(memo.sections.find((item) => item.type === "text")?.content).toBe("**bold** note");
+    expect(memo.sections.find((item) => item.type === "table")).toMatchObject({ cells: [["a", "b"], ["1", "2"]] });
   });
 
   it("creates a 2x2 table and keeps the memo attachment side", () => {
     let project = applyAll([{ type: "addMemo" }]);
     const id = memoOf(project).id;
-    project = applyWorkspaceEdit(project, { type: "addMemoTable", objectId: id }, FALLBACK_QUANTITIES).project;
-    expect(memoOf(project).table?.cells).toEqual([
+    project = applyWorkspaceEdit(project, { type: "addMemoSection", objectId: id, sectionType: "table" }, FALLBACK_QUANTITIES).project;
+    const table = memoOf(project).sections.find((item) => item.type === "table");
+    expect(table?.type === "table" && table.cells).toEqual([
       ["", ""],
       ["", ""],
     ]);
@@ -84,5 +94,26 @@ describe("simple memo", () => {
 
   it("loads a worksheet that has no memos", () => {
     expect(normalizeLoadedProject(JSON.parse(JSON.stringify(blankProject))).objects.filter(isMemoObject)).toEqual([]);
+  });
+
+  it("migrates a legacy single content and table into sections", () => {
+    const loaded = normalizeLoadedProject({
+      ...blankProject,
+      objects: [
+        ...blankProject.objects,
+        {
+          kind: "memo",
+          id: "m_legacy",
+          title: "Old",
+          content: "hello",
+          table: { cells: [["x"]] },
+          links: [],
+          position: { x: 0, y: 0 },
+          size: { width: 200, height: 140 },
+        } as never,
+      ],
+    });
+    const memo = loaded.objects.find(isMemoObject)!;
+    expect(memo.sections.map((item) => item.type)).toEqual(["text", "table"]);
   });
 });

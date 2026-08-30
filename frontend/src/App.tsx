@@ -173,8 +173,7 @@ export function App() {
                 kind: "memo",
                 id: object.id,
                 title: object.title,
-                content: object.content,
-                table: object.table,
+                sections: object.sections,
                 links: object.links,
               };
             }

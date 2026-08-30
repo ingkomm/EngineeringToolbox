@@ -13,7 +13,7 @@ export const PORT_CATEGORY_COLOR: Record<PortCategory, string> = {
   "calc-input": "#38BDF8",
   "calc-output": "#22c55e",
   "arrangement-point": "#f0b429",
-  "memo-attachment": "#94a3b8",
+  "memo-attachment": "#e7eef8",
 };
 
 /** Resolve a handle's category. Missing persisted category uses this default. */

@@ -229,7 +229,7 @@ export function toFlowEdges(
           source: object.id,
           target: link.targetObjectId,
           sourceHandle: MEMO_ATTACHMENT_HANDLE,
-          targetHandle: target && isMemoObject(target) ? MEMO_ATTACHMENT_HANDLE : undefined,
+          targetHandle: target && isMemoObject(target) ? `${MEMO_ATTACHMENT_HANDLE}-in` : OBJECT_LINK_HANDLE,
           type: "memoLink" as const,
           className: "memo-link-edge",
           interactionWidth: 16,

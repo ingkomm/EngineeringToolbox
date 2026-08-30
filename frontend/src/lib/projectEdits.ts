@@ -40,7 +40,7 @@ import {
   parsePointConnectionEnd,
   resolveLayoutPort,
 } from "./worksheet";
-import { cloneMemo, emptyMemo, emptyMemoTable, isMemoObject, parseMemoLinkEdgeId } from "./memo";
+import { cloneMemo, emptyMemo, isMemoObject, newMemoTableSection, newMemoTextSection, parseMemoLinkEdgeId } from "./memo";
 import { newStableId } from "./ids";
 
 export const VARIABLE_ID_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -97,15 +97,14 @@ export type WorkspaceEdit =
       objectId: string;
       patch: {
         title?: string;
-        content?: string;
-        table?: { cells: string[][] } | null;
+        sections?: import("../types/contract").MemoSection[];
         size?: { width: number; height: number };
         position?: { x: number; y: number };
       };
     }
-  | { type: "addMemoTable"; objectId: string }
-  | { type: "removeMemoTable"; objectId: string }
-  | { type: "updateMemoTable"; objectId: string; cells: string[][] }
+  | { type: "addMemoSection"; objectId: string; sectionType: "text" | "table" }
+  | { type: "removeMemoSection"; objectId: string; sectionId: string }
+  | { type: "updateMemoSection"; objectId: string; sectionId: string; patch: { content?: string; cells?: string[][] } }
   | { type: "connectMemoLink"; memoId: string; targetObjectId: string }
   | { type: "addLibrarySymbol"; category?: string }
   | { type: "deleteLibrarySymbol"; symbolId: string }
@@ -1047,14 +1046,24 @@ export function applyWorkspaceEdit(
       };
     case "updateMemo":
       return updateMemo(project, edit.objectId, edit.patch);
-    case "addMemoTable":
-      return patchMemo(project, edit.objectId, (memo) => ({ ...memo, table: memo.table ?? emptyMemoTable() }));
-    case "removeMemoTable":
-      return patchMemo(project, edit.objectId, (memo) => ({ ...memo, table: null }));
-    case "updateMemoTable":
+    case "addMemoSection":
       return patchMemo(project, edit.objectId, (memo) => ({
         ...memo,
-        table: { cells: edit.cells.map((row) => row.map((cell) => cell)) },
+        sections: [...memo.sections, edit.sectionType === "table" ? newMemoTableSection() : newMemoTextSection()],
+      }));
+    case "removeMemoSection":
+      return patchMemo(project, edit.objectId, (memo) => ({
+        ...memo,
+        sections: memo.sections.filter((section) => section.id !== edit.sectionId),
+      }));
+    case "updateMemoSection":
+      return patchMemo(project, edit.objectId, (memo) => ({
+        ...memo,
+        sections: memo.sections.map((section) => {
+          if (section.id !== edit.sectionId) return section;
+          if (section.type === "text") return { ...section, content: edit.patch.content ?? section.content };
+          return { ...section, cells: edit.patch.cells ?? section.cells };
+        }),
       }));
     case "connectMemoLink":
       return connectMemoLink(project, edit.memoId, edit.targetObjectId);
@@ -1961,8 +1970,7 @@ function updateMemo(
   objectId: string,
   patch: {
     title?: string;
-    content?: string;
-    table?: { cells: string[][] } | null;
+    sections?: import("../types/contract").MemoSection[];
     size?: { width: number; height: number };
     position?: { x: number; y: number };
   },
@@ -1970,8 +1978,7 @@ function updateMemo(
   return patchMemo(project, objectId, (memo) => ({
     ...memo,
     title: patch.title ?? memo.title,
-    content: patch.content ?? memo.content,
-    table: patch.table === undefined ? memo.table : patch.table,
+    sections: patch.sections ?? memo.sections,
     size: patch.size ?? memo.size,
     position: patch.position ?? memo.position,
   }));
