@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from "react";
 import type { ArrangementLinkKind, EquipmentObject, PointObject } from "../types/contract";
 import { OBJECT_ID_RE, VARIABLE_ID_RE, type WorkspaceEdit } from "../lib/projectEdits";
-import { SYMBOL_REGISTRY } from "./symbols/registry";
+import { SYMBOL_GROUPS, SYMBOL_REGISTRY } from "./symbols/registry";
 import { POINT_CONNECTION_IDS } from "../lib/worksheet";
 import { equipmentTag, linkKindOf, showArrowOf } from "../lib/arrangementView";
 
@@ -79,10 +79,14 @@ export function EquipmentPopover({
           data-testid={`object-${object.id}-symbol`}
           onChange={(event) => onEdit({ type: "updateEquipment", objectId: object.id, patch: { symbolId: event.target.value } })}
         >
-          {SYMBOL_REGISTRY.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.label}
-            </option>
+          {SYMBOL_GROUPS.map((group) => (
+            <optgroup key={group.id} label={`${group.clause} ${group.labelKo}`}>
+              {SYMBOL_REGISTRY.filter((item) => item.group === group.id).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
       </label>

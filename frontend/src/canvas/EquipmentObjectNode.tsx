@@ -36,7 +36,7 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
     <article
       className={`pid-eq ${selected ? "is-selected" : ""} ${showPorts ? "is-hot" : ""}`}
       data-testid={`object-${id}`}
-      style={{ width: bounds.width, height: bounds.height + 16 }}
+      style={{ width: bounds.width, height: bounds.height }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onDoubleClick={(event) => {
@@ -52,7 +52,7 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
           onEdit({
             type: "updateEquipment",
             objectId: id,
-            patch: { width: Math.round(params.width), height: Math.round(Math.max(24, params.height - 16)) },
+            patch: { width: Math.round(params.width), height: Math.round(Math.max(24, params.height)) },
           })
         }
       />

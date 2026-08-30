@@ -3,6 +3,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 
 import { checkHealth, evaluateProject, fetchQuantities } from "./api/client";
 import { FlowCanvas } from "./canvas/FlowCanvas";
+import { IsoSymbolSidebar } from "./canvas/IsoSymbolSidebar";
 import { blankProject } from "./example/blankProject";
 import { FALLBACK_QUANTITIES, type QuantitySpec } from "./lib/quantities";
 import { applyWorkspaceEdit, type WorkspaceEdit } from "./lib/projectEdits";
@@ -279,6 +280,7 @@ export function App() {
       </header>
 
       <main className="workspace">
+        <IsoSymbolSidebar onAdd={(symbolId) => onEdit({ type: "addEquipment", symbolId })} />
         <section className="canvas-pane">
           <ReactFlowProvider>
             <FlowCanvas

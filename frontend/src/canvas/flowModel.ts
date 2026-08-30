@@ -28,7 +28,7 @@ export function toFlowNodeRecords(
   return project.objects.map((object) => {
     if (isLayoutObject(object) && !isCalculationObject(object)) {
       const bounds = object.kind === "equipment" ? equipmentBounds(object) : { width: 36, height: 36 };
-      const height = object.kind === "equipment" ? bounds.height + 16 : 36;
+      const height = object.kind === "equipment" ? bounds.height : 36;
       return {
         id: object.id,
         type: object.kind === "equipment" ? ("equipmentObject" as const) : ("pointObject" as const),

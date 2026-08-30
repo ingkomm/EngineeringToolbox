@@ -10,6 +10,7 @@ import type {
   ProjectDocument,
   RelationType,
 } from "../types/contract";
+import { catalogEntry, symbolPortDefaults } from "../canvas/symbols/catalog";
 import { blankProject } from "../example/blankProject";
 import { prototypeProject } from "../example/prototypeProject";
 import { siUnitFor, type QuantitySpec } from "./quantities";
@@ -160,11 +161,12 @@ function nextObjectName(project: ProjectDocument): string {
   return `Object ${n}`;
 }
 
-function nextEquipmentName(project: ProjectDocument): string {
+function nextEquipmentName(project: ProjectDocument, symbolId?: string): string {
   const used = new Set(project.objects.map((item) => item.name.trim()));
+  const base = symbolId && symbolId !== "generic-equipment" ? catalogEntry(symbolId).label : "Equipment";
   let n = 1;
-  while (used.has(`Equipment ${n}`)) n += 1;
-  return `Equipment ${n}`;
+  while (used.has(`${base} ${n}`)) n += 1;
+  return `${base} ${n}`;
 }
 
 function objectIdentityTaken(
@@ -1017,14 +1019,16 @@ function noEval(project: ProjectDocument): EditResult {
 
 function addWorksheetEquipment(project: ProjectDocument, symbolId?: string): EditResult {
   const id = nextPrefixedObjectId(project, "EQ");
+  const nextSymbol = symbolId?.trim() || "generic-equipment";
+  const ports = symbolPortDefaults(nextSymbol);
   const object: EquipmentObject = {
     kind: "equipment",
     id,
-    name: nextEquipmentName(project),
+    name: nextEquipmentName(project, nextSymbol),
     position: nextLayoutPosition(project),
-    symbolId: symbolId?.trim() || "generic-equipment",
-    inCount: 1,
-    outCount: 1,
+    symbolId: nextSymbol,
+    inCount: ports.inCount,
+    outCount: ports.outCount,
     rotation: 0,
   };
   return { project: { ...project, objects: [...project.objects, object] }, dirtyObjectIds: [], shouldEvaluate: false };

@@ -282,9 +282,11 @@ Object A의 PIN/POUT만 바꾸면 Object A와 B가 갱신된다. 매핑되지 �
 |---|---|---|
 | `btn-new-worksheet` | 상단 바 | `newWorkspace` |
 | `btn-evaluate` | 상단 바 | `POST /api/v1/evaluate` |
-| `btn-add-object` | Canvas Panel top-left | `addObject` (Calculation Object) |
-| `btn-add-equipment` | Canvas Panel top-left | `addEquipment` |
+| `btn-add-object` | Canvas Panel top-left | `addObject` (Cal. 추가) |
+| `btn-add-equipment` | Canvas Panel top-left | 기본 Equipment 추가 |
 | `btn-add-point` | Canvas Panel top-left | `addPoint` |
+| `iso-sidebar` | 왼쪽 ISO 팔레트 | ISO 14084-2 분류 심볼 |
+| `btn-add-equipment-{symbolId}` | ISO 사이드메뉴 | 해당 심볼 Equipment 추가 |
 | `btn-export-project` | 상단 바 | 프로젝트 JSON 다운로드 |
 | `btn-import-project` | 상단 바 | 프로젝트 JSON 불러오기 |
 | `btn-load-example` | 우측 사이드바 | `loadExample` |
@@ -335,7 +337,7 @@ Equipment와 Point는 Calculation Object와 **같은 공용 워크시트**에 �
 
 Arrangement 기본 화면은 P&ID 도면이다. Equipment는 SVG 심볼과 Tag만 보이고, Point는 작은 연결점이다. ID/입력창/삭제 버튼은 더블클릭 팝오버나 선택 툴바에 둔다. Calculation Object는 기존 카드 UI를 유지하며, 펼치기 버튼으로만 Input/Calculation/Output/Link를 연다.
 
-심볼은 `frontend/src/canvas/symbols/registry.tsx`에 등록한다. `symbolId`를 키로 Generic / Pump / Fan-Compressor / Heat Exchanger / Tank / Turbine / Valve를 고른다. 알 수 없는 `symbolId`는 Generic으로 그린다.
+심볼은 `frontend/src/canvas/symbols/`에 ISO 14084-2 절 구조로 등록한다. 화면 심볼은 ISO 14617 관례를 따른 자체 도면이며 표준 PDF를 복제하지 않는다. 알 수 없는 `symbolId`는 Generic으로 그린다. 종류가 많으므로 왼쪽 `iso-sidebar`에서 고른다.
 
 선택 필드(`tag`, `rotation`, `width`, `height`, `linkKind`, `showArrow`, `waypoints`)는 없어도 예전 JSON을 로드한다. Pipe/Signal은 `Point.connections`에만 있고, Calculation 값 연결(`value_flow`)과 섞지 않는다.
 
@@ -344,7 +346,7 @@ Arrangement 기본 화면은 P&ID 도면이다. Equipment는 SVG 심볼과 Tag�
 - Equipment: 범용 심볼. In/Out 포트 개수를 지정한다. 포트 ID는 `IN_1`… / `OUT_1`…
 - Point: 원형 노드. 배관 연결 점은 서·동·남·북 4개(`C_1`/`C_2`/`C_3`/`C_4`)로 고정한다. Equipment In/Out 또는 다른 Point에 드래그로 붙인다. 연결선은 꺾은선이며 화살표 방향은 토글한다.
 - Calculation Object Link: 각 객체의 노란 `OBJ` 점에만 붙는 점선 association. 위치는 상단/하단을 고른다. Calculation 하나는 여러 Equipment/Point에 연결할 수 있고, layout 객체당 노란 링크는 하나다. 더블클릭으로 지운다. 값은 흐르지 않는다.
-- Valve, Pipe, Signal, Annotation은 이 단계에 없다
+- ISO 객체는 왼쪽 사이드메뉴에서 고른다. Pipe/Signal은 Point·Equipment 포트 연결이다.
 
 역할 분리:
 

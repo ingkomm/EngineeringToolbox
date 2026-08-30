@@ -367,6 +367,12 @@ describe("worksheet equipment and points", () => {
       ["EQ_1", 1, 1],
       ["EQ_2", 1, 1],
     ]);
+    const exchanger = applyWorkspaceEdit(
+      project,
+      { type: "addEquipment", symbolId: "heat-exchanger" },
+      FALLBACK_QUANTITIES,
+    ).project.objects.filter(isEquipmentObject).at(-1);
+    expect(exchanger).toMatchObject({ symbolId: "heat-exchanger", inCount: 2, outCount: 2 });
     expect(project.objects.filter(isPointObject).map((item) => [item.id, item.connectionCount])).toEqual([["PT_1", 4]]);
     expect(applyWorkspaceEdit(project, { type: "addInput", objectId: "EQ_1" }, FALLBACK_QUANTITIES).shouldEvaluate).toBe(false);
   });

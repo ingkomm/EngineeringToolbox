@@ -23,7 +23,6 @@ import { EquipmentObjectNode } from "./EquipmentObjectNode";
 import { MappingEdge } from "./MappingEdge";
 import { PointObjectNode } from "./PointObjectNode";
 import { mergeFlowNodes, toFlowEdges, toFlowNodeRecords } from "./flowModel";
-import { SYMBOL_REGISTRY } from "./symbols/registry";
 import { parseHandleId } from "../lib/display";
 import { type WorkspaceEdit } from "../lib/projectEdits";
 import type { QuantitySpec } from "../lib/quantities";
@@ -134,7 +133,6 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
         ((isCalculationObject(sourceObject) && isLayoutObject(targetObject)) ||
           (isLayoutObject(sourceObject) && isCalculationObject(targetObject)))
       ) {
-        if (!isObjectLinkHandle(connection.sourceHandle) || !isObjectLinkHandle(connection.targetHandle)) return;
         const calc = isCalculationObject(sourceObject) ? sourceObject : targetObject;
         const layout = isLayoutObject(sourceObject) ? sourceObject : targetObject;
         if (!canConnectObjectLink(project, calc.id, layout.id)) return;
@@ -187,7 +185,6 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
       if (!sourceObject || !targetObject) return false;
 
       if (isObjectLinkHandle(connection.sourceHandle) || isObjectLinkHandle(connection.targetHandle)) {
-        if (!isObjectLinkHandle(connection.sourceHandle) || !isObjectLinkHandle(connection.targetHandle)) return false;
         if (
           !(
             (isCalculationObject(sourceObject) && isLayoutObject(targetObject)) ||
@@ -315,22 +312,8 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
           data-testid="btn-add-object"
           onClick={() => onEdit({ type: "addObject" })}
         >
-          + 객체 추가
+          Cal. 추가
         </button>
-        <div className="pid-symbol-bar">
-          {SYMBOL_REGISTRY.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className="ghost-btn pid-symbol-btn"
-              title={item.label}
-              data-testid={`btn-add-equipment-${item.id}`}
-              onClick={() => onEdit({ type: "addEquipment", symbolId: item.id })}
-            >
-              {item.render(item.label)}
-            </button>
-          ))}
-        </div>
         <button
           type="button"
           className="ghost-btn"
