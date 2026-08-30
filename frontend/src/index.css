@@ -2345,7 +2345,7 @@ label.ghost-btn {
 .memo-attach-cluster {
   position: absolute;
   right: 0;
-  z-index: 6;
+  z-index: 22;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -2453,6 +2453,14 @@ label.ghost-btn {
 .react-flow.rf-connecting-memo .memo-attach-cluster {
   opacity: 1;
   pointer-events: auto;
+}
+
+.react-flow.rf-connecting-memo .obj-link-cluster {
+  pointer-events: none;
+}
+
+.react-flow.rf-connecting-memo .obj-link-handle {
+  opacity: 0.25;
 }
 
 .react-flow.rf-connecting-port .memo-attach-cluster {

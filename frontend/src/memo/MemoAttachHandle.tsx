@@ -40,7 +40,7 @@ export function MemoAttachHandle({
         type={role}
         position={Position.Right}
         id={handleId}
-        className={`memo-attach memo-attach--${role}`}
+        className={`memo-attach memo-attach--${role} nodrag nopan`}
         data-port-category="memo-attachment"
         data-testid={`object-${nodeId}-memo`}
         title="Memo"
