@@ -129,6 +129,7 @@ label.ghost-btn {
 }
 
 .canvas-pane {
+  position: relative;
   min-width: 0;
 }
 
@@ -2217,3 +2218,121 @@ label.ghost-btn {
   color: var(--muted);
   line-height: 1.4;
 }
+
+.memo-node {
+  position: relative;
+  background: #16120e;
+  border: 1px solid #5c5348;
+  border-radius: 10px;
+  padding: 10px 10px 12px;
+  color: #efe7dc;
+  font-size: 12px;
+  overflow: hidden;
+}
+
+.memo-node.is-selected {
+  border-color: #c4a574;
+}
+
+.memo-node__kicker {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: #c4a574;
+}
+
+.memo-node__title {
+  margin: 4px 0 6px;
+  font-size: 13px;
+}
+
+.memo-node__preview {
+  margin: 0;
+  white-space: pre-wrap;
+  color: #c9bfb2;
+  line-height: 1.35;
+  font-size: 11px;
+}
+
+.memo-node__preview--empty {
+  color: #8a8174;
+}
+
+.memo-node__table {
+  margin-top: 8px;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+
+.memo-node__table td {
+  border: 1px solid #3f3a34;
+  padding: 2px 4px;
+}
+
+.memo-attach {
+  width: 8px !important;
+  height: 8px !important;
+  background: #94a3b8 !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+.memo-focus {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+}
+
+.memo-focus__scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(4, 8, 14, 0.62);
+}
+
+.memo-focus__panel {
+  position: relative;
+  margin: 48px auto;
+  width: min(640px, calc(100% - 48px));
+  max-height: calc(100% - 96px);
+  overflow: auto;
+  background: #121018;
+  border: 1px solid #5c5348;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.memo-focus__head {
+  display: flex;
+  gap: 8px;
+}
+
+.memo-focus__title,
+.memo-block__text,
+.memo-table input {
+  background: #0d0b0a;
+  border: 1px solid #3f3a34;
+  color: inherit;
+  padding: 8px;
+  width: 100%;
+}
+
+.memo-block__text {
+  min-height: 160px;
+  resize: vertical;
+}
+
+.memo-table__tools {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.memo-link-edge {
+  pointer-events: stroke;
+}
+

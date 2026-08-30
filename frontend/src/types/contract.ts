@@ -5,7 +5,7 @@
 
 export type VariableStatus = "idle" | "ok" | "mapped" | "error";
 export type RelationType = "value_flow" | "reference" | "association" | "pipe" | "signal";
-export type PortCategory = "calc-input" | "calc-output" | "arrangement-point";
+export type PortCategory = "calc-input" | "calc-output" | "arrangement-point" | "memo-attachment";
 export type ObjectLinkSide = "top" | "bottom";
 export type ArrangementLinkKind = "pipe" | "signal";
 export type EquipmentRotation = 0 | 90 | 180 | 270;
@@ -113,7 +113,29 @@ export interface PointObject {
   objectLinkSide?: ObjectLinkSide;
 }
 
-export type WorksheetObject = CalculationObject | EquipmentObject | PointObject;
+export interface SimpleTable {
+  id: string;
+  cells: Array<Array<string | number | null>>;
+}
+
+export interface MemoLink {
+  id: string;
+  memoId: string;
+  targetObjectId: string;
+}
+
+export interface MemoObject {
+  kind: "memo";
+  id: string;
+  title: string;
+  content: string;
+  tables: SimpleTable[];
+  links: MemoLink[];
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+}
+
+export type WorksheetObject = CalculationObject | EquipmentObject | PointObject | MemoObject;
 
 export interface MappingEdge {
   id: string;

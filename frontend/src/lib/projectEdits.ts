@@ -9,6 +9,7 @@ import type {
   PointObject,
   ProjectDocument,
   RelationType,
+  SimpleTable,
 } from "../types/contract";
 import { firstEquipmentSymbol, findLibrarySymbol, libraryOf, moveLibrarySymbol, newBlankEquipmentSymbol, normalizeCategory, uniqueCategory, deleteLibraryFolder } from "../canvas/symbols/library";
 import { POINT_NODE_SIZE, snapCalcWidth, snapCenteredTopLeft, snapGridSize } from "../canvas/symbols/grid";
@@ -40,6 +41,8 @@ import {
   parsePointConnectionEnd,
   resolveLayoutPort,
 } from "./worksheet";
+import { cloneMemo, emptyMemo, emptyTable, isMemoObject, parseMemoLinkEdgeId } from "./memo";
+import { newStableId } from "./ids";
 
 export const VARIABLE_ID_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 export const OBJECT_ID_RE = /^[A-Za-z_][A-Za-z0-9_-]*$/;
@@ -89,6 +92,22 @@ export type WorkspaceEdit =
   | { type: "deleteEdges"; edgeIds: string[] }
   | { type: "addEquipment"; symbolId?: string; position?: { x: number; y: number } }
   | { type: "addPoint"; position?: { x: number; y: number } }
+  | { type: "addMemo"; position?: { x: number; y: number } }
+  | {
+      type: "updateMemo";
+      objectId: string;
+      patch: {
+        title?: string;
+        content?: string;
+        tables?: SimpleTable[];
+        size?: { width: number; height: number };
+        position?: { x: number; y: number };
+      };
+    }
+  | { type: "addMemoTable"; objectId: string }
+  | { type: "removeMemoTable"; objectId: string; tableId: string }
+  | { type: "updateMemoTable"; objectId: string; tableId: string; cells: SimpleTable["cells"] }
+  | { type: "connectMemoLink"; memoId: string; targetObjectId: string }
   | { type: "addLibrarySymbol"; category?: string }
   | { type: "deleteLibrarySymbol"; symbolId: string }
   | { type: "moveLibrarySymbol"; symbolId: string; direction: -1 | 1 }
@@ -173,15 +192,19 @@ function nextObjectId(project: ProjectDocument): string {
   return `obj_${n}`;
 }
 
+function objectDisplayName(item: ProjectDocument["objects"][number]): string {
+  return isMemoObject(item) ? item.title : item.name;
+}
+
 function nextObjectName(project: ProjectDocument): string {
-  const used = new Set(project.objects.map((item) => item.name.trim()));
+  const used = new Set(project.objects.map((item) => objectDisplayName(item).trim()));
   let n = 1;
   while (used.has(`Object ${n}`)) n += 1;
   return `Object ${n}`;
 }
 
 function nextEquipmentName(project: ProjectDocument, symbolId?: string): string {
-  const used = new Set(project.objects.map((item) => item.name.trim()));
+  const used = new Set(project.objects.map((item) => objectDisplayName(item).trim()));
   const base = findLibrarySymbol(project, symbolId)?.name ?? "Equipment";
   let n = 1;
   while (used.has(`${base} ${n}`)) n += 1;
@@ -197,7 +220,7 @@ function objectIdentityTaken(
     if (object.id === exceptId) continue;
     if (candidate.id && object.id === candidate.id) return "id";
     const name = candidate.name?.trim();
-    if (name && object.name.trim() === name) return "name";
+    if (name && !isMemoObject(object) && object.name.trim() === name) return "name";
   }
   return null;
 }
@@ -528,6 +551,9 @@ export function applyWorkspaceEdit(
               };
             })
             .map((object) => {
+              if (isMemoObject(object)) {
+                return { ...object, links: object.links.filter((link) => link.targetObjectId !== edit.objectId) };
+              }
               if (!isCalculationObject(object)) return object;
               return {
                 ...object,
@@ -554,7 +580,7 @@ export function applyWorkspaceEdit(
       );
     case "updateObject": {
       const current = project.objects.find((item) => item.id === edit.objectId);
-      if (!current) return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      if (!current || !isCalculationObject(current)) return { project, dirtyObjectIds: [], shouldEvaluate: false };
       const nextId = edit.patch.id ?? current.id;
       const nextName = (edit.patch.name ?? current.name).trim();
       if (!nextName) return { project, dirtyObjectIds: [], shouldEvaluate: false };
@@ -966,6 +992,17 @@ export function applyWorkspaceEdit(
         if (link) {
           next = connectPointEnd(next, link.pointId, link.end, null, null).project;
         }
+        const memoLinkId = parseMemoLinkEdgeId(edgeId);
+        if (memoLinkId) {
+          next = {
+            ...next,
+            objects: next.objects.map((object) =>
+              isMemoObject(object)
+                ? { ...object, links: object.links.filter((item) => item.id !== memoLinkId) }
+                : object,
+            ),
+          };
+        }
       }
       const dropping = next.edges.filter((edge) => removed.has(edge.id));
       for (const edge of dropping) {
@@ -1003,6 +1040,28 @@ export function applyWorkspaceEdit(
       return addWorksheetEquipment(project, edit.symbolId, edit.position);
     case "addPoint":
       return addWorksheetPoint(project, edit.position);
+    case "addMemo":
+      return {
+        project: { ...project, objects: [...project.objects, emptyMemo(edit.position)] },
+        dirtyObjectIds: [],
+        shouldEvaluate: false,
+      };
+    case "updateMemo":
+      return updateMemo(project, edit.objectId, edit.patch);
+    case "addMemoTable":
+      return patchMemo(project, edit.objectId, (memo) => ({ ...memo, tables: [...memo.tables, emptyTable()] }));
+    case "removeMemoTable":
+      return patchMemo(project, edit.objectId, (memo) => ({
+        ...memo,
+        tables: memo.tables.filter((table) => table.id !== edit.tableId),
+      }));
+    case "updateMemoTable":
+      return patchMemo(project, edit.objectId, (memo) => ({
+        ...memo,
+        tables: memo.tables.map((table) => (table.id === edit.tableId ? { ...table, cells: edit.cells } : table)),
+      }));
+    case "connectMemoLink":
+      return connectMemoLink(project, edit.memoId, edit.targetObjectId);
     case "addLibrarySymbol":
       return addLibrarySymbol(project, edit.category);
     case "deleteLibrarySymbol":
@@ -1052,6 +1111,7 @@ function _endpointExists(
   portId: string,
   role: "source" | "target",
 ): boolean {
+  if (isMemoObject(object)) return false;
   if (isLayoutObject(object)) {
     return layoutPortExists(object, portId);
   }
@@ -1298,7 +1358,9 @@ function duplicateWorksheetObjects(project: ProjectDocument, objectIds: string[]
   const selected = project.objects.filter((item) => objectIds.includes(item.id));
   if (selected.length === 0) return noEval(project);
   const usedObjectIds = new Set(project.objects.map((item) => item.id));
-  const usedObjectNames = new Set(project.objects.map((item) => item.name));
+  const usedObjectNames = new Set(
+    project.objects.flatMap((item) => (isMemoObject(item) ? [] : [item.name])),
+  );
   const usedVars = new Set(allVariableIds(project));
   const usedVarNames = new Set(
     project.objects.flatMap((item) => {
@@ -1308,6 +1370,12 @@ function duplicateWorksheetObjects(project: ProjectDocument, objectIds: string[]
   );
   const idMap = new Map<string, string>();
   for (const item of selected) {
+    if (isMemoObject(item)) {
+      const id = newStableId("m");
+      usedObjectIds.add(id);
+      idMap.set(item.id, id);
+      continue;
+    }
     const prefix = isEquipmentObject(item) ? "EQ" : isPointObject(item) ? "PT" : "obj";
     idMap.set(item.id, nextAvailableId(usedObjectIds, prefix));
   }
@@ -1368,6 +1436,17 @@ function duplicateWorksheetObjects(project: ProjectDocument, objectIds: string[]
           return remapped ? { ...end, objectId: remapped } : { ...end };
         }),
       });
+    }
+    if (isMemoObject(item)) {
+      return {
+        ...cloneMemo(item, position),
+        id,
+        links: item.links.map((link) => ({
+          id: newStableId("l"),
+          memoId: id,
+          targetObjectId: idMap.get(link.targetObjectId) ?? link.targetObjectId,
+        })),
+      };
     }
     return {
       ...item,
@@ -1565,7 +1644,8 @@ function setObjectLinkSide(
   side: "top" | "bottom",
 ): EditResult {
   if (side !== "top" && side !== "bottom") return noEval(project);
-  if (!project.objects.some((item) => item.id === objectId)) return noEval(project);
+  const current = project.objects.find((item) => item.id === objectId);
+  if (!current || isMemoObject(current)) return noEval(project);
   return {
     project: {
       ...project,
@@ -1861,3 +1941,65 @@ function withSiUnit<T extends { quantity?: string | null; unit?: string | null }
   if (!("quantity" in patch)) return patch;
   return { ...patch, unit: siUnitFor(patch.quantity, catalog) };
 }
+
+function patchMemo(
+  project: ProjectDocument,
+  objectId: string,
+  updater: (memo: import("../types/contract").MemoObject) => import("../types/contract").MemoObject,
+): EditResult {
+  const current = project.objects.find((item) => item.id === objectId);
+  if (!current || !isMemoObject(current)) return noEval(project);
+  const next = updater(current);
+  return {
+    project: {
+      ...project,
+      objects: project.objects.map((item) => (item.id === objectId ? next : item)),
+    },
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
+function updateMemo(
+  project: ProjectDocument,
+  objectId: string,
+  patch: {
+    title?: string;
+    content?: string;
+    tables?: SimpleTable[];
+    size?: { width: number; height: number };
+    position?: { x: number; y: number };
+  },
+): EditResult {
+  return patchMemo(project, objectId, (memo) => ({
+    ...memo,
+    title: patch.title ?? memo.title,
+    content: patch.content ?? memo.content,
+    tables: patch.tables ?? memo.tables,
+    size: patch.size ?? memo.size,
+    position: patch.position ?? memo.position,
+  }));
+}
+
+function connectMemoLink(project: ProjectDocument, memoId: string, targetObjectId: string): EditResult {
+  const memo = project.objects.find((item) => item.id === memoId);
+  const target = project.objects.find((item) => item.id === targetObjectId);
+  if (!memo || !isMemoObject(memo) || !target || target.id === memo.id) return noEval(project);
+  if (memo.links.some((link) => link.targetObjectId === targetObjectId)) return noEval(project);
+  return {
+    project: {
+      ...project,
+      objects: project.objects.map((item) =>
+        item.id === memoId
+          ? {
+              ...memo,
+              links: [...memo.links, { id: newStableId("l"), memoId, targetObjectId }],
+            }
+          : item,
+      ),
+    },
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+

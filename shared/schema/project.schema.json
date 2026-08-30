@@ -23,7 +23,8 @@
         "oneOf": [
           { "$ref": "#/$defs/calculationObject" },
           { "$ref": "#/$defs/equipmentObject" },
-          { "$ref": "#/$defs/pointObject" }
+          { "$ref": "#/$defs/pointObject" },
+          { "$ref": "#/$defs/memoObject" }
         ]
       }
     },
@@ -271,6 +272,28 @@
           "items": { "anyOf": [{ "$ref": "#/$defs/pointEnd" }, { "type": "null" }] }
         },
         "objectLinkSide": { "type": "string", "enum": ["top", "bottom"] }
+      }
+    },
+    "memoObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "title", "content", "tables", "links", "position", "size"],
+      "properties": {
+        "kind": { "type": "string", "const": "memo" },
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "tables": { "type": "array" },
+        "links": { "type": "array" },
+        "position": { "$ref": "#/$defs/position" },
+        "size": {
+          "type": "object",
+          "required": ["width", "height"],
+          "properties": {
+            "width": { "type": "number" },
+            "height": { "type": "number" }
+          }
+        }
       }
     },
     "edge": {

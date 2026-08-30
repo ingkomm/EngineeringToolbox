@@ -23,6 +23,9 @@ import { ArrangementLinkEdge } from "./ArrangementLinkEdge";
 import { CalculationObjectNode } from "./CalculationObjectNode";
 import { EquipmentObjectNode } from "./EquipmentObjectNode";
 import { MappingEdge } from "./MappingEdge";
+import { MemoEditor } from "./MemoEditor";
+import { MemoLinkEdge } from "./MemoLinkEdge";
+import { MemoObjectNode } from "./MemoObjectNode";
 import { PointObjectNode } from "./PointObjectNode";
 import { mergeFlowNodes, toFlowEdges, toFlowNodeRecords } from "./flowModel";
 import { CANVAS_GRID, POINT_NODE_SIZE, snapPositionToGrid, toTopLeftPosition } from "./symbols/grid";
@@ -30,10 +33,11 @@ import { parseHandleId } from "../lib/display";
 import { type WorkspaceEdit } from "../lib/projectEdits";
 import { parseLibraryDrag, libraryPlaceEdit } from "../lib/libraryPlace";
 import { associationConnectTargets, isValidCanvasConnection } from "../lib/connectionRules";
+import { isMemoObject } from "../lib/memo";
 import { findLibrarySymbol } from "./symbols/library";
 import { equipmentBounds } from "../lib/arrangementView";
 import type { QuantitySpec } from "../lib/quantities";
-import type { ProjectDocument } from "../types/contract";
+import type { MemoObject, ProjectDocument } from "../types/contract";
 import {
   OBJECT_LINK_HANDLE,
   isCalculationObject,
@@ -46,8 +50,9 @@ const nodeTypes = {
   calculationObject: CalculationObjectNode,
   equipmentObject: EquipmentObjectNode,
   pointObject: PointObjectNode,
+  memoObject: MemoObjectNode,
 };
-const edgeTypes = { mapping: MappingEdge, arrangementLink: ArrangementLinkEdge };
+const edgeTypes = { mapping: MappingEdge, arrangementLink: ArrangementLinkEdge, memoLink: MemoLinkEdge };
 
 const defaultEdgeOptions = {
   type: "mapping" as const,
@@ -109,13 +114,16 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
   const [selectMode, setSelectMode] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number; ids: string[] } | null>(null);
   const [clipboard, setClipboard] = useState<string[]>([]);
+  const [editingMemoId, setEditingMemoId] = useState<string | null>(null);
   const didFit = useRef(false);
 
+  const onOpenMemo = useCallback((objectId: string) => setEditingMemoId(objectId), []);
+
   useEffect(() => {
-    const nextNodes = toFlowNodeRecords(project, quantities, onEdit);
+    const nextNodes = toFlowNodeRecords(project, quantities, onEdit, onOpenMemo);
     setNodes((current) => mergeFlowNodes(current, nextNodes as Node[]));
     setEdges(toFlowEdges(project, onToggle, onToggleCollapsed, onToggleDirection, onEdit));
-  }, [onEdit, onToggle, onToggleCollapsed, onToggleDirection, project, quantities, setEdges, setNodes]);
+  }, [onEdit, onOpenMemo, onToggle, onToggleCollapsed, onToggleDirection, project, quantities, setEdges, setNodes]);
 
   const selectedIds = nodes.filter((node) => node.selected).map((node) => node.id);
   const selectedLayoutIds = selectedIds.filter((id) => project.objects.some((item) => item.id === id && isLayoutObject(item)));
@@ -150,6 +158,13 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
       const sourceObject = project.objects.find((item) => item.id === connection.source);
       const targetObject = project.objects.find((item) => item.id === connection.target);
       if (!sourceObject || !targetObject) return;
+
+      if (isMemoObject(sourceObject) || isMemoObject(targetObject)) {
+        const memo = isMemoObject(sourceObject) ? sourceObject : targetObject;
+        const other = memo.id === sourceObject.id ? targetObject : sourceObject;
+        onEdit({ type: "connectMemoLink", memoId: memo.id, targetObjectId: other.id });
+        return;
+      }
 
       if (isObjectLinkHandle(connection.sourceHandle) || isObjectLinkHandle(connection.targetHandle)) {
         const assoc = associationConnectTargets(project, connection.source, connection.target);
@@ -258,7 +273,10 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
     return () => window.removeEventListener("keydown", onKey);
   }, [copySelected, onRedo, onUndo, pasteClipboard]);
 
+  const editingMemo = project.objects.find((item): item is MemoObject => item.id === editingMemoId && isMemoObject(item));
+
   return (
+    <>
     <ReactFlow
       nodes={nodes}
       edges={edges}
@@ -400,5 +418,9 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
         </div>
       ) : null}
     </ReactFlow>
+    {editingMemo ? (
+      <MemoEditor memo={editingMemo} onEdit={onEdit} onClose={() => setEditingMemoId(null)} />
+    ) : null}
+    </>
   );
 }

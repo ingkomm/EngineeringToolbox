@@ -1,4 +1,4 @@
-import type { MappingEdge, ProjectDocument, WorksheetObject } from "../types/contract";
+import type { MappingEdge, ProjectDocument } from "../types/contract";
 import { displayName } from "./variables";
 import {
   OBJECT_LINK_HANDLE,
@@ -23,10 +23,14 @@ export interface PortSearchHit {
   relationType?: "value_flow" | "association";
 }
 
-export function matchesObjectQuery(object: Pick<WorksheetObject, "id" | "name">, query: string): boolean {
+export function matchesObjectQuery(object: { id: string; name?: string; title?: string }, query: string): boolean {
   const needle = query.trim().toLowerCase();
   if (!needle) return true;
-  return object.id.toLowerCase().includes(needle) || object.name.toLowerCase().includes(needle);
+  return (
+    object.id.toLowerCase().includes(needle) ||
+    (object.name ?? "").toLowerCase().includes(needle) ||
+    (object.title ?? "").toLowerCase().includes(needle)
+  );
 }
 
 function inboundEdge(

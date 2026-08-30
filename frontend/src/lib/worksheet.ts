@@ -9,11 +9,12 @@ import type {
   WorksheetObject,
 } from "../types/contract";
 import { defaultSymbolLibrary } from "../canvas/symbols/library";
+import { isMemoObject, normalizeMemo } from "./memo";
 
 export type { ObjectLinkSide };
 
 export function isCalculationObject(object: WorksheetObject): object is CalculationObject {
-  return object.kind !== "equipment" && object.kind !== "point";
+  return object.kind !== "equipment" && object.kind !== "point" && object.kind !== "memo";
 }
 
 export function isEquipmentObject(object: WorksheetObject): object is EquipmentObject {
@@ -273,6 +274,10 @@ export function normalizeLoadedProject(project: ProjectDocument): ProjectDocumen
       objects.push(...explodeLegacyArrangement(object as LegacyArrangement));
       continue;
     }
+    if (object && typeof object === "object" && object.kind === "memo") {
+      objects.push(object as WorksheetObject);
+      continue;
+    }
     if (object && typeof object === "object" && object.kind === "point") {
       objects.push(normalizePointObject(object as PointObject));
       continue;
@@ -282,6 +287,7 @@ export function normalizeLoadedProject(project: ProjectDocument): ProjectDocumen
   const objectIds = new Set(objects.map((item) => item.id));
   const layoutIds = new Set(objects.filter(isLayoutObject).map((item) => item.id));
   const normalized = objects.map((object) => {
+    if (isMemoObject(object)) return normalizeMemo(object, objectIds);
     if (!isCalculationObject(object)) return object;
     return {
       ...object,
