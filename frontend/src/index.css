@@ -443,9 +443,27 @@ label.ghost-btn {
   width: 280px;
 }
 
-.ws-node--calc.is-expanded .react-flow__resize-control.top,
-.ws-node--calc.is-expanded .react-flow__resize-control.bottom {
+.ws-node--calc.is-expanded .react-flow__resize-control.handle.top,
+.ws-node--calc.is-expanded .react-flow__resize-control.handle.bottom,
+.ws-node--calc.is-expanded .react-flow__resize-control.line.top,
+.ws-node--calc.is-expanded .react-flow__resize-control.line.bottom {
   display: none;
+}
+
+.ws-node--calc.is-expanded .react-flow__resize-control.handle.left,
+.ws-node--calc.is-expanded .react-flow__resize-control.handle.right {
+  width: 8px;
+  height: 36px;
+  background: var(--accent);
+  border: 0;
+  border-radius: 6px;
+  z-index: 12;
+}
+
+.ws-node--calc.is-expanded .react-flow__resize-control.line.left,
+.ws-node--calc.is-expanded .react-flow__resize-control.line.right {
+  width: 12px;
+  z-index: 11;
 }
 
 .calc-node__id,

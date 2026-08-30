@@ -73,6 +73,7 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
         isVisible={Boolean(open && selected)}
         minWidth={440}
         minHeight={80}
+        handleStyle={{ width: 8, height: 36 }}
         onResizeEnd={(_event, params) =>
           onEdit({ type: "updateObject", objectId: id, patch: { width: snapCalcWidth(params.width) } })
         }
