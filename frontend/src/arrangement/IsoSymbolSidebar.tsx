@@ -82,14 +82,6 @@ export function IsoSymbolSidebar({
         <section className="iso-sidebar__system" data-testid="library-system">
           <p className="iso-sidebar__section">SYSTEM</p>
           <SystemTile
-            testId="btn-add-point"
-            name="Point"
-            payload={{ place: "point" }}
-            onEdit={onEdit}
-          >
-            {renderSystemLibraryTile("point")}
-          </SystemTile>
-          <SystemTile
             testId="btn-add-calculation"
             name="Calculation"
             payload={{ place: "calculation" }}
@@ -107,6 +99,14 @@ export function IsoSymbolSidebar({
           </SystemTile>
         </section>
         <p className="iso-sidebar__section">ARRANGEMENT SYMBOLS</p>
+        <SystemTile
+          testId="btn-add-point"
+          name="Point"
+          payload={{ place: "point" }}
+          onEdit={onEdit}
+        >
+          {renderSystemLibraryTile("point")}
+        </SystemTile>
         <FolderBlock
           title="라이브러리"
           folder=""

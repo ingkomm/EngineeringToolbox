@@ -87,7 +87,6 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
     <article
       className={`ws-node ws-node--calc calc-node ${selected ? "is-selected" : ""} ${isBare ? "is-bare" : ""}`}
       data-testid={`object-${id}`}
-      style={{ width: cardWidth }}
     >
       <NodeResizer
         isVisible={selected}
@@ -95,7 +94,16 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
         minHeight={88}
         color="var(--line-strong)"
         shouldResize={(_event, params) => params.direction[1] === 0}
-        onResize={() => updateNodeInternals(id)}
+        onResize={(_event, params) => {
+          setNodes((nodes) =>
+            nodes.map((node) =>
+              node.id === id
+                ? { ...node, width: params.width, style: { ...node.style, width: params.width } }
+                : node,
+            ),
+          );
+          updateNodeInternals(id);
+        }}
         onResizeEnd={(_event, params) => {
           updateNodeInternals(id);
           onEdit({

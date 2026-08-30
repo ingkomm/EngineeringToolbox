@@ -52,6 +52,7 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
         isVisible={selected}
         minWidth={44}
         minHeight={44}
+        onResize={() => updateNodeInternals(id)}
         onResizeEnd={(_event, params) =>
           onEdit({
             type: "updateEquipment",

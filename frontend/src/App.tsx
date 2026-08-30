@@ -307,8 +307,8 @@ export function App() {
           <section>
             <h2>워크시트</h2>
             <p className="side-pane__hint">
-              Calculation Object는 카드 UI를 유지합니다. Point와 Calculation은 SYSTEM 고정 항목입니다.
-              Pump/Valve/Vessel과 사용자 SVG는 Arrangement Symbol이며 라이브러리에서 편집·삭제합니다.
+              Calculation과 Memo는 SYSTEM 고정 항목입니다. Point는 Arrangement Symbols에 두고
+              Pump/Valve/Vessel·사용자 SVG와 같이 배치합니다. 라이브러리 심볼은 편집·삭제할 수 있습니다.
               Equipment와 Point는 P&ID 도면 심볼이며 계산하지 않습니다. Calc Input은 하늘색, Calc Output은
               초록색, Arrangement Point는 노란색입니다. Pipe/Signal은 값 연동(value flow)과 섞이지 않습니다.
             </p>

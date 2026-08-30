@@ -7,6 +7,7 @@ import {
   symbolsInFolder,
   uniqueCategory,
 } from "./library";
+import { libraryPlaceEdit } from "../../shared/libraryPlace";
 
 describe("user symbol library", () => {
   it("starts with pump, valve, and vessel as arrangement symbols", () => {
@@ -47,5 +48,9 @@ describe("user symbol library", () => {
   it("hides a legacy point template from arrangement folders", () => {
     const library = [...defaultSymbolLibrary(), { id: "point", name: "Point", kind: "point" as const }];
     expect(symbolsInFolder(library, "").map((item) => item.id)).toEqual(["pump", "valve", "vessel"]);
+  });
+
+  it("places a Point object from the arrangement library tile", () => {
+    expect(libraryPlaceEdit({ place: "point" })).toEqual({ type: "addPoint" });
   });
 });

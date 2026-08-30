@@ -52,7 +52,6 @@ export function MemoObjectNode({ id, selected, data }: NodeProps<MemoObjectNodeT
     <article
       className={`memo-node ws-node ${selected ? "is-selected" : ""} ${editing ? "is-editing" : "is-view"}`}
       data-testid={`object-${id}`}
-      style={{ width: object.size.width }}
       onKeyDownCapture={(event) => {
         if (!editing) return;
         event.stopPropagation();
@@ -71,13 +70,17 @@ export function MemoObjectNode({ id, selected, data }: NodeProps<MemoObjectNodeT
         minWidth={360}
         minHeight={180}
         onResize={() => updateNodeInternals(id)}
-        onResizeEnd={(_event, params) =>
+        onResizeEnd={(_event, params) => {
+          updateNodeInternals(id);
           onEdit({
             type: "updateMemo",
             objectId: id,
-            patch: { size: { width: snapGridSize(params.width), height: snapGridSize(params.height) } },
-          })
-        }
+            patch: {
+              size: { width: snapGridSize(params.width), height: snapGridSize(params.height) },
+              position: { x: params.x, y: params.y },
+            },
+          });
+        }}
       />
       <MemoAttachHandle
         nodeId={id}
