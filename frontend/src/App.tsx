@@ -174,7 +174,7 @@ export function App() {
                 id: object.id,
                 title: object.title,
                 content: object.content,
-                tables: object.tables,
+                table: object.table,
                 links: object.links,
               };
             }

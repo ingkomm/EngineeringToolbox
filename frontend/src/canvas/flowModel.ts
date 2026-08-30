@@ -26,7 +26,6 @@ export function toFlowNodeRecords(
   project: ProjectDocument,
   quantities: QuantitySpec[],
   onEdit: (edit: WorkspaceEdit) => void,
-  onOpenMemo?: (objectId: string) => void,
 ) {
   return project.objects.map((object) => {
     if (isMemoObject(object)) {
@@ -35,7 +34,7 @@ export function toFlowNodeRecords(
         type: "memoObject" as const,
         origin: [0, 0] as [number, number],
         position: object.position,
-        data: { object, onEdit, onOpen: onOpenMemo ?? (() => undefined) },
+        data: { object, onEdit },
         draggable: true,
         style: { width: object.size.width, height: object.size.height },
         width: object.size.width,

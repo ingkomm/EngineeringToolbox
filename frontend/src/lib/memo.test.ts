@@ -30,7 +30,7 @@ describe("simple memo", () => {
     expect(memo.kind).toBe("memo");
     expect(memo.title).toBe("");
     expect(memo.content).toBe("");
-    expect(memo.tables).toEqual([]);
+    expect(memo.table).toBeNull();
     expect(memo.links).toEqual([]);
     expect(isCalculationObject(memo)).toBe(false);
   });
@@ -40,10 +40,9 @@ describe("simple memo", () => {
     const id = memoOf(project).id;
     project = applyWorkspaceEdit(project, { type: "updateMemo", objectId: id, patch: { title: "Note", content: "line 1\nline 2" } }, FALLBACK_QUANTITIES).project;
     project = applyWorkspaceEdit(project, { type: "addMemoTable", objectId: id }, FALLBACK_QUANTITIES).project;
-    const tableId = memoOf(project).tables[0]!.id;
     project = applyWorkspaceEdit(
       project,
-      { type: "updateMemoTable", objectId: id, tableId, cells: [["a", "b"], ["1", "2"]] },
+      { type: "updateMemoTable", objectId: id, cells: [["a", "b"], ["1", "2"]] },
       FALLBACK_QUANTITIES,
     ).project;
     const loaded = applyWorkspaceEdit(blankProject, { type: "loadProject", project: JSON.parse(JSON.stringify(project)) }, FALLBACK_QUANTITIES).project;
@@ -51,7 +50,19 @@ describe("simple memo", () => {
     expect(memo.id).toBe(id);
     expect(memo.title).toBe("Note");
     expect(memo.content).toBe("line 1\nline 2");
-    expect(memo.tables[0]?.cells).toEqual([["a", "b"], ["1", "2"]]);
+    expect(memo.table?.cells).toEqual([["a", "b"], ["1", "2"]]);
+  });
+
+  it("creates a 2x2 table and keeps the memo attachment side", () => {
+    let project = applyAll([{ type: "addMemo" }]);
+    const id = memoOf(project).id;
+    project = applyWorkspaceEdit(project, { type: "addMemoTable", objectId: id }, FALLBACK_QUANTITIES).project;
+    expect(memoOf(project).table?.cells).toEqual([
+      ["", ""],
+      ["", ""],
+    ]);
+    project = applyWorkspaceEdit(project, { type: "setObjectLinkSide", objectId: id, side: "bottom" }, FALLBACK_QUANTITIES).project;
+    expect(memoOf(project).objectLinkSide).toBe("bottom");
   });
 
   it("stores a visual link without creating a value-flow edge", () => {

@@ -9,7 +9,6 @@ import type {
   PointObject,
   ProjectDocument,
   RelationType,
-  SimpleTable,
 } from "../types/contract";
 import { firstEquipmentSymbol, findLibrarySymbol, libraryOf, moveLibrarySymbol, newBlankEquipmentSymbol, normalizeCategory, uniqueCategory, deleteLibraryFolder } from "../canvas/symbols/library";
 import { POINT_NODE_SIZE, snapCalcWidth, snapCenteredTopLeft, snapGridSize } from "../canvas/symbols/grid";
@@ -41,7 +40,7 @@ import {
   parsePointConnectionEnd,
   resolveLayoutPort,
 } from "./worksheet";
-import { cloneMemo, emptyMemo, emptyTable, isMemoObject, parseMemoLinkEdgeId } from "./memo";
+import { cloneMemo, emptyMemo, emptyMemoTable, isMemoObject, parseMemoLinkEdgeId } from "./memo";
 import { newStableId } from "./ids";
 
 export const VARIABLE_ID_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -99,14 +98,14 @@ export type WorkspaceEdit =
       patch: {
         title?: string;
         content?: string;
-        tables?: SimpleTable[];
+        table?: { cells: string[][] } | null;
         size?: { width: number; height: number };
         position?: { x: number; y: number };
       };
     }
   | { type: "addMemoTable"; objectId: string }
-  | { type: "removeMemoTable"; objectId: string; tableId: string }
-  | { type: "updateMemoTable"; objectId: string; tableId: string; cells: SimpleTable["cells"] }
+  | { type: "removeMemoTable"; objectId: string }
+  | { type: "updateMemoTable"; objectId: string; cells: string[][] }
   | { type: "connectMemoLink"; memoId: string; targetObjectId: string }
   | { type: "addLibrarySymbol"; category?: string }
   | { type: "deleteLibrarySymbol"; symbolId: string }
@@ -1049,16 +1048,13 @@ export function applyWorkspaceEdit(
     case "updateMemo":
       return updateMemo(project, edit.objectId, edit.patch);
     case "addMemoTable":
-      return patchMemo(project, edit.objectId, (memo) => ({ ...memo, tables: [...memo.tables, emptyTable()] }));
+      return patchMemo(project, edit.objectId, (memo) => ({ ...memo, table: memo.table ?? emptyMemoTable() }));
     case "removeMemoTable":
-      return patchMemo(project, edit.objectId, (memo) => ({
-        ...memo,
-        tables: memo.tables.filter((table) => table.id !== edit.tableId),
-      }));
+      return patchMemo(project, edit.objectId, (memo) => ({ ...memo, table: null }));
     case "updateMemoTable":
       return patchMemo(project, edit.objectId, (memo) => ({
         ...memo,
-        tables: memo.tables.map((table) => (table.id === edit.tableId ? { ...table, cells: edit.cells } : table)),
+        table: { cells: edit.cells.map((row) => row.map((cell) => cell)) },
       }));
     case "connectMemoLink":
       return connectMemoLink(project, edit.memoId, edit.targetObjectId);
@@ -1645,7 +1641,7 @@ function setObjectLinkSide(
 ): EditResult {
   if (side !== "top" && side !== "bottom") return noEval(project);
   const current = project.objects.find((item) => item.id === objectId);
-  if (!current || isMemoObject(current)) return noEval(project);
+  if (!current) return noEval(project);
   return {
     project: {
       ...project,
@@ -1966,7 +1962,7 @@ function updateMemo(
   patch: {
     title?: string;
     content?: string;
-    tables?: SimpleTable[];
+    table?: { cells: string[][] } | null;
     size?: { width: number; height: number };
     position?: { x: number; y: number };
   },
@@ -1975,7 +1971,7 @@ function updateMemo(
     ...memo,
     title: patch.title ?? memo.title,
     content: patch.content ?? memo.content,
-    tables: patch.tables ?? memo.tables,
+    table: patch.table === undefined ? memo.table : patch.table,
     size: patch.size ?? memo.size,
     position: patch.position ?? memo.position,
   }));

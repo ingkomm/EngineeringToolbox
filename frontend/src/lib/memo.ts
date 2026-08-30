@@ -1,4 +1,4 @@
-import type { MemoLink, MemoObject, SimpleTable, WorksheetObject } from "../types/contract";
+import type { MemoLink, MemoObject, WorksheetObject } from "../types/contract";
 import { newStableId } from "./ids";
 
 export const MEMO_ATTACHMENT_HANDLE = "MEMO";
@@ -18,7 +18,7 @@ export function emptyMemo(position?: { x: number; y: number }): MemoObject {
     id: newStableId("m"),
     title: "",
     content: "",
-    tables: [],
+    table: null,
     links: [],
     position: position ?? { x: 80, y: 88 },
     size: { ...MEMO_DEFAULT_SIZE },
@@ -27,26 +27,21 @@ export function emptyMemo(position?: { x: number; y: number }): MemoObject {
 
 export function cloneMemo(memo: MemoObject, position?: { x: number; y: number }): MemoObject {
   const id = newStableId("m");
-  const linkIdMap = new Map(memo.links.map((link) => [link.id, newStableId("l")]));
   return {
     ...memo,
     id,
     position: position ?? { x: memo.position.x + 36, y: memo.position.y + 36 },
-    tables: memo.tables.map((table) => ({
-      id: newStableId("t"),
-      cells: table.cells.map((row) => [...row]),
-    })),
+    table: memo.table ? { cells: memo.table.cells.map((row) => row.map((cell) => cell)) } : null,
     links: memo.links.map((link) => ({
       ...link,
-      id: linkIdMap.get(link.id) ?? newStableId("l"),
+      id: newStableId("l"),
       memoId: id,
     })),
   };
 }
 
-export function emptyTable(): SimpleTable {
+export function emptyMemoTable(): { cells: string[][] } {
   return {
-    id: newStableId("t"),
     cells: [
       ["", ""],
       ["", ""],
@@ -54,12 +49,11 @@ export function emptyTable(): SimpleTable {
   };
 }
 
-export function contentPreview(content: string, lines = 4): string {
-  return content
-    .split(/\n/)
-    .slice(0, lines)
-    .join("\n")
-    .trim();
+export function stringifyCells(cells: unknown): string[][] {
+  if (!Array.isArray(cells)) return [];
+  return cells.map((row) =>
+    Array.isArray(row) ? row.map((cell) => (cell == null ? "" : String(cell))) : [],
+  );
 }
 
 export function memoLinkEdgeId(linkId: string): string {
@@ -75,20 +69,20 @@ export function normalizeMemo(object: MemoObject, objectIds: Set<string>): MemoO
     (link): link is MemoLink =>
       Boolean(link?.id && link.targetObjectId && objectIds.has(link.targetObjectId) && link.targetObjectId !== object.id),
   );
+  const legacy = (object as MemoObject & { tables?: Array<{ cells?: unknown }> }).tables;
+  const rawTable = object.table ?? (legacy?.[0] ? { cells: legacy[0].cells } : null);
   return {
     kind: "memo",
     id: object.id,
     title: object.title ?? "",
     content: object.content ?? "",
-    tables: (object.tables ?? []).map((table) => ({
-      id: table.id || newStableId("t"),
-      cells: Array.isArray(table.cells) ? table.cells.map((row) => (Array.isArray(row) ? [...row] : [])) : [],
-    })),
+    table: rawTable ? { cells: stringifyCells(rawTable.cells) } : null,
     links: links.map((link) => ({ ...link, memoId: object.id })),
     position: object.position ?? { x: 80, y: 88 },
     size: {
       width: Math.max(160, object.size?.width ?? MEMO_DEFAULT_SIZE.width),
       height: Math.max(110, object.size?.height ?? MEMO_DEFAULT_SIZE.height),
     },
+    objectLinkSide: object.objectLinkSide === "bottom" ? "bottom" : "top",
   };
 }

@@ -277,15 +277,16 @@
     "memoObject": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "id", "title", "content", "tables", "links", "position", "size"],
+      "required": ["kind", "id", "title", "content", "links", "position", "size"],
       "properties": {
         "kind": { "type": "string", "const": "memo" },
         "id": { "type": "string", "minLength": 1 },
         "title": { "type": "string" },
         "content": { "type": "string" },
-        "tables": { "type": "array" },
+        "table": { "type": ["object", "null"] },
         "links": { "type": "array" },
         "position": { "$ref": "#/$defs/position" },
+        "objectLinkSide": { "type": "string", "enum": ["top", "bottom"] },
         "size": {
           "type": "object",
           "required": ["width", "height"],

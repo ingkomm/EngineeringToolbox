@@ -248,8 +248,7 @@ class PointObject(BaseModel):
 
 class SimpleTable(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    id: str
-    cells: list[list[str | float | int | None]] = Field(default_factory=list)
+    cells: list[list[str]] = Field(default_factory=list)
 
 
 class MemoLink(BaseModel):
@@ -266,10 +265,32 @@ class MemoObject(BaseModel):
     id: str
     title: str = ""
     content: str = ""
-    tables: list[SimpleTable] = Field(default_factory=list)
+    table: SimpleTable | None = None
     links: list[MemoLink] = Field(default_factory=list)
     position: Position
     size: Size = Field(default_factory=lambda: Size(width=200, height=140))
+    objectLinkSide: Literal["top", "bottom"] = "top"
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_tables(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        payload = dict(data)
+        legacy = payload.pop("tables", None)
+        if payload.get("table") is None and isinstance(legacy, list) and legacy:
+            first = legacy[0]
+            cells = first.get("cells") if isinstance(first, dict) else None
+            payload["table"] = {"cells": stringify_table_cells(cells)}
+        elif isinstance(payload.get("table"), dict):
+            payload["table"] = {"cells": stringify_table_cells(payload["table"].get("cells"))}
+        return payload
+
+
+def stringify_table_cells(cells: object) -> list[list[str]]:
+    if not isinstance(cells, list):
+        return []
+    return [["" if cell is None else str(cell) for cell in row] if isinstance(row, list) else [] for row in cells]
 
 
 OBJECT_LINK_HANDLE = "OBJ"

@@ -113,11 +113,6 @@ export interface PointObject {
   objectLinkSide?: ObjectLinkSide;
 }
 
-export interface SimpleTable {
-  id: string;
-  cells: Array<Array<string | number | null>>;
-}
-
 export interface MemoLink {
   id: string;
   memoId: string;
@@ -129,10 +124,11 @@ export interface MemoObject {
   id: string;
   title: string;
   content: string;
-  tables: SimpleTable[];
+  table: { cells: string[][] } | null;
   links: MemoLink[];
   position: { x: number; y: number };
   size: { width: number; height: number };
+  objectLinkSide?: ObjectLinkSide;
 }
 
 export type WorksheetObject = CalculationObject | EquipmentObject | PointObject | MemoObject;
