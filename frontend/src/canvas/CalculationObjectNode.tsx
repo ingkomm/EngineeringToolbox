@@ -1,5 +1,5 @@
 import { NodeResizer, Position, type Node, type NodeProps, useReactFlow, useUpdateNodeInternals } from "@xyflow/react";
-import { useEffect, useLayoutEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import type { CalculationObject, ProjectDocument } from "../types/contract";
 import { formatValue, inputHandleId, outputHandleId } from "../lib/display";
 import { OBJECT_LINK_HANDLE, objectLinkSideOf } from "../lib/worksheet";
