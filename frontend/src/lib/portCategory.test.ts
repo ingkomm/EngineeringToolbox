@@ -63,6 +63,8 @@ describe("port categories", () => {
     expect(portCategoryOf(calc, "in:A")).toBe("calc-input");
     expect(portCategoryOf(calc, "out:POWER")).toBe("calc-output");
     expect(portCategoryOf(calc, "OBJ")).toBe("arrangement-point");
+    expect(portCategoryOf(calc, "MEMO-in")).toBe("memo-attachment");
+    expect(portCategoryOf(equipment, "MEMO-in")).toBe("memo-attachment");
     expect(portCategoryOf(equipment, "IN_1")).toBe("arrangement-point");
     expect(defaultPortCategory(calc, undefined)).toBe("arrangement-point");
   });
@@ -74,6 +76,9 @@ describe("port categories", () => {
     expect(canConnectPortCategories("calc-output", "calc-output")).toBe(false);
     expect(canConnectPortCategories("arrangement-point", "calc-input")).toBe(false);
     expect(canConnectPortCategories("calc-output", "arrangement-point")).toBe(false);
+    expect(canConnectPortCategories("memo-attachment", "memo-attachment")).toBe(true);
+    expect(canConnectPortCategories("memo-attachment", "calc-input")).toBe(false);
+    expect(canConnectPortCategories("memo-attachment", "arrangement-point")).toBe(false);
   });
 });
 

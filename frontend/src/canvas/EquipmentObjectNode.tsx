@@ -3,11 +3,13 @@ import { useLayoutEffect, useState } from "react";
 import type { EquipmentObject } from "../types/contract";
 import type { WorkspaceEdit } from "../lib/projectEdits";
 import { objectLinkSideOf } from "../lib/worksheet";
+import { memoLinkSideOf } from "../lib/memo";
 import { equipmentBounds, equipmentPortLayout, equipmentTag } from "../lib/arrangementView";
 import { resolveDrawing } from "./symbols/drawing";
 import { DrawingSvg } from "./symbols/DrawingSvg";
 import { snapGridSize } from "./symbols/grid";
 import { ObjectLinkHandle } from "./ObjectLinkHandle";
+import { MemoAttachHandle } from "./MemoAttachHandle";
 import { EquipmentPopover } from "./ArrangementPopover";
 
 export type EquipmentObjectNodeType = Node<
@@ -28,7 +30,7 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
   const connecting = Boolean(useConnection().inProgress);
   const showPorts = Boolean(selected || hovered || connecting);
   const updateNodeInternals = useUpdateNodeInternals();
-  const handleSignature = `${object.inCount}:${object.outCount}:${objectLinkSideOf(object)}:${bounds.rotation}:${bounds.width}x${bounds.height}:${object.drawing?.primitives.length ?? 0}:${object.drawing?.ports?.map((item) => `${item.id}:${item.x}:${item.y}`).join(",") ?? ""}`;
+  const handleSignature = `${object.inCount}:${object.outCount}:${objectLinkSideOf(object)}:${memoLinkSideOf(object)}:${bounds.rotation}:${bounds.width}x${bounds.height}:${object.drawing?.primitives.length ?? 0}:${object.drawing?.ports?.map((item) => `${item.id}:${item.x}:${item.y}`).join(",") ?? ""}`;
 
   useLayoutEffect(() => {
     updateNodeInternals(id);
@@ -66,6 +68,17 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
             type: "setObjectLinkSide",
             objectId: id,
             side: objectLinkSideOf(object) === "top" ? "bottom" : "top",
+          })
+        }
+      />
+      <MemoAttachHandle
+        nodeId={id}
+        side={memoLinkSideOf(object)}
+        onToggleSide={() =>
+          onEdit({
+            type: "setMemoLinkSide",
+            objectId: id,
+            side: memoLinkSideOf(object) === "top" ? "bottom" : "top",
           })
         }
       />

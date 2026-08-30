@@ -2438,9 +2438,32 @@ label.ghost-btn {
 }
 
 .memo-attach-cluster:hover .memo-attach-side,
-.memo-node.is-selected .memo-attach-side {
+.memo-node.is-selected .memo-attach-side,
+.ws-node.is-selected .memo-attach-side,
+.pid-eq.is-hot .memo-attach-side,
+.pid-pt.is-hot .memo-attach-side,
+.pid-eq.is-selected .memo-attach-side,
+.pid-pt.is-selected .memo-attach-side {
   opacity: 1;
   pointer-events: auto;
+}
+
+.pid-pt .memo-attach-cluster--top {
+  top: 0;
+}
+
+.pid-pt .memo-attach-cluster--bottom {
+  bottom: 0;
+}
+
+.pid-eq:not(:hover):not(.is-hot):not(.is-selected) .memo-attach-cluster,
+.pid-pt:not(:hover):not(.is-hot):not(.is-selected) .memo-attach-cluster {
+  opacity: 0;
+}
+
+.react-flow:has(.react-flow__connection) .memo-attach-cluster,
+.react-flow:has(.react-flow__connectionline) .memo-attach-cluster {
+  opacity: 1;
 }
 
 .memo-link-edge {

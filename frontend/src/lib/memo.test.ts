@@ -87,9 +87,19 @@ describe("simple memo", () => {
         source: memoId,
         target: calcId,
         sourceHandle: "MEMO",
-        targetHandle: "OBJ",
+        targetHandle: "MEMO-in",
       }),
     ).toBe(true);
+    expect(
+      isValidCanvasConnection(project, {
+        source: memoId,
+        target: calcId,
+        sourceHandle: "MEMO",
+        targetHandle: "OBJ",
+      }),
+    ).toBe(false);
+    project = applyWorkspaceEdit(project, { type: "setMemoLinkSide", objectId: calcId, side: "bottom" }, FALLBACK_QUANTITIES).project;
+    expect(project.objects.find(isCalculationObject)?.memoLinkSide).toBe("bottom");
   });
 
   it("loads a worksheet that has no memos", () => {

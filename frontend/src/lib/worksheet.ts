@@ -192,6 +192,7 @@ export function normalizePointObject(point: {
   a?: PointEnd | null;
   b?: PointEnd | null;
   objectLinkSide?: ObjectLinkSide | null;
+  memoLinkSide?: ObjectLinkSide | null;
 }): PointObject {
   const fromLegacy = point.connections ?? [point.a ?? null, point.b ?? null];
   return {
@@ -202,6 +203,7 @@ export function normalizePointObject(point: {
     connectionCount: POINT_CONNECTION_COUNT,
     connections: POINT_CONNECTION_IDS.map((_, index) => normalizePointEnd(fromLegacy[index] ?? null)),
     objectLinkSide: point.objectLinkSide === "bottom" ? "bottom" : "top",
+    memoLinkSide: point.memoLinkSide === "bottom" ? "bottom" : "top",
   };
 }
 

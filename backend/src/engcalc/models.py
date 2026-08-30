@@ -97,6 +97,7 @@ class CalculationObject(BaseModel):
     outputs: list[OutputBinding] = Field(default_factory=list)
     links: list[CalculationLink] = Field(default_factory=list)
     objectLinkSide: Literal["top", "bottom"] = "top"
+    memoLinkSide: Literal["top", "bottom"] = "top"
     width: float | None = Field(default=None, ge=280)
 
 
@@ -197,6 +198,7 @@ class EquipmentObject(BaseModel):
     inCount: int = Field(default=1, ge=0, le=8)
     outCount: int = Field(default=1, ge=0, le=8)
     objectLinkSide: Literal["top", "bottom"] = "top"
+    memoLinkSide: Literal["top", "bottom"] = "top"
     tag: str = ""
     rotation: Literal[0, 90, 180, 270] = 0
     width: float | None = Field(default=None, ge=22)
@@ -220,6 +222,7 @@ class PointObject(BaseModel):
     connectionCount: int = Field(default=4, ge=2, le=4)
     connections: list[PointEnd | None] = Field(default_factory=list)
     objectLinkSide: Literal["top", "bottom"] = "top"
+    memoLinkSide: Literal["top", "bottom"] = "top"
 
     @model_validator(mode="before")
     @classmethod

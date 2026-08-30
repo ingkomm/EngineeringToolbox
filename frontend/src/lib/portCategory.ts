@@ -47,8 +47,6 @@ export function defaultPortCategory(
 export function canConnectPortCategories(source: PortCategory, target: PortCategory): boolean {
   if (source === "calc-output" && target === "calc-input") return true;
   if (source === "arrangement-point" && target === "arrangement-point") return true;
-  if (source === "memo-attachment" || target === "memo-attachment") {
-    return source === "memo-attachment" || target === "memo-attachment";
-  }
+  if (source === "memo-attachment" && target === "memo-attachment") return true;
   return false;
 }

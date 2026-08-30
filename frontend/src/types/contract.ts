@@ -59,6 +59,7 @@ export interface CalculationObject {
   outputs: OutputBinding[];
   links?: CalculationLink[];
   objectLinkSide?: ObjectLinkSide;
+  memoLinkSide?: ObjectLinkSide;
   width?: number;
 }
 
@@ -81,6 +82,7 @@ export interface EquipmentObject {
   inCount: number;
   outCount: number;
   objectLinkSide?: ObjectLinkSide;
+  memoLinkSide?: ObjectLinkSide;
   tag?: string;
   rotation?: EquipmentRotation;
   width?: number;
@@ -111,6 +113,7 @@ export interface PointObject {
   connectionCount: number;
   connections: Array<PointEnd | null>;
   objectLinkSide?: ObjectLinkSide;
+  memoLinkSide?: ObjectLinkSide;
 }
 
 export interface MemoTextSection {

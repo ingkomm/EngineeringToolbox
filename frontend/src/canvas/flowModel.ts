@@ -15,7 +15,7 @@ import {
   isPointObject,
   pointConnectionIds,
 } from "../lib/worksheet";
-import { isMemoObject, memoLinkEdgeId, MEMO_ATTACHMENT_HANDLE } from "../lib/memo";
+import { isMemoObject, memoLinkEdgeId, MEMO_ATTACHMENT_HANDLE, MEMO_RECEIVE_HANDLE } from "../lib/memo";
 import { mappedInputsForObject } from "./mappedInputs";
 import { equipmentBounds } from "../lib/arrangementView";
 import { LAYOUT_NODE_ORIGIN, POINT_NODE_SIZE, toCenterPosition } from "./symbols/grid";
@@ -222,20 +222,17 @@ export function toFlowEdges(
     if (!isMemoObject(object)) return [];
     return object.links
       .filter((link) => objects.has(link.targetObjectId))
-      .map((link) => {
-        const target = objects.get(link.targetObjectId);
-        return {
-          id: memoLinkEdgeId(link.id),
-          source: object.id,
-          target: link.targetObjectId,
-          sourceHandle: MEMO_ATTACHMENT_HANDLE,
-          targetHandle: target && isMemoObject(target) ? `${MEMO_ATTACHMENT_HANDLE}-in` : OBJECT_LINK_HANDLE,
-          type: "memoLink" as const,
-          className: "memo-link-edge",
-          interactionWidth: 16,
-          data: {},
-        };
-      });
+      .map((link) => ({
+        id: memoLinkEdgeId(link.id),
+        source: object.id,
+        target: link.targetObjectId,
+        sourceHandle: MEMO_ATTACHMENT_HANDLE,
+        targetHandle: MEMO_RECEIVE_HANDLE,
+        type: "memoLink" as const,
+        className: "memo-link-edge",
+        interactionWidth: 16,
+        data: {},
+      }));
   });
 
   return [...mapping, ...links, ...memoLinks];

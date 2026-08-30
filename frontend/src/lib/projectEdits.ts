@@ -156,6 +156,7 @@ export type WorkspaceEdit =
     }
   | { type: "setEquipmentPorts"; objectId: string; inCount?: number; outCount?: number }
   | { type: "setObjectLinkSide"; objectId: string; side: "top" | "bottom" }
+  | { type: "setMemoLinkSide"; objectId: string; side: "top" | "bottom" }
   | {
       type: "connectPointEnd";
       pointId: string;
@@ -1101,6 +1102,8 @@ export function applyWorkspaceEdit(
       return setEquipmentPorts(project, edit.objectId, edit.inCount, edit.outCount);
     case "setObjectLinkSide":
       return setObjectLinkSide(project, edit.objectId, edit.side);
+    case "setMemoLinkSide":
+      return setMemoLinkSide(project, edit.objectId, edit.side);
     case "connectPointEnd":
       return connectPointEnd(
         project,
@@ -1662,6 +1665,26 @@ function setObjectLinkSide(
       ...project,
       objects: project.objects.map((item) =>
         item.id === objectId ? { ...item, objectLinkSide: side } : item,
+      ),
+    },
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
+function setMemoLinkSide(
+  project: ProjectDocument,
+  objectId: string,
+  side: "top" | "bottom",
+): EditResult {
+  if (side !== "top" && side !== "bottom") return noEval(project);
+  const current = project.objects.find((item) => item.id === objectId);
+  if (!current || isMemoObject(current)) return noEval(project);
+  return {
+    project: {
+      ...project,
+      objects: project.objects.map((item) =>
+        item.id === objectId && !isMemoObject(item) ? { ...item, memoLinkSide: side } : item,
       ),
     },
     dirtyObjectIds: [],

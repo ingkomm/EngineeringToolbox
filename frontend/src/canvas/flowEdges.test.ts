@@ -215,7 +215,7 @@ describe("layout node origin", () => {
 });
 
 describe("memo visual links", () => {
-  it("draws a memo link from the right-edge MEMO handle to the target OBJ handle", () => {
+  it("draws a memo link from the memo MEMO handle to the target MEMO-in handle", () => {
     const withMemo: ProjectDocument = {
       ...project,
       objects: [
@@ -239,7 +239,7 @@ describe("memo visual links", () => {
       source: "m_1",
       target: "obj_1",
       sourceHandle: "MEMO",
-      targetHandle: "OBJ",
+      targetHandle: "MEMO-in",
       type: "memoLink",
     });
   });

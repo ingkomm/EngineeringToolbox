@@ -2,6 +2,7 @@ import type { MemoLink, MemoObject, MemoSection, WorksheetObject } from "../type
 import { newStableId } from "./ids";
 
 export const MEMO_ATTACHMENT_HANDLE = "MEMO";
+export const MEMO_RECEIVE_HANDLE = `${MEMO_ATTACHMENT_HANDLE}-in`;
 export const MEMO_DEFAULT_SIZE = { width: 240, height: 220 };
 
 export function isMemoObject(object: WorksheetObject): object is MemoObject {
@@ -9,7 +10,11 @@ export function isMemoObject(object: WorksheetObject): object is MemoObject {
 }
 
 export function isMemoAttachmentHandle(portId: string | null | undefined): boolean {
-  return portId === MEMO_ATTACHMENT_HANDLE || portId === `${MEMO_ATTACHMENT_HANDLE}-in`;
+  return portId === MEMO_ATTACHMENT_HANDLE || portId === MEMO_RECEIVE_HANDLE;
+}
+
+export function memoLinkSideOf(object: { memoLinkSide?: "top" | "bottom" | null }): "top" | "bottom" {
+  return object.memoLinkSide === "bottom" ? "bottom" : "top";
 }
 
 export function emptyMemo(position?: { x: number; y: number }): MemoObject {

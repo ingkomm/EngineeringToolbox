@@ -2,7 +2,10 @@ import { Position, type Node, type NodeProps, useReactFlow, useUpdateNodeInterna
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import type { CalculationObject, ProjectDocument } from "../types/contract";
 import { formatValue, inputHandleId, outputHandleId } from "../lib/display";
+import { OBJECT_LINK_HANDLE, objectLinkSideOf } from "../lib/worksheet";
+import { memoLinkSideOf } from "../lib/memo";
 import { ObjectLinkHandle } from "./ObjectLinkHandle";
+import { MemoAttachHandle } from "./MemoAttachHandle";
 import {
   applyCandidate,
   identifierAt,
@@ -12,7 +15,6 @@ import {
   type FormulaCandidate,
 } from "../lib/formulaComplete";
 import { OBJECT_ID_RE, VARIABLE_ID_RE, type WorkspaceEdit } from "../lib/projectEdits";
-import { OBJECT_LINK_HANDLE, objectLinkSideOf } from "../lib/worksheet";
 import { calcCardWidth, snapCalcWidth } from "./symbols/grid";
 import { displayName } from "../lib/variables";
 import type { QuantitySpec } from "../lib/quantities";
@@ -54,6 +56,7 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
     ...object.outputs.map((item) => item.id),
     OBJECT_LINK_HANDLE,
     objectLinkSideOf(object),
+    memoLinkSideOf(object),
     open ? "open" : "compact",
     cardWidth,
   ].join("|");
@@ -169,6 +172,17 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
             type: "setObjectLinkSide",
             objectId: id,
             side: objectLinkSideOf(object) === "top" ? "bottom" : "top",
+          })
+        }
+      />
+      <MemoAttachHandle
+        nodeId={id}
+        side={memoLinkSideOf(object)}
+        onToggleSide={() =>
+          onEdit({
+            type: "setMemoLinkSide",
+            objectId: id,
+            side: memoLinkSideOf(object) === "top" ? "bottom" : "top",
           })
         }
       />

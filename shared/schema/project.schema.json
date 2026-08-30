@@ -121,6 +121,7 @@
           "items": { "$ref": "#/$defs/calculationLink" }
         },
         "objectLinkSide": { "type": "string", "enum": ["top", "bottom"] },
+        "memoLinkSide": { "type": "string", "enum": ["top", "bottom"] },
         "width": { "type": "number", "minimum": 280 }
       }
     },
@@ -250,6 +251,7 @@
         "inCount": { "type": "integer", "minimum": 0, "maximum": 8 },
         "outCount": { "type": "integer", "minimum": 0, "maximum": 8 },
         "objectLinkSide": { "type": "string", "enum": ["top", "bottom"] },
+        "memoLinkSide": { "type": "string", "enum": ["top", "bottom"] },
         "tag": { "type": "string" },
         "rotation": { "type": "integer", "enum": [0, 90, 180, 270] },
         "width": { "type": "number", "minimum": 22 },
@@ -271,7 +273,8 @@
           "type": "array",
           "items": { "anyOf": [{ "$ref": "#/$defs/pointEnd" }, { "type": "null" }] }
         },
-        "objectLinkSide": { "type": "string", "enum": ["top", "bottom"] }
+        "objectLinkSide": { "type": "string", "enum": ["top", "bottom"] },
+        "memoLinkSide": { "type": "string", "enum": ["top", "bottom"] }
       }
     },
     "memoObject": {

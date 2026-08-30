@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useState } from "react";
-import { Handle, NodeResizer, Position, useUpdateNodeInternals, type Node, type NodeProps } from "@xyflow/react";
+import { NodeResizer, useUpdateNodeInternals, type Node, type NodeProps } from "@xyflow/react";
 import type { MemoObject, MemoSection } from "../types/contract";
 import type { WorkspaceEdit } from "../lib/projectEdits";
-import { MEMO_ATTACHMENT_HANDLE } from "../lib/memo";
 import { renderMemoMarkdown } from "../lib/memoMarkdown";
 import { objectLinkSideOf } from "../lib/worksheet";
 import { snapGridSize } from "./symbols/grid";
+import { MemoAttachHandle } from "./MemoAttachHandle";
 
 function stopKeys(event: { stopPropagation: () => void }) {
   event.stopPropagation();
@@ -71,44 +71,17 @@ export function MemoObjectNode({ id, selected, data }: NodeProps<MemoObjectNodeT
           })
         }
       />
-      <div className={`memo-attach-cluster memo-attach-cluster--${side}`}>
-        <button
-          type="button"
-          className="memo-attach-side nodrag nopan"
-          data-testid={`object-${id}-memo-side`}
-          title={side === "top" ? "연결점을 하단으로" : "연결점을 상단으로"}
-          onClick={(event) => {
-            event.stopPropagation();
-            onEdit({
-              type: "setObjectLinkSide",
-              objectId: id,
-              side: side === "top" ? "bottom" : "top",
-            });
-          }}
-        >
-          {side === "top" ? "↓" : "↑"}
-        </button>
-        <div className="memo-attach-ports">
-          <Handle
-            type="source"
-            position={Position.Right}
-            id={MEMO_ATTACHMENT_HANDLE}
-            className="memo-attach"
-            data-port-category="memo-attachment"
-            data-testid={`object-${id}-memo`}
-            title="Memo"
-            isConnectable
-          />
-          <Handle
-            type="target"
-            position={Position.Right}
-            id={`${MEMO_ATTACHMENT_HANDLE}-in`}
-            className="memo-attach memo-attach--target"
-            data-port-category="memo-attachment"
-            isConnectable
-          />
-        </div>
-      </div>
+      <MemoAttachHandle
+        nodeId={id}
+        side={side}
+        onToggleSide={() =>
+          onEdit({
+            type: "setObjectLinkSide",
+            objectId: id,
+            side: side === "top" ? "bottom" : "top",
+          })
+        }
+      />
       <header className="memo-node__header">
         <p className="ws-node__kicker">MEMO</p>
         {editing ? (

@@ -3,8 +3,10 @@ import { useLayoutEffect, useState } from "react";
 import type { PointObject } from "../types/contract";
 import type { WorkspaceEdit } from "../lib/projectEdits";
 import { POINT_CONNECTION_IDS, objectLinkSideOf, pointConnectionSide } from "../lib/worksheet";
+import { memoLinkSideOf } from "../lib/memo";
 import { POINT_NODE_SIZE } from "./symbols/grid";
 import { ObjectLinkHandle } from "./ObjectLinkHandle";
+import { MemoAttachHandle } from "./MemoAttachHandle";
 import { PointPopover } from "./ArrangementPopover";
 
 export type PointObjectNodeType = Node<
@@ -25,6 +27,7 @@ const SIDE_POSITION: Record<"left" | "right" | "bottom" | "top", Position> = {
 export function PointObjectNode({ id, selected, data }: NodeProps<PointObjectNodeType>) {
   const { object, onEdit } = data;
   const side = objectLinkSideOf(object);
+  const memoSide = memoLinkSideOf(object);
   const linked = object.connections.some(Boolean);
   const [hovered, setHovered] = useState(false);
   const [inspect, setInspect] = useState(false);
@@ -34,7 +37,7 @@ export function PointObjectNode({ id, selected, data }: NodeProps<PointObjectNod
 
   useLayoutEffect(() => {
     updateNodeInternals(id);
-  }, [id, side, updateNodeInternals]);
+  }, [id, side, memoSide, updateNodeInternals]);
 
   return (
     <article
@@ -56,6 +59,17 @@ export function PointObjectNode({ id, selected, data }: NodeProps<PointObjectNod
             type: "setObjectLinkSide",
             objectId: id,
             side: side === "top" ? "bottom" : "top",
+          })
+        }
+      />
+      <MemoAttachHandle
+        nodeId={id}
+        side={memoSide}
+        onToggleSide={() =>
+          onEdit({
+            type: "setMemoLinkSide",
+            objectId: id,
+            side: memoSide === "top" ? "bottom" : "top",
           })
         }
       />
