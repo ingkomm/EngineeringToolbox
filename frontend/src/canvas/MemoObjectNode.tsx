@@ -35,7 +35,18 @@ export function MemoObjectNode({ id, selected, data }: NodeProps<MemoObjectNodeT
 
   useLayoutEffect(() => {
     updateNodeInternals(id);
-  }, [id, side, editing, object.sections, object.title, object.size.width, updateNodeInternals]);
+  }, [
+    id,
+    side,
+    editing,
+    object.sections,
+    object.title,
+    object.size.width,
+    object.size.height,
+    object.position.x,
+    object.position.y,
+    updateNodeInternals,
+  ]);
 
   return (
     <article
@@ -59,6 +70,7 @@ export function MemoObjectNode({ id, selected, data }: NodeProps<MemoObjectNodeT
         isVisible={selected}
         minWidth={360}
         minHeight={180}
+        onResize={() => updateNodeInternals(id)}
         onResizeEnd={(_event, params) =>
           onEdit({
             type: "updateMemo",

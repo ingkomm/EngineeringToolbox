@@ -31,9 +31,8 @@ describe("layout snap helpers", () => {
     expect(snapCalcWidth(440) % CANVAS_GRID).toBe(0);
   });
 
-  it("uses compact width until the calculation card is expanded", () => {
-    expect(calcCardWidth(false, 495)).toBe(280);
-    expect(calcCardWidth(true, 495)).toBe(495);
-    expect(calcCardWidth(true)).toBe(759);
+  it("uses the stored calculation width when present", () => {
+    expect(calcCardWidth(495)).toBe(495);
+    expect(calcCardWidth()).toBe(759);
   });
 });

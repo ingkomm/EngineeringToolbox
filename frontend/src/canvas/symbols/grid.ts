@@ -2,7 +2,6 @@ export const CANVAS_GRID = 11;
 export const EDITOR_PAD = CANVAS_GRID;
 export const POINT_NODE_SIZE = 36;
 export const LAYOUT_NODE_ORIGIN: [number, number] = [0.5, 0.5];
-export const CALC_COMPACT_WIDTH = 280;
 export const CALC_EXPANDED_MIN_WIDTH = 440;
 
 export function snapToGrid(value: number, grid = CANVAS_GRID): number {
@@ -30,10 +29,6 @@ export function snapCenteredTopLeft(
 export function snapGridSize(value: number, minCells = 2): number {
   const cells = Math.max(minCells, Math.round(value / CANVAS_GRID));
   return cells * CANVAS_GRID;
-}
-
-export function evenGridSize(value: number, minCells = 4): number {
-  return snapGridSize(value, minCells);
 }
 
 export function gridCenter(size: number): number {
@@ -75,6 +70,6 @@ export function snapCalcWidth(value: number): number {
 
 export const CALC_EXPANDED_DEFAULT_WIDTH = snapCalcWidth(760);
 
-export function calcCardWidth(open: boolean, stored?: number): number {
-  return open ? (stored ?? CALC_EXPANDED_DEFAULT_WIDTH) : CALC_COMPACT_WIDTH;
+export function calcCardWidth(stored?: number): number {
+  return stored ?? CALC_EXPANDED_DEFAULT_WIDTH;
 }

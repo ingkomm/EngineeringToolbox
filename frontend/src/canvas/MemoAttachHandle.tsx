@@ -36,6 +36,7 @@ export function MemoAttachHandle({
           data-testid={`object-${nodeId}-memo`}
           title="Memo"
           isConnectable
+          style={{ top: "auto", right: "auto", transform: "none" }}
         />
         <Handle
           type="target"
@@ -44,6 +45,7 @@ export function MemoAttachHandle({
           className="memo-attach memo-attach--target"
           data-port-category="memo-attachment"
           isConnectable
+          style={{ top: 0, left: 0, transform: "none" }}
         />
       </div>
     </div>

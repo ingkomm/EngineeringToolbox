@@ -18,7 +18,7 @@ import {
 import { isMemoObject, memoLinkEdgeId, MEMO_ATTACHMENT_HANDLE, MEMO_RECEIVE_HANDLE } from "../lib/memo";
 import { mappedInputsForObject } from "./mappedInputs";
 import { equipmentBounds } from "../lib/arrangementView";
-import { LAYOUT_NODE_ORIGIN, POINT_NODE_SIZE, toCenterPosition } from "./symbols/grid";
+import { LAYOUT_NODE_ORIGIN, POINT_NODE_SIZE, calcCardWidth, toCenterPosition } from "./symbols/grid";
 
 export { mappedInputsForObject } from "./mappedInputs";
 
@@ -55,6 +55,7 @@ export function toFlowNodeRecords(
         height,
       };
     }
+    const width = calcCardWidth(object.width);
     return {
       id: object.id,
       type: "calculationObject" as const,
@@ -68,6 +69,8 @@ export function toFlowNodeRecords(
         onEdit,
       },
       draggable: true,
+      style: { width },
+      width,
     };
   });
 }

@@ -12,6 +12,7 @@ import {
   useEdgesState,
   useNodesState,
   useReactFlow,
+  useUpdateNodeInternals,
   type Connection,
   type Edge,
   type Node,
@@ -114,6 +115,7 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
   const [menu, setMenu] = useState<{ x: number; y: number; ids: string[] } | null>(null);
   const [clipboard, setClipboard] = useState<string[]>([]);
   const didFit = useRef(false);
+  const updateNodeInternals = useUpdateNodeInternals();
 
   useEffect(() => {
     const nextNodes = toFlowNodeRecords(project, quantities, onEdit);
@@ -293,7 +295,11 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
       onEdgeDoubleClick={(_event, edge) => {
         onEdit({ type: "deleteEdges", edgeIds: [edge.id] });
       }}
+      onNodeDrag={(_event, node) => {
+        updateNodeInternals(node.id);
+      }}
       onNodeDragStop={(_event, _node, dragged) => {
+        dragged.forEach((node) => updateNodeInternals(node.id));
         const moved = new Map(
           dragged.map((node) => {
             const object = project.objects.find((item) => item.id === node.id);

@@ -1,5 +1,5 @@
-import { Position, type Node, type NodeProps, useReactFlow, useUpdateNodeInternals } from "@xyflow/react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { NodeResizer, Position, type Node, type NodeProps, useReactFlow, useUpdateNodeInternals } from "@xyflow/react";
+import { useEffect, useLayoutEffect, useMemo, useState, type KeyboardEvent } from "react";
 import type { CalculationObject, ProjectDocument } from "../types/contract";
 import { formatValue, inputHandleId, outputHandleId } from "../lib/display";
 import { OBJECT_LINK_HANDLE, objectLinkSideOf } from "../lib/worksheet";
@@ -15,7 +15,7 @@ import {
   type FormulaCandidate,
 } from "../lib/formulaComplete";
 import { OBJECT_ID_RE, VARIABLE_ID_RE, type WorkspaceEdit } from "../lib/projectEdits";
-import { calcCardWidth, snapCalcWidth } from "./symbols/grid";
+import { CALC_EXPANDED_MIN_WIDTH, calcCardWidth, snapCalcWidth } from "./symbols/grid";
 import { displayName } from "../lib/variables";
 import type { QuantitySpec } from "../lib/quantities";
 import { RowHandle } from "./RowHandle";
@@ -40,17 +40,8 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
   const { object, project, mappedInputIds, quantities, onEdit } = data;
   const mapped = new Set(mappedInputIds);
   const isBare = object.inputs.length === 0 && object.calculations.length === 0 && object.outputs.length === 0;
-  const [expanded, setExpanded] = useState(false);
-  const [resizeWidth, setResizeWidth] = useState<number | null>(null);
-  const open = isBare ? false : expanded;
-  const cardWidth = resizeWidth ?? calcCardWidth(open, object.width);
-  const { setNodes, getZoom } = useReactFlow();
-  const resizeDrag = useRef<{
-    side: "left" | "right";
-    startX: number;
-    startWidth: number;
-    startPosX: number;
-  } | null>(null);
+  const cardWidth = calcCardWidth(object.width);
+  const { setNodes } = useReactFlow();
   const updateNodeInternals = useUpdateNodeInternals();
   const handleSignature = [
     ...object.inputs.map((item) => item.id),
@@ -58,7 +49,6 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
     OBJECT_LINK_HANDLE,
     objectLinkSideOf(object),
     memoLinkSideOf(object),
-    open ? "open" : "compact",
     cardWidth,
   ].join("|");
 
@@ -79,13 +69,8 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
   }, [cardWidth, handleSignature, id, setNodes, updateNodeInternals]);
 
   useEffect(() => {
-    if (!isBare) setExpanded(true);
-  }, [isBare]);
-
-  useEffect(() => {
-    if (resizeWidth == null || object.width == null) return;
-    if (object.width === snapCalcWidth(resizeWidth)) setResizeWidth(null);
-  }, [object.width, resizeWidth]);
+    updateNodeInternals(id);
+  }, [object.position.x, object.position.y, updateNodeInternals, id]);
 
   const candidatesFor = (excludeId: string): FormulaCandidate[] => [
     ...[...object.inputs, ...object.calculations]
@@ -97,78 +82,31 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
     ...FORMULA_FUNCTIONS,
   ];
 
-  const startWidthDrag = (side: "left" | "right") => (event: PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const zoom = getZoom() || 1;
-    const drag = { side, startX: event.clientX, startWidth: cardWidth, startPosX: object.position.x };
-    resizeDrag.current = drag;
-
-    const widthFromEvent = (clientX: number) => {
-      const dx = (clientX - drag.startX) / zoom;
-      const nextWidth = Math.max(440, drag.side === "right" ? drag.startWidth + dx : drag.startWidth - dx);
-      const positionX = drag.side === "right" ? drag.startPosX : drag.startPosX + (drag.startWidth - nextWidth);
-      return { nextWidth, positionX };
-    };
-
-    const onMove = (moveEvent: globalThis.PointerEvent) => {
-      if (!resizeDrag.current) return;
-      const { nextWidth, positionX } = widthFromEvent(moveEvent.clientX);
-      setResizeWidth(nextWidth);
-      setNodes((nodes) =>
-        nodes.map((node) =>
-          node.id === id
-            ? {
-                ...node,
-                width: nextWidth,
-                style: { ...node.style, width: nextWidth },
-                measured: { width: nextWidth, height: node.measured?.height ?? node.height },
-                position: { ...node.position, x: positionX },
-              }
-            : node,
-        ),
-      );
-    };
-    const onUp = (upEvent: globalThis.PointerEvent) => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-      if (!resizeDrag.current) return;
-      resizeDrag.current = null;
-      const { nextWidth, positionX } = widthFromEvent(upEvent.clientX);
-      const snapped = snapCalcWidth(nextWidth);
-      setResizeWidth(snapped);
-      onEdit({
-        type: "updateObject",
-        objectId: id,
-        patch: { width: snapped, position: { x: positionX, y: object.position.y } },
-      });
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-  };
-
   return (
     <article
-      className={`ws-node ws-node--calc calc-node ${selected ? "is-selected" : ""} ${open ? "is-expanded" : ""} ${isBare ? "is-bare" : ""}`}
+      className={`ws-node ws-node--calc calc-node ${selected ? "is-selected" : ""} ${isBare ? "is-bare" : ""}`}
       data-testid={`object-${id}`}
       style={{ width: cardWidth }}
     >
-      {open ? (
-        <>
-          <div
-            className="calc-resize calc-resize--left nodrag nopan nowheel"
-            data-testid={`object-${id}-resize-left`}
-            onPointerDown={startWidthDrag("left")}
-          />
-          <div
-            className="calc-resize calc-resize--right nodrag nopan nowheel"
-            data-testid={`object-${id}-resize-right`}
-            onPointerDown={startWidthDrag("right")}
-          />
-        </>
-      ) : null}
+      <NodeResizer
+        isVisible={selected}
+        minWidth={CALC_EXPANDED_MIN_WIDTH}
+        minHeight={88}
+        color="var(--line-strong)"
+        shouldResize={(_event, params) => params.direction[1] === 0}
+        onResize={() => updateNodeInternals(id)}
+        onResizeEnd={(_event, params) => {
+          updateNodeInternals(id);
+          onEdit({
+            type: "updateObject",
+            objectId: id,
+            patch: {
+              width: snapCalcWidth(params.width),
+              position: { x: params.x, y: params.y },
+            },
+          });
+        }}
+      />
       <ObjectLinkHandle
         nodeId={id}
         side={objectLinkSideOf(object)}
@@ -215,20 +153,6 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
               ×
             </button>
           </div>
-          {!isBare ? (
-          <button
-            type="button"
-            className="icon-btn ws-node__expand nodrag"
-            title={expanded ? "접기" : "펼치기"}
-            data-testid={`object-${id}-expand`}
-            onClick={(event) => {
-              event.stopPropagation();
-              setExpanded((value) => !value);
-            }}
-          >
-            {open && expanded ? "▴" : "▾"}
-          </button>
-          ) : null}
         </div>
       </header>
 
@@ -256,51 +180,7 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
         </div>
       ) : null}
 
-      {!open && !isBare ? (
-        <div className="ws-node__compact">
-          <div className="ws-node__values">
-            {object.outputs.length === 0 ? <span className="ws-node__muted">값 없음</span> : null}
-            {object.outputs.slice(0, 4).map((item) => (
-              <span key={item.id} className="ws-node__value">
-                <em>{displayName(item)}</em>
-                {formatValue(item.value)}
-              </span>
-            ))}
-          </div>
-          <div className="ws-node__rail ws-node__rail--in">
-            {object.inputs.map((item, index) => (
-              <RowHandle
-                key={item.id}
-                nodeId={id}
-                handleId={inputHandleId(item.id)}
-                type="target"
-                position={Position.Left}
-                className="ws-port calc-handle calc-handle--in calc-handle--rail"
-                portCategory="calc-input"
-                style={{ top: `${((index + 1) / (object.inputs.length + 1)) * 100}%` }}
-                label={item.id}
-              />
-            ))}
-          </div>
-          <div className="ws-node__rail ws-node__rail--out">
-            {object.outputs.map((item, index) => (
-              <RowHandle
-                key={item.id}
-                nodeId={id}
-                handleId={outputHandleId(item.id)}
-                type="source"
-                position={Position.Right}
-                className="ws-port calc-handle calc-handle--out calc-handle--rail"
-                portCategory="calc-output"
-                style={{ top: `${((index + 1) / (object.outputs.length + 1)) * 100}%` }}
-                label={item.id}
-              />
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {open ? (
+      {!isBare ? (
         <>
       <section className="calc-table calc-table--input">
         <div className="calc-table__title">

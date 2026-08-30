@@ -100,7 +100,7 @@ describe("mergeFlowNodes", () => {
     expect(merged[0]?.position).toEqual({ x: 8, y: 9 });
   });
 
-  it("keeps an expanded calculation wrapper width when the project record has none", () => {
+  it("keeps a calculation wrapper width when the project record has none", () => {
     const merged = mergeFlowNodes(
       [{ id: "obj_1", position: { x: 0, y: 0 }, width: 759, style: { width: 759 }, data: { label: "old" } }],
       [{ id: "obj_1", position: { x: 0, y: 0 }, data: { label: "new" } }],

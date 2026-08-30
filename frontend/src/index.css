@@ -367,52 +367,6 @@ label.ghost-btn {
   padding: 4px 8px 8px;
 }
 
-.ws-node__compact {
-  position: relative;
-  min-height: 52px;
-  padding: 8px 18px 12px;
-}
-
-.ws-node__values {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-}
-
-.ws-node__value {
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: var(--ws-mono);
-  color: #d5e4f7;
-}
-
-.ws-node__value em {
-  font-style: normal;
-  color: var(--muted);
-  margin-right: 6px;
-}
-
-.ws-node__muted {
-  color: var(--muted);
-  font-size: var(--ws-mono);
-}
-
-.ws-node__rail {
-  position: absolute;
-  top: 8px;
-  bottom: 8px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-evenly;
-}
-
-.ws-node__rail--in {
-  left: 0;
-}
-
-.ws-node__rail--out {
-  right: 0;
-}
-
 .ws-port {
   width: var(--ws-port) !important;
   min-width: var(--ws-port);
@@ -482,61 +436,31 @@ label.ghost-btn {
   overflow: visible !important;
 }
 
-.ws-node--calc.is-expanded .calc-resize {
-  position: absolute;
-  top: 50%;
-  width: 10px;
-  height: 48px;
-  margin-top: -24px;
-  background: var(--accent);
-  border-radius: 6px;
-  cursor: ew-resize;
-  z-index: 30;
-  pointer-events: all;
-}
-
-.calc-resize--left {
-  left: -5px;
-}
-
-.calc-resize--right {
-  right: -5px;
-}
-
-.react-flow__node-calculationObject {
-  overflow: visible !important;
-}
-
-.react-flow__node-equipmentObject,
-.react-flow__node-pointObject {
-  overflow: visible !important;
-}
-
-.ws-node--calc.is-expanded .react-flow__resize-control.handle.top,
-.ws-node--calc.is-expanded .react-flow__resize-control.handle.bottom,
-.ws-node--calc.is-expanded .react-flow__resize-control.handle.top.left,
-.ws-node--calc.is-expanded .react-flow__resize-control.handle.top.right,
-.ws-node--calc.is-expanded .react-flow__resize-control.handle.bottom.left,
-.ws-node--calc.is-expanded .react-flow__resize-control.handle.bottom.right,
-.ws-node--calc.is-expanded .react-flow__resize-control.line.top,
-.ws-node--calc.is-expanded .react-flow__resize-control.line.bottom {
+.ws-node--calc .react-flow__resize-control.handle.top,
+.ws-node--calc .react-flow__resize-control.handle.bottom,
+.ws-node--calc .react-flow__resize-control.handle.top.left,
+.ws-node--calc .react-flow__resize-control.handle.top.right,
+.ws-node--calc .react-flow__resize-control.handle.bottom.left,
+.ws-node--calc .react-flow__resize-control.handle.bottom.right,
+.ws-node--calc .react-flow__resize-control.line.top,
+.ws-node--calc .react-flow__resize-control.line.bottom {
   display: none;
 }
 
-.ws-node--calc.is-expanded .react-flow__resize-control.handle.left,
-.ws-node--calc.is-expanded .react-flow__resize-control.handle.right {
-  width: 10px !important;
-  height: 44px !important;
-  background: var(--accent);
-  border: 0;
-  border-radius: 6px;
+.ws-node--calc .react-flow__resize-control.handle.left,
+.ws-node--calc .react-flow__resize-control.handle.right {
+  width: 4px !important;
+  height: 28px !important;
+  background: var(--line-strong) !important;
+  border: 0 !important;
+  border-radius: 2px;
   z-index: 20;
   pointer-events: all;
 }
 
-.ws-node--calc.is-expanded .react-flow__resize-control.line.left,
-.ws-node--calc.is-expanded .react-flow__resize-control.line.right {
-  width: 14px;
+.ws-node--calc .react-flow__resize-control.line.left,
+.ws-node--calc .react-flow__resize-control.line.right {
+  width: 8px;
   border-width: 0 !important;
   background: transparent;
   z-index: 19;
@@ -2420,13 +2344,11 @@ label.ghost-btn {
 
 .memo-attach-cluster--top {
   top: 10px;
-  transform: translate(50%, -50%);
 }
 
 .memo-attach-cluster--bottom {
   bottom: 10px;
   top: auto;
-  transform: translate(50%, 50%);
 }
 
 .memo-attach-ports {
