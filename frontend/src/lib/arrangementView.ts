@@ -1,7 +1,7 @@
 import { Position } from "@xyflow/react";
 import type { ArrangementLinkKind, EquipmentObject, EquipmentRotation, PointEnd } from "../types/contract";
 import { equipmentSize, normalizeRotation } from "../canvas/symbols/registry";
-import { defaultPortAnchors, type EdgeSide } from "../canvas/symbols/drawing";
+import { mergePortAnchors, resolveDrawing, type EdgeSide } from "../canvas/symbols/drawing";
 
 export function equipmentTag(object: Pick<EquipmentObject, "id" | "name" | "tag">): string {
   const tag = (object.tag ?? "").trim();
@@ -48,9 +48,10 @@ export function equipmentBounds(object: EquipmentObject) {
 
 export function equipmentPortLayout(object: EquipmentObject) {
   const bounds = equipmentBounds(object);
-  const drawingHeight = object.drawing?.height ?? bounds.size.height;
-  const drawingWidth = object.drawing?.width ?? bounds.size.width;
-  return defaultPortAnchors(object.inCount, object.outCount, drawingHeight).map((anchor) => {
+  const drawing = resolveDrawing(object.symbolId, object.drawing);
+  const drawingHeight = drawing.height;
+  const drawingWidth = drawing.width;
+  return mergePortAnchors(drawing.ports, object.inCount, object.outCount, drawingWidth, drawingHeight).map((anchor) => {
     const side = rotateEdge(anchor.side, bounds.rotation);
     const along = side === "left" || side === "right" ? bounds.height : bounds.width;
     const source = side === "left" || side === "right" ? drawingHeight : drawingWidth;

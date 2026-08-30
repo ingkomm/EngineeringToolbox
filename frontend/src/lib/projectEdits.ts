@@ -12,6 +12,7 @@ import type {
 } from "../types/contract";
 import { firstEquipmentSymbol, findLibrarySymbol, libraryOf, newBlankEquipmentSymbol } from "../canvas/symbols/library";
 import { evenGridSize } from "../canvas/symbols/grid";
+import { resolveDrawing, withPorts } from "../canvas/symbols/drawing";
 import { blankProject } from "../example/blankProject";
 import { prototypeProject } from "../example/prototypeProject";
 import { siUnitFor, type QuantitySpec } from "./quantities";
@@ -1462,7 +1463,8 @@ function setEquipmentPorts(
   };
   const nextIn = clampPort(inCount, equipment.inCount);
   const nextOut = clampPort(outCount, equipment.outCount);
-  const updated: EquipmentObject = { ...equipment, inCount: nextIn, outCount: nextOut };
+  const drawing = withPorts(resolveDrawing(equipment.symbolId, equipment.drawing), nextIn, nextOut);
+  const updated: EquipmentObject = { ...equipment, inCount: nextIn, outCount: nextOut, drawing };
   return {
     project: {
       ...project,

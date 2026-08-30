@@ -14,3 +14,16 @@ export function evenGridSize(value: number, minCells = 4): number {
 export function gridCenter(size: number): number {
   return size / 2;
 }
+
+/** Border-inclusive line count. 88px / 11 = 8 cells → 9 lines. */
+export const MIN_GRID_LINES = 3;
+export const MAX_GRID_LINES = 21;
+
+export function sizeToGridLines(px: number): number {
+  return Math.max(MIN_GRID_LINES, Math.round(px / CANVAS_GRID) + 1);
+}
+
+export function gridLinesToSize(lines: number): number {
+  const clamped = Math.max(MIN_GRID_LINES, Math.min(MAX_GRID_LINES, Math.round(lines) || MIN_GRID_LINES));
+  return (clamped - 1) * CANVAS_GRID;
+}

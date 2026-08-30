@@ -159,6 +159,16 @@
         "drawing": { "$ref": "#/$defs/symbolDrawing" }
       }
     },
+    "symbolPort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "side", "offset"],
+      "properties": {
+        "id": { "type": "string" },
+        "side": { "type": "string", "enum": ["left", "right", "top", "bottom"] },
+        "offset": { "type": "number" }
+      }
+    },
     "symbolDrawing": {
       "type": "object",
       "additionalProperties": false,
@@ -166,6 +176,10 @@
       "properties": {
         "width": { "type": "number", "minimum": 22 },
         "height": { "type": "number", "minimum": 22 },
+        "ports": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/symbolPort" }
+        },
         "primitives": {
           "type": "array",
           "items": {

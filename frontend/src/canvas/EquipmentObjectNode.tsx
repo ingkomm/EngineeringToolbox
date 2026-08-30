@@ -28,7 +28,7 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
   const connecting = Boolean(useConnection().inProgress);
   const showPorts = Boolean(selected || hovered || connecting);
   const updateNodeInternals = useUpdateNodeInternals();
-  const handleSignature = `${object.inCount}:${object.outCount}:${objectLinkSideOf(object)}:${bounds.rotation}:${bounds.width}x${bounds.height}:${object.drawing?.primitives.length ?? 0}`;
+  const handleSignature = `${object.inCount}:${object.outCount}:${objectLinkSideOf(object)}:${bounds.rotation}:${bounds.width}x${bounds.height}:${object.drawing?.primitives.length ?? 0}:${object.drawing?.ports?.map((item) => `${item.id}:${item.side}:${item.offset}`).join(",") ?? ""}`;
 
   useLayoutEffect(() => {
     updateNodeInternals(id);

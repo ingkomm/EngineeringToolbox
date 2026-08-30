@@ -159,11 +159,19 @@ class SymbolPolygon(BaseModel):
     points: list[Position]
 
 
+class SymbolPort(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str
+    side: Literal["left", "right", "top", "bottom"]
+    offset: float = 0
+
+
 class SymbolDrawing(BaseModel):
     model_config = ConfigDict(extra="forbid")
     width: float = Field(ge=22)
     height: float = Field(ge=22)
     primitives: list[SymbolLine | SymbolCircle | SymbolPolygon] = Field(default_factory=list)
+    ports: list[SymbolPort] = Field(default_factory=list)
 
 
 class EquipmentObject(BaseModel):

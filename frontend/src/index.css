@@ -1917,15 +1917,59 @@ label.ghost-btn {
   margin: 8px 0;
 }
 
+.symbol-editor__meta {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+}
+
+.symbol-editor__field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.symbol-editor__field input {
+  width: 48px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #070c14;
+  color: var(--text);
+  padding: 4px 6px;
+  font: inherit;
+}
+
 .symbol-editor__canvas {
   width: 100%;
-  height: 300px;
-  background: #f4f6f8;
-  color: #1a2436;
+  height: 280px;
+  background: #070c14;
+  color: #c5d4e8;
   border: 1px solid var(--line);
   border-radius: 8px;
   cursor: crosshair;
   touch-action: none;
+}
+
+.symbol-editor__port {
+  cursor: grab;
+}
+
+.symbol-editor__port circle {
+  fill: #070c14;
+  stroke: #6cb6ff;
+  stroke-width: 1.4;
+}
+
+.symbol-editor__port--out circle {
+  stroke: #3ecf8e;
+}
+
+.symbol-editor__port text {
+  fill: #8ea0b8;
+  font-size: 7px;
+  pointer-events: none;
 }
 
 .symbol-editor__rubber {
@@ -1937,14 +1981,14 @@ label.ghost-btn {
 }
 
 .symbol-editor__handle {
-  fill: #fff;
-  stroke: #3d7dd6;
+  fill: #0b121c;
+  stroke: #6cb6ff;
   stroke-width: 1.2;
   cursor: grab;
 }
 
 .symbol-editor__grid {
-  stroke: #1c2738;
+  stroke: #243044;
   stroke-width: 0.6;
 }
 
@@ -1952,6 +1996,7 @@ label.ghost-btn {
   stroke: #3ecf8e;
   stroke-width: 1;
   stroke-dasharray: 3 3;
+  opacity: 0.55;
 }
 
 .symbol-editor__pending {

@@ -1,53 +1,77 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
-import type { SymbolDrawing, SymbolPrimitive } from "./drawing";
-import { nextPrimitiveId } from "./drawing";
-import { CANVAS_GRID, snapToGrid } from "./grid";
+import type { PortAnchor, SymbolDrawing, SymbolPrimitive } from "./drawing";
+import {
+  nextPrimitiveId,
+  portXY,
+  resizeDrawing,
+  snapPortToBorder,
+  withPorts,
+} from "./drawing";
+import { CANVAS_GRID, gridLinesToSize, sizeToGridLines, snapToGrid } from "./grid";
 import { DrawingPrimitives } from "./DrawingSvg";
+import type { EquipmentObject } from "../../types/contract";
 
 type Tool = "select" | "line" | "circle" | "polygon";
 
 export function SymbolEditor({
   name,
   drawing,
+  inCount,
+  outCount,
   onChangeName,
-  onChange,
+  onPatch,
   onClose,
 }: {
   symbolId: string;
   name: string;
   drawing: SymbolDrawing;
+  inCount: number;
+  outCount: number;
   onChangeName?: (name: string) => void;
-  onChange: (drawing: SymbolDrawing) => void;
+  onPatch: (patch: {
+    name?: string;
+    inCount?: number;
+    outCount?: number;
+    drawing?: EquipmentObject["drawing"];
+  }) => void;
   onClose: () => void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [tool, setTool] = useState<Tool>("line");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<SymbolDrawing>(drawing);
+  const [draft, setDraft] = useState<SymbolDrawing>(() => withPorts(drawing, inCount, outCount));
+  const [ins, setIns] = useState(inCount);
+  const [outs, setOuts] = useState(outCount);
   const [pending, setPending] = useState<Array<{ x: number; y: number }>>([]);
   const [rubber, setRubber] = useState<{ x: number; y: number } | null>(null);
   const drag = useRef<{
-    mode: "draw" | "move" | "vertex";
+    mode: "draw" | "move" | "vertex" | "port";
     start: { x: number; y: number };
     origin?: SymbolPrimitive;
     vertex?: number;
+    portId?: string;
   } | null>(null);
 
   useEffect(() => {
     if (drag.current) return;
-    setDraft(drawing);
-  }, [drawing]);
+    setDraft(withPorts(drawing, inCount, outCount));
+    setIns(inCount);
+    setOuts(outCount);
+  }, [drawing, inCount, outCount]);
 
-  const commit = (next: SymbolDrawing) => {
-    setDraft(next);
-    onChange(next);
+  const commit = (next: SymbolDrawing, counts?: { inCount?: number; outCount?: number }) => {
+    const portsOf = counts
+      ? withPorts(next, counts.inCount ?? ins, counts.outCount ?? outs)
+      : next;
+    setDraft(portsOf);
+    onPatch({ drawing: portsOf, ...counts });
   };
 
   const removeSelected = (id: string | null) => {
     if (!id) return;
     setDraft((current) => {
       const next = { ...current, primitives: current.primitives.filter((item) => item.id !== id) };
-      onChange(next);
+      onPatch({ drawing: next });
       return next;
     });
     setSelectedId(null);
@@ -68,7 +92,7 @@ export function SymbolEditor({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onChange, selectedId]);
+  }, [onPatch, selectedId]);
 
   const gridLines = useMemo(() => {
     const lines: Array<{ key: string; x1: number; y1: number; x2: number; y2: number }> = [];
@@ -93,6 +117,13 @@ export function SymbolEditor({
 
   const preview = (item: SymbolPrimitive) => {
     setDraft({ ...draft, primitives: draft.primitives.map((entry) => (entry.id === item.id ? item : entry)) });
+  };
+
+  const previewPort = (port: PortAnchor) => {
+    setDraft({
+      ...draft,
+      ports: (draft.ports ?? []).map((item) => (item.id === port.id ? port : item)),
+    });
   };
 
   const onPointerDown = (event: PointerEvent<SVGSVGElement>) => {
@@ -125,6 +156,11 @@ export function SymbolEditor({
     }
     if (active.mode === "draw") {
       setRubber(point);
+      return;
+    }
+    if (active.mode === "port" && active.portId) {
+      const snapped = snapPortToBorder(point.x, point.y, draft.width, draft.height);
+      previewPort({ id: active.portId, ...snapped });
       return;
     }
     if (active.mode === "move" && active.origin && selectedId) {
@@ -169,6 +205,14 @@ export function SymbolEditor({
       setRubber(null);
       return;
     }
+    if (active.mode === "port" && active.portId) {
+      const snapped = snapPortToBorder(point.x, point.y, draft.width, draft.height);
+      commit({
+        ...draft,
+        ports: (draft.ports ?? []).map((item) => (item.id === active.portId ? { id: active.portId, ...snapped } : item)),
+      });
+      return;
+    }
     if ((active.mode === "move" || active.mode === "vertex") && active.origin && selectedId) {
       const nextItem =
         active.mode === "move"
@@ -188,7 +232,22 @@ export function SymbolEditor({
     setTool("select");
   };
 
+  const setCount = (kind: "in" | "out", value: number) => {
+    const nextIn = kind === "in" ? clampCount(value) : ins;
+    const nextOut = kind === "out" ? clampCount(value) : outs;
+    setIns(nextIn);
+    setOuts(nextOut);
+    commit(draft, { inCount: nextIn, outCount: nextOut });
+  };
+
+  const setGrid = (axis: "x" | "y", lines: number) => {
+    const width = axis === "x" ? gridLinesToSize(lines) : draft.width;
+    const height = axis === "y" ? gridLinesToSize(lines) : draft.height;
+    commit(resizeDrawing(draft, width, height));
+  };
+
   const selected = draft.primitives.find((item) => item.id === selectedId);
+  const ports = draft.ports ?? [];
 
   return (
     <div className="symbol-editor symbol-editor--dock nodrag nopan" data-testid="symbol-editor">
@@ -206,6 +265,48 @@ export function SymbolEditor({
           onChange={(event) => onChangeName(event.target.value)}
         />
       ) : null}
+      <div className="symbol-editor__meta">
+        <label className="symbol-editor__field">
+          그리드
+          <input
+            type="number"
+            min={3}
+            max={21}
+            value={sizeToGridLines(draft.width)}
+            data-testid="symbol-grid-x"
+            onChange={(event) => setGrid("x", Number(event.target.value))}
+          />
+          ×
+          <input
+            type="number"
+            min={3}
+            max={21}
+            value={sizeToGridLines(draft.height)}
+            data-testid="symbol-grid-y"
+            onChange={(event) => setGrid("y", Number(event.target.value))}
+          />
+        </label>
+        <label className="symbol-editor__field">
+          In
+          <input
+            type="number"
+            min={0}
+            max={8}
+            value={ins}
+            data-testid="symbol-in-count"
+            onChange={(event) => setCount("in", Number(event.target.value))}
+          />
+          Out
+          <input
+            type="number"
+            min={0}
+            max={8}
+            value={outs}
+            data-testid="symbol-out-count"
+            onChange={(event) => setCount("out", Number(event.target.value))}
+          />
+        </label>
+      </div>
       <div className="symbol-editor__tools">
         {(["select", "line", "circle", "polygon"] as Tool[]).map((item) => (
           <button
@@ -264,35 +365,39 @@ export function SymbolEditor({
             <HitShape item={item} />
           </g>
         ))}
+        {ports.map((port) => {
+          const point = portXY(port, draft.width, draft.height);
+          const inbound = port.id.startsWith("IN_");
+          return (
+            <g
+              key={port.id}
+              className={`symbol-editor__port ${inbound ? "symbol-editor__port--in" : "symbol-editor__port--out"}`}
+              data-testid={`symbol-port-${port.id}`}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                drag.current = { mode: "port", start: pointFromClient(event), portId: port.id };
+                svgRef.current?.setPointerCapture(event.pointerId);
+              }}
+            >
+              <circle cx={point.x} cy={point.y} r={4} />
+              <text x={point.x + (port.side === "right" ? -6 : 6)} y={point.y - 6} textAnchor={port.side === "right" ? "end" : "start"}>
+                {port.id}
+              </text>
+            </g>
+          );
+        })}
         {selected?.kind === "line" ? (
           <>
-            <VertexHandle
-              x={selected.x1}
-              y={selected.y1}
-              onPointerDown={(event) => startVertex(event, selected, 0)}
-            />
-            <VertexHandle
-              x={selected.x2}
-              y={selected.y2}
-              onPointerDown={(event) => startVertex(event, selected, 1)}
-            />
+            <VertexHandle x={selected.x1} y={selected.y1} onPointerDown={(event) => startVertex(event, selected, 0)} />
+            <VertexHandle x={selected.x2} y={selected.y2} onPointerDown={(event) => startVertex(event, selected, 1)} />
           </>
         ) : null}
         {selected?.kind === "circle" ? (
-          <VertexHandle
-            x={selected.cx + selected.r}
-            y={selected.cy}
-            onPointerDown={(event) => startVertex(event, selected, 0)}
-          />
+          <VertexHandle x={selected.cx + selected.r} y={selected.cy} onPointerDown={(event) => startVertex(event, selected, 0)} />
         ) : null}
         {selected?.kind === "polygon"
           ? selected.points.map((point, index) => (
-              <VertexHandle
-                key={index}
-                x={point.x}
-                y={point.y}
-                onPointerDown={(event) => startVertex(event, selected, index)}
-              />
+              <VertexHandle key={index} x={point.x} y={point.y} onPointerDown={(event) => startVertex(event, selected, index)} />
             ))
           : null}
         {tool === "line" && pending[0] && rubber ? (
@@ -315,7 +420,7 @@ export function SymbolEditor({
         ) : null}
       </svg>
       <p className="symbol-editor__hint">
-        직선/원: 드래그. 다각형: 꼭짓점 클릭 후 닫기(또는 더블클릭). 이동: 도형·꼭짓점을 잡고 옮깁니다. Delete로 지웁니다.
+        그리드는 선 개수입니다(기본 9×7). In/Out 점을 가장자리로 끌어 포트를 둡니다. 직선/원은 드래그, 다각형은 클릭 후 닫기.
       </p>
     </div>
   );
@@ -325,6 +430,11 @@ export function SymbolEditor({
     drag.current = { mode: "vertex", start: pointFromClient(event), origin, vertex };
     svgRef.current?.setPointerCapture(event.pointerId);
   }
+}
+
+function clampCount(value: number): number {
+  if (Number.isNaN(value)) return 0;
+  return Math.max(0, Math.min(8, Math.floor(value)));
 }
 
 function translatePrimitive(item: SymbolPrimitive, dx: number, dy: number): SymbolPrimitive {

@@ -289,7 +289,7 @@ Object A의 PIN/POUT만 바꾸면 Object A와 B가 갱신된다. 매핑되지 �
 | `btn-add-point` | 왼쪽 라이브러리 | Point 추가 |
 | `btn-edit-symbol-{symbolId}` | 왼쪽 라이브러리 | 심볼 편집기 |
 | `btn-delete-symbol-{symbolId}` | 왼쪽 라이브러리 | 라이브러리에서 삭제 (캔버스 인스턴스는 유지) |
-| `symbol-editor` | 왼쪽 사이드바 | 직선/원 드래그, 다각형 클릭, 이동/꼭짓점 |
+| `symbol-editor` | 왼쪽 사이드바 | 직선/원 드래그, 다각형 클릭, 이동/꼭짓점, In/Out 포트, 그리드 크기 |
 | `btn-export-project` | 상단 바 | 프로젝트 JSON 다운로드 |
 | `btn-import-project` | 상단 바 | 프로젝트 JSON 불러오기 |
 | `btn-load-example` | 우측 사이드바 | `loadExample` |
@@ -339,7 +339,7 @@ Equipment와 Point는 Calculation Object와 **같은 공용 워크시트**에 �
 
 Arrangement 기본 화면은 P&ID 도면이다. Equipment는 SVG 심볼과 Tag만 보이고, Point는 작은 연결점이다. ID/입력창/삭제 버튼은 더블클릭 팝오버나 선택 툴바에 둔다. Calculation Object는 기존 카드 UI를 유지하며, 펼치기 버튼으로만 Input/Calculation/Output/Link를 연다.
 
-심볼은 프로젝트 `symbolLibrary`에 저장한다. 기본값은 Pump, Valve, Point 세 개다. 사용자는 Create로 빈 심볼을 만들고 왼쪽 편집기에서 직선·원·다각형을 그린 뒤 저장한다. 크기는 11px 그리드의 짝수 칸이라 중심선이 그리드에 붙는다. 라이브러리 심볼을 고치면 같은 `symbolId`를 쓰는 캔버스 Equipment도 따라간다.
+심볼은 프로젝트 `symbolLibrary`에 저장한다. 기본값은 Pump, Valve, Point 세 개다. 사용자는 Create로 빈 심볼을 만들고 왼쪽 편집기에서 직선·원·다각형을 그린 뒤 저장한다. 편집기에서 그리드 선 개수(기본 9×7), In/Out 개수, 포트 점 위치를 정한다. 라이브러리 심볼을 고치면 같은 `symbolId`를 쓰는 캔버스 Equipment도 따라간다.
 
 선택 필드(`tag`, `rotation`, `width`, `height`, `linkKind`, `showArrow`, `waypoints`)는 없어도 예전 JSON을 로드한다. Pipe/Signal은 `Point.connections`에만 있고, Calculation 값 연결(`value_flow`)과 섞지 않는다.
 

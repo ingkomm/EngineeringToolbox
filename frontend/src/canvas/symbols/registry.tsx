@@ -3,7 +3,6 @@ import type { EquipmentObject, EquipmentRotation } from "../../types/contract";
 import type { LibrarySymbol } from "./library";
 import { resolveDrawing } from "./drawing";
 import { DrawingSvg } from "./DrawingSvg";
-import { evenGridSize } from "./grid";
 
 export function renderLibrarySymbol(item: LibrarySymbol, title?: string): ReactElement {
   if (item.kind === "point") {
@@ -26,7 +25,7 @@ export function normalizeRotation(value: number | undefined): EquipmentRotation 
 export function equipmentSize(object: Pick<EquipmentObject, "symbolId" | "width" | "height" | "drawing">) {
   const drawing = resolveDrawing(object.symbolId, object.drawing);
   return {
-    width: evenGridSize(object.width ?? drawing.width),
-    height: evenGridSize(object.height ?? drawing.height),
+    width: object.width ?? drawing.width,
+    height: object.height ?? drawing.height,
   };
 }

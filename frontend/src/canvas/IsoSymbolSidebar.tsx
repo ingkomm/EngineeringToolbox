@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { ProjectDocument } from "../types/contract";
 import type { WorkspaceEdit } from "../lib/projectEdits";
 import { libraryOf, nextLibrarySymbolId } from "./symbols/library";
-import { resolveDrawing } from "./symbols/drawing";
+import { resolveDrawing, withPorts } from "./symbols/drawing";
 import { renderLibrarySymbol } from "./symbols/registry";
 import { SymbolEditor } from "./symbols/SymbolEditor";
 
@@ -80,9 +80,11 @@ export function IsoSymbolSidebar({
         <SymbolEditor
           symbolId={editing.id}
           name={editing.name}
-          drawing={resolveDrawing(editing.id, editing.drawing)}
+          drawing={withPorts(resolveDrawing(editing.id, editing.drawing), editing.inCount ?? 1, editing.outCount ?? 1)}
+          inCount={editing.inCount ?? 1}
+          outCount={editing.outCount ?? 1}
           onChangeName={(name) => onEdit({ type: "updateLibrarySymbol", symbolId: editing.id, patch: { name } })}
-          onChange={(drawing) => onEdit({ type: "updateLibrarySymbol", symbolId: editing.id, patch: { drawing } })}
+          onPatch={(patch) => onEdit({ type: "updateLibrarySymbol", symbolId: editing.id, patch })}
           onClose={() => setEditingId(null)}
         />
       ) : null}

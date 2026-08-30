@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { defaultPortAnchors, defaultDrawing, blankDrawing } from "./drawing";
-import { CANVAS_GRID } from "./grid";
+import { defaultPortAnchors, defaultDrawing, blankDrawing, mergePortAnchors, snapPortToBorder } from "./drawing";
+import { CANVAS_GRID, gridLinesToSize, sizeToGridLines } from "./grid";
 
 describe("symbol drawings", () => {
   it("keeps pump and valve vertices on the canvas grid", () => {
@@ -45,7 +45,26 @@ describe("symbol drawings", () => {
   it("starts a blank drawing on the even grid", () => {
     const drawing = blankDrawing();
     expect(drawing.primitives).toEqual([]);
+    expect(sizeToGridLines(drawing.width)).toBe(9);
+    expect(sizeToGridLines(drawing.height)).toBe(7);
+    expect(gridLinesToSize(9)).toBe(88);
     expect(drawing.width % (CANVAS_GRID * 2)).toBe(0);
     expect(drawing.height % (CANVAS_GRID * 2)).toBe(0);
+  });
+
+  it("keeps custom port sides when in/out counts change", () => {
+    const ports = mergePortAnchors(
+      [{ id: "IN_1", side: "top", offset: 22 }],
+      2,
+      1,
+      88,
+      66,
+    );
+    expect(ports).toEqual([
+      { id: "IN_1", side: "top", offset: 22 },
+      { id: "IN_2", side: "left", offset: 44 },
+      { id: "OUT_1", side: "right", offset: 33 },
+    ]);
+    expect(snapPortToBorder(88, 11, 88, 66)).toEqual({ side: "right", offset: 11 });
   });
 });
