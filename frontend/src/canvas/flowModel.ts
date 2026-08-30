@@ -17,6 +17,7 @@ import {
 } from "../lib/worksheet";
 import { mappedInputsForObject } from "./mappedInputs";
 import { equipmentBounds } from "../lib/arrangementView";
+import { LAYOUT_NODE_ORIGIN, POINT_NODE_SIZE, toCenterPosition } from "./symbols/grid";
 
 export { mappedInputsForObject } from "./mappedInputs";
 
@@ -27,12 +28,13 @@ export function toFlowNodeRecords(
 ) {
   return project.objects.map((object) => {
     if (isLayoutObject(object) && !isCalculationObject(object)) {
-      const bounds = object.kind === "equipment" ? equipmentBounds(object) : { width: 36, height: 36 };
-      const height = object.kind === "equipment" ? bounds.height : 36;
+      const bounds = object.kind === "equipment" ? equipmentBounds(object) : { width: POINT_NODE_SIZE, height: POINT_NODE_SIZE };
+      const height = bounds.height;
       return {
         id: object.id,
         type: object.kind === "equipment" ? ("equipmentObject" as const) : ("pointObject" as const),
-        position: object.position,
+        position: toCenterPosition(object.position, bounds.width, height),
+        origin: LAYOUT_NODE_ORIGIN,
         data: { object, onEdit },
         draggable: true,
         style: { width: bounds.width, height, background: "transparent" },

@@ -90,6 +90,7 @@ class CalculationObject(BaseModel):
     outputs: list[OutputBinding] = Field(default_factory=list)
     links: list[CalculationLink] = Field(default_factory=list)
     objectLinkSide: Literal["top", "bottom"] = "top"
+    width: float | None = Field(default=None, ge=280)
 
 
 class CalculationLink(BaseModel):

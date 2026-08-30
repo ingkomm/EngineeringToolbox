@@ -58,6 +58,7 @@ export interface CalculationObject {
   outputs: OutputBinding[];
   links?: CalculationLink[];
   objectLinkSide?: ObjectLinkSide;
+  width?: number;
 }
 
 export interface PointEnd {

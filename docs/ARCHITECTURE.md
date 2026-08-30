@@ -337,7 +337,9 @@ Arrangement:
 
 Equipment와 Point는 Calculation Object와 **같은 공용 워크시트**에 놓인다. 별도의 Arrangement 창/노드로 감싸지 않는다. 내부에서 공학 계산을 하지 않는다.
 
-Arrangement 기본 화면은 P&ID 도면이다. Equipment는 SVG 심볼과 Tag만 보이고, Point는 작은 연결점이다. ID/입력창/삭제 버튼은 더블클릭 팝오버나 선택 툴바에 둔다. Calculation Object는 기존 카드 UI를 유지하며, 펼치기 버튼으로만 Input/Calculation/Output/Link를 연다.
+Arrangement 기본 화면은 P&ID 도면이다. Equipment는 SVG 심볼과 Tag만 보이고, Point는 작은 연결점이다. ID/입력창/삭제 버튼은 더블클릭 팝오버나 선택 툴바에 둔다. Calculation Object는 기존 카드 UI를 유지하며, 펼치기 버튼으로만 Input/Calculation/Output/Link를 연다. 펼친 상태에서는 좌우로 폭을 조절할 수 있고 `width`로 저장한다.
+
+심볼(Equipment / Point)은 Grid snap이 켜져 있으면 **노드 중심**이 그리드에 붙는다. 저장 좌표는 계속 좌상단이다.
 
 심볼은 프로젝트 `symbolLibrary`에 저장한다. 기본값은 Pump, Valve, Point 세 개다. 사용자는 Create로 빈 심볼을 만들고 왼쪽 편집기에서 직선·원·다각형을 그린 뒤 저장한다. 편집기에서 그리드 선 개수(기본 9×7), In/Out 개수, 포트 점 위치를 정한다. 라이브러리 심볼을 고치면 같은 `symbolId`를 쓰는 캔버스 Equipment도 따라간다.
 

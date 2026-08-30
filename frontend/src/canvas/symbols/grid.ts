@@ -1,5 +1,9 @@
 export const CANVAS_GRID = 11;
 export const EDITOR_PAD = CANVAS_GRID;
+export const POINT_NODE_SIZE = 36;
+export const LAYOUT_NODE_ORIGIN: [number, number] = [0.5, 0.5];
+export const CALC_COMPACT_WIDTH = 280;
+export const CALC_EXPANDED_MIN_WIDTH = 440;
 
 export function snapToGrid(value: number, grid = CANVAS_GRID): number {
   return Math.round(value / grid) * grid;
@@ -27,4 +31,24 @@ export function sizeToGridLines(px: number): number {
 export function gridLinesToSize(lines: number): number {
   const clamped = Math.max(MIN_GRID_LINES, Math.min(MAX_GRID_LINES, Math.round(lines) || MIN_GRID_LINES));
   return (clamped - 1) * CANVAS_GRID;
+}
+
+export function toCenterPosition(
+  topLeft: { x: number; y: number },
+  width: number,
+  height: number,
+): { x: number; y: number } {
+  return { x: topLeft.x + width / 2, y: topLeft.y + height / 2 };
+}
+
+export function toTopLeftPosition(
+  center: { x: number; y: number },
+  width: number,
+  height: number,
+): { x: number; y: number } {
+  return { x: center.x - width / 2, y: center.y - height / 2 };
+}
+
+export function snapCalcWidth(value: number): number {
+  return Math.max(CALC_EXPANDED_MIN_WIDTH, snapToGrid(value));
 }

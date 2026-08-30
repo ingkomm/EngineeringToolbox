@@ -11,7 +11,7 @@ import type {
   RelationType,
 } from "../types/contract";
 import { firstEquipmentSymbol, findLibrarySymbol, libraryOf, newBlankEquipmentSymbol } from "../canvas/symbols/library";
-import { evenGridSize } from "../canvas/symbols/grid";
+import { evenGridSize, snapCalcWidth } from "../canvas/symbols/grid";
 import { resolveDrawing, withPorts } from "../canvas/symbols/drawing";
 import { blankProject } from "../example/blankProject";
 import { prototypeProject } from "../example/prototypeProject";
@@ -48,7 +48,7 @@ export type WorkspaceEdit =
   | { type: "addObject" }
   | { type: "deleteObject"; objectId: string }
   | { type: "renameObject"; objectId: string; name: string }
-  | { type: "updateObject"; objectId: string; patch: { id?: string; name?: string } }
+  | { type: "updateObject"; objectId: string; patch: { id?: string; name?: string; width?: number } }
   | { type: "addInput"; objectId: string }
   | { type: "removeInput"; objectId: string; index: number }
   | { type: "updateInput"; objectId: string; index: number; patch: Partial<InputVariable> }
@@ -554,9 +554,15 @@ export function applyWorkspaceEdit(
       }
       let next = project;
       if (nextId !== current.id) next = rekeyObject(next, current.id, nextId);
+      const nextWidth =
+        edit.patch.width != null && isCalculationObject(current) ? snapCalcWidth(edit.patch.width) : undefined;
       next = {
         ...next,
-        objects: next.objects.map((object) => (object.id === nextId ? { ...object, name: nextName } : object)),
+        objects: next.objects.map((object) =>
+          object.id === nextId
+            ? { ...object, name: nextName, ...(nextWidth != null ? { width: nextWidth } : {}) }
+            : object,
+        ),
       };
       const shouldEvaluate = isCalculationObject(current) && nextId !== current.id;
       return {

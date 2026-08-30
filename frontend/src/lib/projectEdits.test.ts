@@ -30,6 +30,11 @@ describe("blank workspace", () => {
     expect(calc(blankProject).outputs).toEqual([]);
     expect(blankProject.edges).toEqual([]);
   });
+
+  it("stores an expanded calculation width on the grid", () => {
+    const project = applyAll([{ type: "updateObject", objectId: "obj_1", patch: { width: 500 } }]);
+    expect(calc(project).width).toBe(495);
+  });
 });
 
 describe("user-authored tables", () => {

@@ -1,4 +1,4 @@
-import { Position, type Node, type NodeProps, useUpdateNodeInternals } from "@xyflow/react";
+import { NodeResizer, Position, type Node, type NodeProps, useUpdateNodeInternals } from "@xyflow/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import type { CalculationObject, ProjectDocument } from "../types/contract";
 import { formatValue, inputHandleId, outputHandleId } from "../lib/display";
@@ -13,6 +13,7 @@ import {
 } from "../lib/formulaComplete";
 import { OBJECT_ID_RE, VARIABLE_ID_RE, type WorkspaceEdit } from "../lib/projectEdits";
 import { OBJECT_LINK_HANDLE, objectLinkSideOf } from "../lib/worksheet";
+import { CALC_COMPACT_WIDTH, snapCalcWidth } from "./symbols/grid";
 import { displayName } from "../lib/variables";
 import type { QuantitySpec } from "../lib/quantities";
 import { RowHandle } from "./RowHandle";
@@ -45,6 +46,7 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
     OBJECT_LINK_HANDLE,
     objectLinkSideOf(object),
     open ? "open" : "compact",
+    object.width ?? "",
   ].join("|");
 
   useLayoutEffect(() => {
@@ -65,7 +67,16 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
     <article
       className={`ws-node ws-node--calc calc-node ${selected ? "is-selected" : ""} ${open ? "is-expanded" : ""}`}
       data-testid={`object-${id}`}
+      style={open ? { width: object.width ?? snapCalcWidth(760) } : { width: CALC_COMPACT_WIDTH }}
     >
+      <NodeResizer
+        isVisible={Boolean(open && selected)}
+        minWidth={440}
+        minHeight={80}
+        onResizeEnd={(_event, params) =>
+          onEdit({ type: "updateObject", objectId: id, patch: { width: snapCalcWidth(params.width) } })
+        }
+      />
       <ObjectLinkHandle
         nodeId={id}
         side={objectLinkSideOf(object)}

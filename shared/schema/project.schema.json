@@ -115,7 +115,8 @@
           "type": "array",
           "items": { "$ref": "#/$defs/calculationLink" }
         },
-        "objectLinkSide": { "type": "string", "enum": ["top", "bottom"] }
+        "objectLinkSide": { "type": "string", "enum": ["top", "bottom"] },
+        "width": { "type": "number", "minimum": 280 }
       }
     },
     "calculationLink": {

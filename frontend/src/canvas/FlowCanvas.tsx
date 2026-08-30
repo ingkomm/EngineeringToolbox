@@ -23,7 +23,7 @@ import { EquipmentObjectNode } from "./EquipmentObjectNode";
 import { MappingEdge } from "./MappingEdge";
 import { PointObjectNode } from "./PointObjectNode";
 import { mergeFlowNodes, toFlowEdges, toFlowNodeRecords } from "./flowModel";
-import { CANVAS_GRID } from "./symbols/grid";
+import { CANVAS_GRID, toTopLeftPosition } from "./symbols/grid";
 import { parseHandleId } from "../lib/display";
 import { type WorkspaceEdit } from "../lib/projectEdits";
 import type { QuantitySpec } from "../lib/quantities";
@@ -280,7 +280,18 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
         onEdit({ type: "deleteEdges", edgeIds: [edge.id] });
       }}
       onNodeDragStop={(_event, _node, dragged) => {
-        const moved = new Map(dragged.map((node) => [node.id, node.position]));
+        const moved = new Map(
+          dragged.map((node) => {
+            const origin = node.origin ?? [0, 0];
+            const width = node.measured?.width ?? node.width ?? 0;
+            const height = node.measured?.height ?? node.height ?? 0;
+            const position =
+              origin[0] || origin[1]
+                ? toTopLeftPosition(node.position, width, height)
+                : node.position;
+            return [node.id, position] as const;
+          }),
+        );
         onProjectChange({
           ...project,
           objects: project.objects.map((object) =>

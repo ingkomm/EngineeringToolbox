@@ -443,9 +443,9 @@ label.ghost-btn {
   width: 280px;
 }
 
-.ws-node--calc.is-expanded,
-.calc-node.is-expanded {
-  width: 760px;
+.ws-node--calc.is-expanded .react-flow__resize-control.top,
+.ws-node--calc.is-expanded .react-flow__resize-control.bottom {
+  display: none;
 }
 
 .calc-node__id,
