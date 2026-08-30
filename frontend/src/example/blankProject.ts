@@ -1,5 +1,5 @@
 import type { ProjectDocument } from "../types/contract";
-import { defaultSymbolLibrary } from "../canvas/symbols/library";
+import { defaultSymbolLibrary } from "../arrangement/symbols/library";
 
 export const blankProject: ProjectDocument = {
   id: "workspace-1",

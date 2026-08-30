@@ -1,5 +1,5 @@
 import type { EvaluateResponse, ProjectDocument } from "../types/contract";
-import { FALLBACK_QUANTITIES, type QuantitySpec } from "../lib/quantities";
+import { FALLBACK_QUANTITIES, type QuantitySpec } from "../shared/quantities";
 
 export async function evaluateProject(
   project: ProjectDocument,

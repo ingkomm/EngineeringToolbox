@@ -2,14 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 
 import { checkHealth, evaluateProject, fetchQuantities } from "./api/client";
-import { FlowCanvas } from "./canvas/FlowCanvas";
-import { IsoSymbolSidebar } from "./canvas/IsoSymbolSidebar";
+import { FlowCanvas } from "./shared/FlowCanvas";
+import { IsoSymbolSidebar } from "./arrangement/IsoSymbolSidebar";
 import { blankProject } from "./example/blankProject";
-import { FALLBACK_QUANTITIES, type QuantitySpec } from "./lib/quantities";
-import { applyWorkspaceEdit, type WorkspaceEdit } from "./lib/projectEdits";
+import { FALLBACK_QUANTITIES, type QuantitySpec } from "./shared/quantities";
+import { applyWorkspaceEdit, type WorkspaceEdit } from "./shared/projectEdits";
 import type { EvalError, ProjectDocument } from "./types/contract";
-import { isEquipmentObject, isPointObject } from "./lib/worksheet";
-import { isMemoObject } from "./lib/memo";
+import { isEquipmentObject, isPointObject } from "./shared/worksheet";
+import { isMemoObject } from "./memo/memo";
 
 export function App() {
   const [project, setProject] = useState<ProjectDocument>(blankProject);
