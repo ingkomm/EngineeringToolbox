@@ -1541,6 +1541,10 @@ label.ghost-btn {
   cursor: grab;
 }
 
+.pid-eq .react-flow__handle.pid-port--free {
+  transform: translate(-50%, -50%) !important;
+}
+
 .pid-port {
   width: 12px !important;
   height: 12px !important;
@@ -1813,14 +1817,17 @@ label.ghost-btn {
 }
 
 .iso-sidebar__tile {
-  display: grid;
-  gap: 4px;
-  padding: 6px 4px 5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: 6px;
   background: #101826;
   color: #c5d4e8;
   cursor: pointer;
+  min-width: 0;
+  flex: 1;
 }
 
 .iso-sidebar__tile:hover {
@@ -1828,30 +1835,43 @@ label.ghost-btn {
   color: var(--text);
 }
 
+.iso-sidebar__row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
 .iso-sidebar__row.is-editing .iso-sidebar__tile {
   border-color: var(--accent);
 }
 
-.iso-sidebar__row .iso-sidebar__tile {
-  flex: 1;
-  min-width: 0;
-}
-
 .iso-sidebar__actions {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  justify-content: center;
+  flex-direction: row;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
-.iso-sidebar__actions .ghost-btn {
-  min-height: 28px;
-  padding: 4px 8px;
-  font-size: 11px;
-  white-space: nowrap;
+.iso-sidebar__mini {
+  min-height: 22px;
+  padding: 2px 6px;
+  font-size: 10px;
+  line-height: 1;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
 }
 
-.iso-sidebar__actions .ghost-btn--danger:hover {
+.iso-sidebar__mini:hover {
+  color: var(--text);
+  border-color: var(--line-strong);
+}
+
+.iso-sidebar__mini--danger:hover,
+.iso-sidebar__mini--danger:focus {
   border-color: var(--danger);
   color: var(--danger);
 }
@@ -1860,19 +1880,24 @@ label.ghost-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 36px;
+  width: 32px;
+  height: 24px;
+  flex-shrink: 0;
 }
 
 .iso-sidebar__icon .pid-symbol-svg {
-  width: 40px;
-  height: 32px;
+  width: 32px;
+  height: 24px;
 }
 
 .iso-sidebar__name {
-  font-size: 9px;
-  line-height: 1.25;
-  color: var(--muted);
-  text-align: center;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--text);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .canvas-panel--pid .ghost-btn {
@@ -1950,6 +1975,13 @@ label.ghost-btn {
   border-radius: 8px;
   cursor: crosshair;
   touch-action: none;
+  overflow: visible;
+}
+
+.symbol-editor__frame {
+  fill: none;
+  stroke: #3d5d86;
+  stroke-width: 1.2;
 }
 
 .symbol-editor__port {

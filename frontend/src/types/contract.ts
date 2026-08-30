@@ -91,7 +91,13 @@ export interface EquipmentObject {
       | { id: string; kind: "circle"; cx: number; cy: number; r: number }
       | { id: string; kind: "polygon"; points: Array<{ x: number; y: number }> }
     >;
-    ports?: Array<{ id: string; side: "left" | "right" | "top" | "bottom"; offset: number }>;
+    ports?: Array<{
+      id: string;
+      x?: number;
+      y?: number;
+      side?: "left" | "right" | "top" | "bottom";
+      offset?: number;
+    }>;
   } | null;
 }
 

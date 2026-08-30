@@ -49,21 +49,45 @@ export function equipmentBounds(object: EquipmentObject) {
 export function equipmentPortLayout(object: EquipmentObject) {
   const bounds = equipmentBounds(object);
   const drawing = resolveDrawing(object.symbolId, object.drawing);
-  const drawingHeight = drawing.height;
-  const drawingWidth = drawing.width;
-  return mergePortAnchors(drawing.ports, object.inCount, object.outCount, drawingWidth, drawingHeight).map((anchor) => {
-    const side = rotateEdge(anchor.side, bounds.rotation);
-    const along = side === "left" || side === "right" ? bounds.height : bounds.width;
-    const source = side === "left" || side === "right" ? drawingHeight : drawingWidth;
-    const offset = source ? (anchor.offset / source) * along : along / 2;
+  return mergePortAnchors(drawing.ports, object.inCount, object.outCount, drawing.width, drawing.height).map((anchor) => {
+    const point = rotatePortXY(anchor.x ?? 0, anchor.y ?? 0, drawing.width, drawing.height, bounds.rotation);
+    const side = rotateEdge(
+      anchor.side ?? nearestSide(anchor.x ?? 0, anchor.y ?? 0, drawing.width, drawing.height),
+      bounds.rotation,
+    );
     return {
       ...anchor,
       side,
       position: sideToPosition(side),
-      style:
-        side === "left" || side === "right"
-          ? { top: `${(offset / bounds.height) * 100}%` }
-          : { left: `${(offset / bounds.width) * 100}%` },
+      style: {
+        left: `${(point.x / bounds.width) * 100}%`,
+        top: `${(point.y / bounds.height) * 100}%`,
+        right: "auto",
+        bottom: "auto",
+      },
     };
   });
+}
+
+function nearestSide(x: number, y: number, width: number, height: number): EdgeSide {
+  const candidates: Array<{ side: EdgeSide; dist: number }> = [
+    { side: "left", dist: Math.abs(x) },
+    { side: "right", dist: Math.abs(width - x) },
+    { side: "top", dist: Math.abs(y) },
+    { side: "bottom", dist: Math.abs(height - y) },
+  ];
+  return candidates.reduce((winner, item) => (item.dist < winner.dist ? item : winner)).side;
+}
+
+function rotatePortXY(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  rotation: EquipmentRotation,
+): { x: number; y: number } {
+  if (rotation === 90) return { x: height - y, y: x };
+  if (rotation === 180) return { x: width - x, y: height - y };
+  if (rotation === 270) return { x: y, y: width - x };
+  return { x, y };
 }

@@ -1,4 +1,5 @@
 export const CANVAS_GRID = 11;
+export const EDITOR_PAD = CANVAS_GRID;
 
 export function snapToGrid(value: number, grid = CANVAS_GRID): number {
   return Math.round(value / grid) * grid;

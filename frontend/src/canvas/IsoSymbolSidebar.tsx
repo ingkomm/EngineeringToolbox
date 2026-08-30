@@ -15,6 +15,7 @@ export function IsoSymbolSidebar({
 }) {
   const library = libraryOf(project);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const editing = library.find((item) => item.id === editingId && item.kind === "equipment");
 
   return (
@@ -30,6 +31,7 @@ export function IsoSymbolSidebar({
             const id = nextLibrarySymbolId(library);
             onEdit({ type: "addLibrarySymbol" });
             setEditingId(id);
+            setPendingDelete(null);
           }}
         >
           Create
@@ -54,24 +56,44 @@ export function IsoSymbolSidebar({
               {item.kind === "equipment" ? (
                 <button
                   type="button"
-                  className="ghost-btn"
+                  className="iso-sidebar__mini"
                   data-testid={`btn-edit-symbol-${item.id}`}
-                  onClick={() => setEditingId(item.id === editingId ? null : item.id)}
+                  onClick={() => {
+                    setPendingDelete(null);
+                    setEditingId(item.id === editingId ? null : item.id);
+                  }}
                 >
                   편집
                 </button>
               ) : null}
-              <button
-                type="button"
-                className="ghost-btn ghost-btn--danger"
-                data-testid={`btn-delete-symbol-${item.id}`}
-                onClick={() => {
-                  if (editingId === item.id) setEditingId(null);
-                  onEdit({ type: "deleteLibrarySymbol", symbolId: item.id });
-                }}
-              >
-                삭제
-              </button>
+              {pendingDelete === item.id ? (
+                <>
+                  <button
+                    type="button"
+                    className="iso-sidebar__mini iso-sidebar__mini--danger"
+                    data-testid={`btn-confirm-delete-symbol-${item.id}`}
+                    onClick={() => {
+                      if (editingId === item.id) setEditingId(null);
+                      setPendingDelete(null);
+                      onEdit({ type: "deleteLibrarySymbol", symbolId: item.id });
+                    }}
+                  >
+                    확인
+                  </button>
+                  <button type="button" className="iso-sidebar__mini" onClick={() => setPendingDelete(null)}>
+                    취소
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="iso-sidebar__mini iso-sidebar__mini--danger"
+                  data-testid={`btn-delete-symbol-${item.id}`}
+                  onClick={() => setPendingDelete(item.id)}
+                >
+                  삭제
+                </button>
+              )}
             </div>
           </div>
         ))}

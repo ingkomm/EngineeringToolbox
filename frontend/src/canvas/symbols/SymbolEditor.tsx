@@ -4,10 +4,10 @@ import {
   nextPrimitiveId,
   portXY,
   resizeDrawing,
-  snapPortToBorder,
+  snapPortPoint,
   withPorts,
 } from "./drawing";
-import { CANVAS_GRID, gridLinesToSize, sizeToGridLines, snapToGrid } from "./grid";
+import { CANVAS_GRID, EDITOR_PAD, gridLinesToSize, sizeToGridLines, snapToGrid } from "./grid";
 import { DrawingPrimitives } from "./DrawingSvg";
 import type { EquipmentObject } from "../../types/contract";
 
@@ -108,10 +108,15 @@ export function SymbolEditor({
   const pointFromClient = (event: { clientX: number; clientY: number }) => {
     const svg = svgRef.current;
     if (!svg) return { x: 0, y: 0 };
-    const box = svg.getBoundingClientRect();
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return { x: 0, y: 0 };
+    const point = svg.createSVGPoint();
+    point.x = event.clientX;
+    point.y = event.clientY;
+    const local = point.matrixTransform(ctm.inverse());
     return {
-      x: snapToGrid(((event.clientX - box.left) / box.width) * draft.width),
-      y: snapToGrid(((event.clientY - box.top) / box.height) * draft.height),
+      x: snapToGrid(Math.min(draft.width, Math.max(0, local.x))),
+      y: snapToGrid(Math.min(draft.height, Math.max(0, local.y))),
     };
   };
 
@@ -159,8 +164,8 @@ export function SymbolEditor({
       return;
     }
     if (active.mode === "port" && active.portId) {
-      const snapped = snapPortToBorder(point.x, point.y, draft.width, draft.height);
-      previewPort({ id: active.portId, ...snapped });
+      const snapped = snapPortPoint(point.x, point.y, draft.width, draft.height);
+      previewPort({ id: active.portId, x: snapped.x, y: snapped.y, side: snapped.side });
       return;
     }
     if (active.mode === "move" && active.origin && selectedId) {
@@ -206,10 +211,12 @@ export function SymbolEditor({
       return;
     }
     if (active.mode === "port" && active.portId) {
-      const snapped = snapPortToBorder(point.x, point.y, draft.width, draft.height);
+      const snapped = snapPortPoint(point.x, point.y, draft.width, draft.height);
       commit({
         ...draft,
-        ports: (draft.ports ?? []).map((item) => (item.id === active.portId ? { id: active.portId, ...snapped } : item)),
+        ports: (draft.ports ?? []).map((item) =>
+          item.id === active.portId ? { id: active.portId, x: snapped.x, y: snapped.y, side: snapped.side } : item,
+        ),
       });
       return;
     }
@@ -333,7 +340,8 @@ export function SymbolEditor({
       <svg
         ref={svgRef}
         className="symbol-editor__canvas"
-        viewBox={`0 0 ${draft.width} ${draft.height}`}
+        viewBox={`${-EDITOR_PAD} ${-EDITOR_PAD} ${draft.width + EDITOR_PAD * 2} ${draft.height + EDITOR_PAD * 2}`}
+        preserveAspectRatio="xMidYMid meet"
         data-testid="symbol-editor-canvas"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -342,6 +350,7 @@ export function SymbolEditor({
           if (tool === "polygon") finishPolygon();
         }}
       >
+        <rect className="symbol-editor__frame" x={0} y={0} width={draft.width} height={draft.height} />
         {gridLines.map((item) => (
           <line key={item.key} className="symbol-editor__grid" x1={item.x1} y1={item.y1} x2={item.x2} y2={item.y2} />
         ))}
@@ -380,7 +389,7 @@ export function SymbolEditor({
               }}
             >
               <circle cx={point.x} cy={point.y} r={4} />
-              <text x={point.x + (port.side === "right" ? -6 : 6)} y={point.y - 6} textAnchor={port.side === "right" ? "end" : "start"}>
+              <text x={point.x + 6} y={point.y - 6} textAnchor="start">
                 {port.id}
               </text>
             </g>
@@ -420,7 +429,7 @@ export function SymbolEditor({
         ) : null}
       </svg>
       <p className="symbol-editor__hint">
-        그리드는 선 개수입니다(기본 9×7). In/Out 점을 가장자리로 끌어 포트를 둡니다. 직선/원은 드래그, 다각형은 클릭 후 닫기.
+        In/Out 점은 그리드 안 어디에나 둘 수 있습니다. 직선/원은 드래그, 다각형은 클릭 후 닫기.
       </p>
     </div>
   );

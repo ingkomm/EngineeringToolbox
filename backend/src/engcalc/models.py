@@ -162,8 +162,10 @@ class SymbolPolygon(BaseModel):
 class SymbolPort(BaseModel):
     model_config = ConfigDict(extra="forbid")
     id: str
-    side: Literal["left", "right", "top", "bottom"]
-    offset: float = 0
+    x: float | None = None
+    y: float | None = None
+    side: Literal["left", "right", "top", "bottom"] | None = None
+    offset: float | None = None
 
 
 class SymbolDrawing(BaseModel):

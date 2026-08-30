@@ -9,8 +9,10 @@ export type SymbolPrimitive =
 
 export interface PortAnchor {
   id: string;
-  side: EdgeSide;
-  offset: number;
+  x?: number;
+  y?: number;
+  side?: EdgeSide;
+  offset?: number;
 }
 
 export interface SymbolDrawing {
@@ -115,23 +117,27 @@ export function defaultPortAnchors(
   inCount: number,
   outCount: number,
   height: number,
-  _width = height,
+  width = height,
 ): PortAnchor[] {
-  const ins = Array.from({ length: Math.max(0, inCount) }, (_, index) => ({
-    id: `IN_${index + 1}`,
-    side: "left" as const,
-    offset: spacedOffset(inCount, index, height),
-  }));
-  const outs = Array.from({ length: Math.max(0, outCount) }, (_, index) => ({
-    id: `OUT_${index + 1}`,
-    side: "right" as const,
-    offset: spacedOffset(outCount, index, height),
-  }));
+  const ins = Array.from({ length: Math.max(0, inCount) }, (_, index) =>
+    clampPortAnchor(
+      { id: `IN_${index + 1}`, x: 0, y: spacedOffset(inCount, index, height), side: "left" },
+      width,
+      height,
+    ),
+  );
+  const outs = Array.from({ length: Math.max(0, outCount) }, (_, index) =>
+    clampPortAnchor(
+      { id: `OUT_${index + 1}`, x: width, y: spacedOffset(outCount, index, height), side: "right" },
+      width,
+      height,
+    ),
+  );
   return [...ins, ...outs];
 }
 
 export function mergePortAnchors(
-  existing: PortAnchor[] | undefined,
+  existing: Array<Partial<PortAnchor> & { id: string }> | undefined,
   inCount: number,
   outCount: number,
   width: number,
@@ -142,8 +148,8 @@ export function mergePortAnchors(
   for (let index = 0; index < Math.max(0, inCount); index += 1) {
     const id = `IN_${index + 1}`;
     next.push(
-      clampPortAnchor(
-        prev.get(id) ?? { id, side: "left", offset: spacedOffset(inCount, index, height) },
+      normalizePort(
+        prev.get(id) ?? { id, x: 0, y: spacedOffset(inCount, index, height), side: "left" },
         width,
         height,
       ),
@@ -152,8 +158,8 @@ export function mergePortAnchors(
   for (let index = 0; index < Math.max(0, outCount); index += 1) {
     const id = `OUT_${index + 1}`;
     next.push(
-      clampPortAnchor(
-        prev.get(id) ?? { id, side: "right", offset: spacedOffset(outCount, index, height) },
+      normalizePort(
+        prev.get(id) ?? { id, x: width, y: spacedOffset(outCount, index, height), side: "right" },
         width,
         height,
       ),
@@ -175,31 +181,50 @@ export function resizeDrawing(drawing: SymbolDrawing, width: number, height: num
   return withPorts({ ...drawing, width, height }, inCount, outCount);
 }
 
+export function nearestPortSide(x: number, y: number, width: number, height: number): EdgeSide {
+  const candidates: Array<{ side: EdgeSide; dist: number }> = [
+    { side: "left", dist: Math.abs(x) },
+    { side: "right", dist: Math.abs(width - x) },
+    { side: "top", dist: Math.abs(y) },
+    { side: "bottom", dist: Math.abs(height - y) },
+  ];
+  return candidates.reduce((winner, item) => (item.dist < winner.dist ? item : winner)).side;
+}
+
+export function normalizePort(
+  item: Partial<PortAnchor> & { id: string },
+  width: number,
+  height: number,
+): PortAnchor {
+  if (item.x != null && item.y != null && Number.isFinite(item.x) && Number.isFinite(item.y)) {
+    return clampPortAnchor({ id: item.id, x: item.x, y: item.y, side: item.side }, width, height);
+  }
+  const side = item.side ?? "left";
+  const offset = item.offset ?? 0;
+  const xy = edgePortXY(side, offset, width, height);
+  return clampPortAnchor({ id: item.id, x: xy.x, y: xy.y, side }, width, height);
+}
+
 export function clampPortAnchor(anchor: PortAnchor, width: number, height: number): PortAnchor {
-  const along = anchor.side === "left" || anchor.side === "right" ? height : width;
-  return { ...anchor, offset: snapToGrid(Math.min(along, Math.max(0, anchor.offset))) };
+  const x = snapToGrid(Math.min(width, Math.max(0, anchor.x ?? 0)));
+  const y = snapToGrid(Math.min(height, Math.max(0, anchor.y ?? 0)));
+  return { id: anchor.id, x, y, side: nearestPortSide(x, y, width, height) };
+}
+
+export function snapPortPoint(x: number, y: number, width: number, height: number): PortAnchor {
+  return clampPortAnchor({ id: "", x, y }, width, height);
 }
 
 export function portXY(anchor: PortAnchor, width: number, height: number): { x: number; y: number } {
-  if (anchor.side === "left") return { x: 0, y: anchor.offset };
-  if (anchor.side === "right") return { x: width, y: anchor.offset };
-  if (anchor.side === "top") return { x: anchor.offset, y: 0 };
-  return { x: anchor.offset, y: height };
+  if (anchor.x != null && anchor.y != null) return { x: anchor.x, y: anchor.y };
+  return edgePortXY(anchor.side ?? "left", anchor.offset ?? 0, width, height);
 }
 
-export function snapPortToBorder(x: number, y: number, width: number, height: number): Pick<PortAnchor, "side" | "offset"> {
-  const candidates: Array<{ side: EdgeSide; dist: number; offset: number }> = [
-    { side: "left", dist: Math.abs(x), offset: clampAlong(y, height) },
-    { side: "right", dist: Math.abs(width - x), offset: clampAlong(y, height) },
-    { side: "top", dist: Math.abs(y), offset: clampAlong(x, width) },
-    { side: "bottom", dist: Math.abs(height - y), offset: clampAlong(x, width) },
-  ];
-  const best = candidates.reduce((winner, item) => (item.dist < winner.dist ? item : winner));
-  return { side: best.side, offset: best.offset };
-}
-
-function clampAlong(value: number, length: number): number {
-  return snapToGrid(Math.min(length, Math.max(0, value)));
+function edgePortXY(side: EdgeSide, offset: number, width: number, height: number): { x: number; y: number } {
+  if (side === "left") return { x: 0, y: offset };
+  if (side === "right") return { x: width, y: offset };
+  if (side === "top") return { x: offset, y: 0 };
+  return { x: offset, y: height };
 }
 
 function spacedOffset(count: number, index: number, length: number): number {

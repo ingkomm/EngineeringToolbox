@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultPortAnchors, defaultDrawing, blankDrawing, mergePortAnchors, snapPortToBorder } from "./drawing";
+import { defaultPortAnchors, defaultDrawing, blankDrawing, mergePortAnchors, snapPortPoint } from "./drawing";
 import { CANVAS_GRID, gridLinesToSize, sizeToGridLines } from "./grid";
 
 describe("symbol drawings", () => {
@@ -30,15 +30,15 @@ describe("symbol drawings", () => {
   });
 
   it("spaces in/out ports along the flow axis", () => {
-    expect(defaultPortAnchors(1, 1, 66)).toEqual([
-      { id: "IN_1", side: "left", offset: 33 },
-      { id: "OUT_1", side: "right", offset: 33 },
+    expect(defaultPortAnchors(1, 1, 66, 66)).toEqual([
+      { id: "IN_1", x: 0, y: 33, side: "left" },
+      { id: "OUT_1", x: 66, y: 33, side: "right" },
     ]);
-    expect(defaultPortAnchors(2, 2, 66)).toEqual([
-      { id: "IN_1", side: "left", offset: 22 },
-      { id: "IN_2", side: "left", offset: 44 },
-      { id: "OUT_1", side: "right", offset: 22 },
-      { id: "OUT_2", side: "right", offset: 44 },
+    expect(defaultPortAnchors(2, 2, 66, 66)).toEqual([
+      { id: "IN_1", x: 0, y: 22, side: "left" },
+      { id: "IN_2", x: 0, y: 44, side: "left" },
+      { id: "OUT_1", x: 66, y: 22, side: "right" },
+      { id: "OUT_2", x: 66, y: 44, side: "right" },
     ]);
   });
 
@@ -52,19 +52,13 @@ describe("symbol drawings", () => {
     expect(drawing.height % (CANVAS_GRID * 2)).toBe(0);
   });
 
-  it("keeps custom port sides when in/out counts change", () => {
-    const ports = mergePortAnchors(
-      [{ id: "IN_1", side: "top", offset: 22 }],
-      2,
-      1,
-      88,
-      66,
-    );
+  it("keeps interior port positions when in/out counts change", () => {
+    const ports = mergePortAnchors([{ id: "IN_1", x: 22, y: 22 }], 2, 1, 88, 66);
     expect(ports).toEqual([
-      { id: "IN_1", side: "top", offset: 22 },
-      { id: "IN_2", side: "left", offset: 44 },
-      { id: "OUT_1", side: "right", offset: 33 },
+      { id: "IN_1", x: 22, y: 22, side: "left" },
+      { id: "IN_2", x: 0, y: 44, side: "left" },
+      { id: "OUT_1", x: 88, y: 33, side: "right" },
     ]);
-    expect(snapPortToBorder(88, 11, 88, 66)).toEqual({ side: "right", offset: 11 });
+    expect(snapPortPoint(33, 22, 88, 66)).toMatchObject({ x: 33, y: 22 });
   });
 });

@@ -162,9 +162,11 @@
     "symbolPort": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "side", "offset"],
+      "required": ["id"],
       "properties": {
         "id": { "type": "string" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
         "side": { "type": "string", "enum": ["left", "right", "top", "bottom"] },
         "offset": { "type": "number" }
       }

@@ -28,7 +28,7 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
   const connecting = Boolean(useConnection().inProgress);
   const showPorts = Boolean(selected || hovered || connecting);
   const updateNodeInternals = useUpdateNodeInternals();
-  const handleSignature = `${object.inCount}:${object.outCount}:${objectLinkSideOf(object)}:${bounds.rotation}:${bounds.width}x${bounds.height}:${object.drawing?.primitives.length ?? 0}:${object.drawing?.ports?.map((item) => `${item.id}:${item.side}:${item.offset}`).join(",") ?? ""}`;
+  const handleSignature = `${object.inCount}:${object.outCount}:${objectLinkSideOf(object)}:${bounds.rotation}:${bounds.width}x${bounds.height}:${object.drawing?.primitives.length ?? 0}:${object.drawing?.ports?.map((item) => `${item.id}:${item.x}:${item.y}`).join(",") ?? ""}`;
 
   useLayoutEffect(() => {
     updateNodeInternals(id);
@@ -83,7 +83,7 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
           type="source"
           position={port.position}
           id={port.id}
-          className={`pid-port pid-port--${port.id.startsWith("IN_") ? "in" : "out"} ${showPorts ? "is-visible" : ""}`}
+          className={`pid-port pid-port--free pid-port--${port.id.startsWith("IN_") ? "in" : "out"} ${showPorts ? "is-visible" : ""}`}
           style={port.style}
           data-testid={`object-${id}-${port.id}`}
           title={`${id}.${port.id}`}
