@@ -2,8 +2,8 @@ import { Handle, Position, useConnection, useUpdateNodeInternals, type Node, typ
 import { useLayoutEffect, useState } from "react";
 import type { PointObject } from "../types/contract";
 import type { WorkspaceEdit } from "../shared/projectEdits";
-import { POINT_CONNECTION_IDS, objectLinkSideOf, pointConnectionSide } from "../shared/worksheet";
-import { memoLinkSideOf } from "../memo/memo";
+import { POINT_CONNECTION_IDS, isObjectLinkHandle, objectLinkSideOf, pointConnectionSide } from "../shared/worksheet";
+import { isMemoAttachmentHandle, memoLinkSideOf } from "../memo/memo";
 import { POINT_NODE_SIZE } from "../shared/grid";
 import { ObjectLinkHandle } from "../shared/ObjectLinkHandle";
 import { MemoAttachHandle } from "../memo/MemoAttachHandle";
@@ -31,8 +31,13 @@ export function PointObjectNode({ id, selected, data }: NodeProps<PointObjectNod
   const linked = object.connections.some(Boolean);
   const [hovered, setHovered] = useState(false);
   const [inspect, setInspect] = useState(false);
-  const connecting = Boolean(useConnection().inProgress);
-  const hot = Boolean(selected || hovered || connecting);
+  const connecting = useConnection();
+  const connectingFrom = connecting.fromHandle?.id;
+  const pipeConnectable =
+    !connecting.inProgress ||
+    (!isMemoAttachmentHandle(connectingFrom) && !isObjectLinkHandle(connectingFrom));
+  const fromThis = connecting.inProgress && connecting.fromNode?.id === id;
+  const hot = Boolean(selected || hovered || fromThis);
   const updateNodeInternals = useUpdateNodeInternals();
 
   useLayoutEffect(() => {
@@ -65,6 +70,7 @@ export function PointObjectNode({ id, selected, data }: NodeProps<PointObjectNod
       <MemoAttachHandle
         nodeId={id}
         side={memoSide}
+        role="target"
         onToggleSide={() =>
           onEdit({
             type: "setMemoLinkSide",
@@ -85,6 +91,7 @@ export function PointObjectNode({ id, selected, data }: NodeProps<PointObjectNod
           data-testid={`object-${id}-${endId}`}
           data-port-category="arrangement-point"
           title={`${id}.${endId}`}
+          isConnectable={pipeConnectable}
         />
       ))}
       <span className={`pid-pt__dot ${linked ? "is-on" : ""}`} />

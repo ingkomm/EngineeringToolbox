@@ -33,7 +33,7 @@ import { parseHandleId } from "./display";
 import { type WorkspaceEdit } from "./projectEdits";
 import { parseLibraryDrag, libraryPlaceEdit } from "./libraryPlace";
 import { associationConnectTargets, isValidCanvasConnection } from "./connectionRules";
-import { isMemoObject } from "../memo/memo";
+import { isMemoAttachmentHandle, isMemoObject, MEMO_ATTACHMENT_HANDLE, MEMO_RECEIVE_HANDLE } from "../memo/memo";
 import { findLibrarySymbol } from "../arrangement/symbols/library";
 import { equipmentBounds } from "../arrangement/arrangementView";
 import type { QuantitySpec } from "./quantities";
@@ -114,6 +114,7 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
   const [selectMode, setSelectMode] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number; ids: string[] } | null>(null);
   const [clipboard, setClipboard] = useState<string[]>([]);
+  const [connectingHandleId, setConnectingHandleId] = useState<string | null>(null);
   const didFit = useRef(false);
   const updateNodeInternals = useUpdateNodeInternals();
 
@@ -157,10 +158,13 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
       const targetObject = project.objects.find((item) => item.id === connection.target);
       if (!sourceObject || !targetObject) return;
 
-      if (isMemoObject(sourceObject) || isMemoObject(targetObject)) {
-        const memo = isMemoObject(sourceObject) ? sourceObject : targetObject;
-        const other = memo.id === sourceObject.id ? targetObject : sourceObject;
-        onEdit({ type: "connectMemoLink", memoId: memo.id, targetObjectId: other.id });
+      if (
+        isMemoObject(sourceObject) &&
+        !isMemoObject(targetObject) &&
+        connection.sourceHandle === MEMO_ATTACHMENT_HANDLE &&
+        connection.targetHandle === MEMO_RECEIVE_HANDLE
+      ) {
+        onEdit({ type: "connectMemoLink", memoId: sourceObject.id, targetObjectId: targetObject.id });
         return;
       }
 
@@ -286,6 +290,16 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
       defaultEdgeOptions={defaultEdgeOptions}
       connectionLineType={ConnectionLineType.SmoothStep}
       connectionMode={ConnectionMode.Loose}
+      connectionRadius={4}
+      className={
+        isMemoAttachmentHandle(connectingHandleId)
+          ? "rf-connecting-memo"
+          : connectingHandleId
+            ? "rf-connecting-port"
+            : undefined
+      }
+      onConnectStart={(_event, params) => setConnectingHandleId(params.handleId ?? null)}
+      onConnectEnd={() => setConnectingHandleId(null)}
       onInit={onInit}
       onPaneClick={() => setMenu(null)}
       onNodeContextMenu={(event, node) => {

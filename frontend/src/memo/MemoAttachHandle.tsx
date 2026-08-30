@@ -1,17 +1,27 @@
-import { Handle, Position } from "@xyflow/react";
+import { Handle, Position, useConnection } from "@xyflow/react";
 import { MEMO_ATTACHMENT_HANDLE, MEMO_RECEIVE_HANDLE } from "./memo";
 import type { ObjectLinkSide } from "../shared/worksheet";
 
-/** White right-edge memo link. Memo is the source; other objects use this as the receive end. */
+/** White right-edge memo link. Memo is source-only; Calculation/Arrangement receive-only. */
 export function MemoAttachHandle({
   nodeId,
   side,
+  role,
   onToggleSide,
 }: {
   nodeId: string;
   side: ObjectLinkSide;
+  role: "source" | "target";
   onToggleSide: () => void;
 }) {
+  const connecting = useConnection();
+  const fromMemoSource = connecting.fromHandle?.id === MEMO_ATTACHMENT_HANDLE;
+  const handleId = role === "source" ? MEMO_ATTACHMENT_HANDLE : MEMO_RECEIVE_HANDLE;
+  const isConnectable =
+    role === "source"
+      ? !connecting.inProgress || connecting.fromHandle?.id === MEMO_ATTACHMENT_HANDLE
+      : !connecting.inProgress || fromMemoSource;
+
   return (
     <div className={`memo-attach-cluster memo-attach-cluster--${side}`}>
       <button
@@ -26,26 +36,18 @@ export function MemoAttachHandle({
       >
         {side === "top" ? "↓" : "↑"}
       </button>
-      <div className="memo-attach-ports">
-        <Handle
-          type="source"
-          position={Position.Right}
-          id={MEMO_ATTACHMENT_HANDLE}
-          className="memo-attach"
-          data-port-category="memo-attachment"
-          data-testid={`object-${nodeId}-memo`}
-          title="Memo"
-          isConnectable
-        />
-        <Handle
-          type="target"
-          position={Position.Right}
-          id={MEMO_RECEIVE_HANDLE}
-          className="memo-attach memo-attach--target"
-          data-port-category="memo-attachment"
-          isConnectable
-        />
-      </div>
+      <Handle
+        type={role}
+        position={Position.Right}
+        id={handleId}
+        className={`memo-attach memo-attach--${role}`}
+        data-port-category="memo-attachment"
+        data-testid={`object-${nodeId}-memo`}
+        title="Memo"
+        isConnectable={isConnectable}
+        isConnectableStart={role === "source"}
+        isConnectableEnd={role === "target"}
+      />
     </div>
   );
 }

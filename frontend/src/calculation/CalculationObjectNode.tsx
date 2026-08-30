@@ -130,6 +130,7 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
       <MemoAttachHandle
         nodeId={id}
         side={memoLinkSideOf(object)}
+        role="target"
         onToggleSide={() =>
           onEdit({
             type: "setMemoLinkSide",

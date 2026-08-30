@@ -1602,7 +1602,7 @@ label.ghost-btn {
   height: 12px !important;
   min-width: 12px;
   opacity: 0;
-  pointer-events: all;
+  pointer-events: none;
   z-index: 4;
   cursor: crosshair;
   border-radius: 50% !important;
@@ -1612,10 +1612,22 @@ label.ghost-btn {
 
 .pid-port.is-visible,
 .pid-eq.is-hot .pid-port,
-.pid-pt.is-hot .pid-port,
-.react-flow:has(.react-flow__connection) .pid-port,
-.react-flow:has(.react-flow__connectionline) .pid-port {
+.pid-pt.is-hot .pid-port {
   opacity: 1;
+  pointer-events: all;
+}
+
+.react-flow.rf-connecting-port .pid-eq:hover .pid-port,
+.react-flow.rf-connecting-port .pid-pt:hover .pid-port,
+.react-flow.rf-connecting-port .pid-eq.is-hot .pid-port,
+.react-flow.rf-connecting-port .pid-pt.is-hot .pid-port {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.react-flow.rf-connecting-memo .pid-port {
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 .pid-port__label {
@@ -2352,13 +2364,18 @@ label.ghost-btn {
   transform: translate(50%, 50%);
 }
 
-.memo-attach-ports {
-  position: relative;
-  width: var(--ws-port);
-  height: var(--ws-port);
+.ws-node--calc .memo-attach-cluster,
+.calc-node .memo-attach-cluster {
+  right: -12px;
 }
 
-.memo-attach-cluster .memo-attach {
+.pid-eq .memo-attach-cluster,
+.pid-pt .memo-attach-cluster {
+  right: -10px;
+}
+
+.memo-attach-cluster .memo-attach,
+.react-flow__handle[data-port-category="memo-attachment"] {
   position: relative !important;
   top: auto !important;
   right: auto !important;
@@ -2373,13 +2390,6 @@ label.ghost-btn {
   border-radius: 50% !important;
   background: #e7eef8 !important;
   border: 2px solid #071018 !important;
-}
-
-.memo-attach--target {
-  position: absolute !important;
-  inset: 0 !important;
-  transform: none !important;
-  opacity: 0;
 }
 
 .react-flow__node-memoObject .react-flow__resize-control.line {
@@ -2440,10 +2450,14 @@ label.ghost-btn {
   pointer-events: none;
 }
 
-.react-flow:has(.react-flow__connection) .memo-attach-cluster,
-.react-flow:has(.react-flow__connectionline) .memo-attach-cluster {
+.react-flow.rf-connecting-memo .memo-attach-cluster {
   opacity: 1;
   pointer-events: auto;
+}
+
+.react-flow.rf-connecting-port .memo-attach-cluster {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .memo-link-edge {

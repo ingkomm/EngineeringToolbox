@@ -98,6 +98,22 @@ describe("simple memo", () => {
         targetHandle: "OBJ",
       }),
     ).toBe(false);
+    expect(
+      isValidCanvasConnection(project, {
+        source: memoId,
+        target: calcId,
+        sourceHandle: "MEMO",
+        targetHandle: "MEMO",
+      }),
+    ).toBe(false);
+    expect(
+      isValidCanvasConnection(project, {
+        source: calcId,
+        target: memoId,
+        sourceHandle: "MEMO",
+        targetHandle: "MEMO-in",
+      }),
+    ).toBe(false);
     project = applyWorkspaceEdit(project, { type: "setMemoLinkSide", objectId: calcId, side: "bottom" }, FALLBACK_QUANTITIES).project;
     expect(project.objects.find(isCalculationObject)?.memoLinkSide).toBe("bottom");
   });

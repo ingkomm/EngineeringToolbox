@@ -2,8 +2,8 @@ import { Handle, NodeResizer, useConnection, useUpdateNodeInternals, type Node, 
 import { useLayoutEffect, useState } from "react";
 import type { EquipmentObject } from "../types/contract";
 import type { WorkspaceEdit } from "../shared/projectEdits";
-import { objectLinkSideOf } from "../shared/worksheet";
-import { memoLinkSideOf } from "../memo/memo";
+import { isObjectLinkHandle, objectLinkSideOf } from "../shared/worksheet";
+import { isMemoAttachmentHandle, memoLinkSideOf } from "../memo/memo";
 import { equipmentBounds, equipmentPortLayout, equipmentTag } from "./arrangementView";
 import { resolveDrawing } from "./symbols/drawing";
 import { DrawingSvg } from "./symbols/DrawingSvg";
@@ -27,8 +27,13 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
   const ports = equipmentPortLayout(object);
   const [hovered, setHovered] = useState(false);
   const [inspect, setInspect] = useState(false);
-  const connecting = Boolean(useConnection().inProgress);
-  const showPorts = Boolean(selected || hovered || connecting);
+  const connection = useConnection();
+  const connecting = connection.inProgress;
+  const pipeConnectable =
+    !connecting ||
+    (!isMemoAttachmentHandle(connection.fromHandle?.id) && !isObjectLinkHandle(connection.fromHandle?.id));
+  const fromThis = connecting && connection.fromNode?.id === id;
+  const showPorts = Boolean(selected || hovered || fromThis);
   const updateNodeInternals = useUpdateNodeInternals();
   const handleSignature = `${object.inCount}:${object.outCount}:${objectLinkSideOf(object)}:${memoLinkSideOf(object)}:${bounds.rotation}:${bounds.width}x${bounds.height}:${object.drawing?.primitives.length ?? 0}:${object.drawing?.ports?.map((item) => `${item.id}:${item.x}:${item.y}`).join(",") ?? ""}`;
 
@@ -75,6 +80,7 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
       <MemoAttachHandle
         nodeId={id}
         side={memoLinkSideOf(object)}
+        role="target"
         onToggleSide={() =>
           onEdit({
             type: "setMemoLinkSide",
@@ -101,6 +107,7 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
           data-testid={`object-${id}-${port.id}`}
           data-port-category="arrangement-point"
           title={`${id}.${port.id}`}
+          isConnectable={pipeConnectable}
         >
           <span className="pid-port__label">{port.id}</span>
         </Handle>

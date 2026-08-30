@@ -1,5 +1,6 @@
-import { Handle, Position } from "@xyflow/react";
+import { Handle, Position, useConnection } from "@xyflow/react";
 import { OBJECT_LINK_HANDLE, type ObjectLinkSide } from "./worksheet";
+import { isMemoAttachmentHandle } from "../memo/memo";
 
 export function ObjectLinkHandle({
   nodeId,
@@ -12,6 +13,8 @@ export function ObjectLinkHandle({
   onToggleSide: () => void;
   hidden?: boolean;
 }) {
+  const connecting = useConnection();
+  const connectable = !connecting.inProgress || !isMemoAttachmentHandle(connecting.fromHandle?.id);
   return (
     <div className={`obj-link-cluster obj-link-cluster--${side} ${hidden ? "" : "is-open"}`}>
       <Handle
@@ -22,7 +25,9 @@ export function ObjectLinkHandle({
         data-port-category="arrangement-point"
         data-testid={`object-${nodeId}-obj`}
         title="객체 링크"
-        isConnectable
+        isConnectable={connectable}
+        isConnectableStart={connectable}
+        isConnectableEnd={connectable}
       />
       <button
         type="button"

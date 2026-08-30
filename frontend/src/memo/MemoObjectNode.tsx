@@ -85,6 +85,7 @@ export function MemoObjectNode({ id, selected, data }: NodeProps<MemoObjectNodeT
       <MemoAttachHandle
         nodeId={id}
         side={side}
+        role="source"
         onToggleSide={() =>
           onEdit({
             type: "setObjectLinkSide",
