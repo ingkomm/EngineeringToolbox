@@ -14,7 +14,7 @@ export type MemoLinkTargetKind =
   | "calc-output"
   | "arrangement-edge";
 export type MemoLinkRelation = "attachment" | "reference" | "association";
-export type MemoBlockType = "text" | "status" | "table" | "object-link";
+export type MemoBlockType = "text" | "status" | "table" | "flow-diagram" | "object-link";
 export type ObjectLinkSide = "top" | "bottom";
 export type ArrangementLinkKind = "pipe" | "signal";
 export type EquipmentRotation = 0 | 90 | 180 | 270;
@@ -196,7 +196,28 @@ export interface TableBlock extends MemoBlockBase {
   rows: TableRow[];
 }
 
-export type MemoBlock = TextBlock | StatusBlock | TableBlock | ObjectLinkBlock;
+export interface FlowNode {
+  id: string;
+  shape: "process" | "decision" | "start-end" | "note";
+  text: string;
+  position: { x: number; y: number };
+}
+
+export interface FlowEdge {
+  id: string;
+  source: string;
+  target: string;
+  label?: string;
+}
+
+export interface FlowDiagramBlock extends MemoBlockBase {
+  type: "flow-diagram";
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+  viewport?: { x: number; y: number; zoom: number };
+}
+
+export type MemoBlock = TextBlock | StatusBlock | TableBlock | FlowDiagramBlock | ObjectLinkBlock;
 
 export interface MemoObject {
   kind: "memo";

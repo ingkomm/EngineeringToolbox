@@ -1,9 +1,10 @@
 import { Handle, NodeResizer, Position, useConnection, type Node, type NodeProps } from "@xyflow/react";
 import type { MemoObject } from "../types/contract";
 import type { WorkspaceEdit } from "../lib/projectEdits";
-import { backlinksTo, firstTextPreview, MEMO_ATTACHMENT_HANDLE, memoTitleOf } from "../lib/memo";
+import { backlinksTo, firstMajorBlock, firstTextPreview, MEMO_ATTACHMENT_HANDLE, memoTitleOf } from "../lib/memo";
 import { snapGridSize } from "./symbols/grid";
 import type { ProjectDocument } from "../types/contract";
+import { FlowDiagramPreview } from "./FlowDiagramEditor";
 
 export type MemoObjectNodeType = Node<
   {
@@ -21,6 +22,7 @@ export function MemoObjectNode({ id, selected, data }: NodeProps<MemoObjectNodeT
   const hot = Boolean(selected || connecting);
   const backlinks = backlinksTo(project, id).length;
   const preview = firstTextPreview(object);
+  const major = firstMajorBlock(object);
   const title = memoTitleOf(object);
 
   return (
@@ -57,7 +59,13 @@ export function MemoObjectNode({ id, selected, data }: NodeProps<MemoObjectNodeT
       />
       <p className="memo-node__kicker">MEMO</p>
       <h3 className="memo-node__title">{title || "제목 없음"}</h3>
-      {preview ? <p className="memo-node__preview">{preview}</p> : <p className="memo-node__preview memo-node__preview--empty">빈 기록</p>}
+      {major?.type === "flow-diagram" ? (
+        <FlowDiagramPreview block={major} />
+      ) : preview ? (
+        <p className="memo-node__preview">{preview}</p>
+      ) : (
+        <p className="memo-node__preview memo-node__preview--empty">빈 기록</p>
+      )}
       <div className="memo-node__tags">
         {object.tags.map((tag) => (
           <span key={tag.normalizedKey} className="memo-tag">

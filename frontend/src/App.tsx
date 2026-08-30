@@ -3,6 +3,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 
 import { checkHealth, evaluateProject, fetchQuantities } from "./api/client";
 import { FlowCanvas } from "./canvas/FlowCanvas";
+import { KnowledgeGraphView } from "./canvas/KnowledgeGraphView";
 import { IsoSymbolSidebar } from "./canvas/IsoSymbolSidebar";
 import { blankProject } from "./example/blankProject";
 import { FALLBACK_QUANTITIES, type QuantitySpec } from "./lib/quantities";
@@ -19,6 +20,8 @@ export function App() {
   const [backendUp, setBackendUp] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("변수와 수식을 직접 정의하세요");
+  const [workspaceView, setWorkspaceView] = useState<"canvas" | "graph">("canvas");
+  const [focusObjectId, setFocusObjectId] = useState<string | null>(null);
   const pastRef = useRef<ProjectDocument[]>([]);
   const futureRef = useRef<ProjectDocument[]>([]);
   const debounceRef = useRef<number | null>(null);
@@ -256,6 +259,22 @@ export function App() {
           </span>
           <span className="pill" data-testid="eval-status">{busy ? "계산 중" : message}</span>
           <button
+            className={`ghost-btn ${workspaceView === "canvas" ? "ghost-btn--on" : ""}`}
+            type="button"
+            data-testid="btn-view-canvas"
+            onClick={() => setWorkspaceView("canvas")}
+          >
+            Engineering Canvas
+          </button>
+          <button
+            className={`ghost-btn ${workspaceView === "graph" ? "ghost-btn--on" : ""}`}
+            type="button"
+            data-testid="btn-view-graph"
+            onClick={() => setWorkspaceView("graph")}
+          >
+            Knowledge Graph
+          </button>
+          <button
             className="ghost-btn"
             type="button"
             data-testid="btn-new-worksheet"
@@ -294,16 +313,27 @@ export function App() {
       <main className="workspace">
         <IsoSymbolSidebar project={project} onEdit={onEdit} />
         <section className="canvas-pane">
-          <ReactFlowProvider>
-            <FlowCanvas
+          {workspaceView === "graph" ? (
+            <KnowledgeGraphView
               project={project}
-              quantities={quantities}
-              onProjectChange={onProjectChange}
-              onEdit={onEdit}
-              onUndo={onUndo}
-              onRedo={onRedo}
+              onOpenObject={(objectId) => {
+                setFocusObjectId(objectId);
+                setWorkspaceView("canvas");
+              }}
             />
-          </ReactFlowProvider>
+          ) : (
+            <ReactFlowProvider>
+              <FlowCanvas
+                project={project}
+                quantities={quantities}
+                onProjectChange={onProjectChange}
+                onEdit={onEdit}
+                onUndo={onUndo}
+                onRedo={onRedo}
+                focusObjectId={focusObjectId}
+              />
+            </ReactFlowProvider>
+          )}
         </section>
         <aside className="side-pane">
           <section>

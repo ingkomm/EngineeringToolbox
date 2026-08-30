@@ -67,6 +67,7 @@ interface FlowCanvasProps {
   onEdit: (edit: WorkspaceEdit) => void;
   onUndo?: () => void;
   onRedo?: () => void;
+  focusObjectId?: string | null;
 }
 
 function isTypingTarget(target: EventTarget | null) {
@@ -94,7 +95,7 @@ function CanvasZoomHotkeys() {
   return null;
 }
 
-export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUndo, onRedo }: FlowCanvasProps) {
+export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUndo, onRedo, focusObjectId }: FlowCanvasProps) {
   const onToggle = useCallback((edgeId: string) => {
     onEdit({ type: "toggleEdge", edgeId });
   }, [onEdit]);
@@ -118,6 +119,12 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
   const didFit = useRef(false);
 
   const onOpenMemo = useCallback((objectId: string) => setEditingMemoId(objectId), []);
+
+  useEffect(() => {
+    if (!focusObjectId) return;
+    if (!project.objects.some((item) => item.id === focusObjectId)) return;
+    void fitView({ nodes: [{ id: focusObjectId }], padding: 0.4, duration: 280 });
+  }, [fitView, focusObjectId, project.objects]);
 
   useEffect(() => {
     const nextNodes = toFlowNodeRecords(project, quantities, onEdit, onOpenMemo);

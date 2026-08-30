@@ -2,6 +2,7 @@ import { childrenOf, memosOf, memoTitleOf, objectKindOf, sortedBlocks } from "..
 import type { MemoObject, ProjectDocument, WorksheetObject } from "../types/contract";
 import type { WorkspaceEdit } from "../lib/projectEdits";
 import { StatusBlockEditor, TableBlockEditor } from "./MemoStructuredBlocks";
+import { FlowDiagramEditor } from "./FlowDiagramEditor";
 
 export function MemoFocusEditor({
   memo,
@@ -100,7 +101,9 @@ export function MemoFocusEditor({
                       ? "Status"
                       : block.type === "table"
                         ? "Table"
-                        : "Object Link"}
+                        : block.type === "flow-diagram"
+                          ? "Flow Diagram"
+                          : "Object Link"}
                 </strong>
                 <button type="button" onClick={() => onEdit({ type: "moveMemoBlock", objectId: memo.id, blockId: block.id, direction: -1 })}>
                   ↑
@@ -133,6 +136,8 @@ export function MemoFocusEditor({
                 <StatusBlockEditor memoId={memo.id} block={block} onEdit={onEdit} />
               ) : block.type === "table" ? (
                 <TableBlockEditor memoId={memo.id} block={block} project={project} onEdit={onEdit} />
+              ) : block.type === "flow-diagram" ? (
+                <FlowDiagramEditor memoId={memo.id} block={block} onEdit={onEdit} />
               ) : (
                 <ObjectLinkBlockView
                   memo={memo}
@@ -156,6 +161,9 @@ export function MemoFocusEditor({
           </button>
           <button type="button" data-testid={`memo-${memo.id}-add-table`} onClick={() => onEdit({ type: "addMemoBlock", objectId: memo.id, blockType: "table" })}>
             Table
+          </button>
+          <button type="button" data-testid={`memo-${memo.id}-add-flow`} onClick={() => onEdit({ type: "addMemoBlock", objectId: memo.id, blockType: "flow-diagram" })}>
+            Flow Diagram
           </button>
           <button
             type="button"

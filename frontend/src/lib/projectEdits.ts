@@ -32,6 +32,7 @@ import {
   emptyMemo,
   isMemoObject,
   newObjectLinkBlock,
+  newFlowDiagramBlock,
   newStatusBlock,
   newTableBlock,
   newTextBlock,
@@ -185,7 +186,7 @@ export type WorkspaceEdit =
         position?: { x: number; y: number };
       };
     }
-  | { type: "addMemoBlock"; objectId: string; blockType: "text" | "status" | "table" | "object-link" }
+  | { type: "addMemoBlock"; objectId: string; blockType: "text" | "status" | "table" | "flow-diagram" | "object-link" }
   | { type: "updateMemoBlock"; objectId: string; blockId: string; patch: Partial<MemoBlock> }
   | { type: "removeMemoBlock"; objectId: string; blockId: string }
   | { type: "moveMemoBlock"; objectId: string; blockId: string; direction: -1 | 1 }
@@ -2042,7 +2043,7 @@ function updateWorksheetMemo(
 function addMemoBlock(
   project: ProjectDocument,
   objectId: string,
-  blockType: "text" | "status" | "table" | "object-link",
+  blockType: "text" | "status" | "table" | "flow-diagram" | "object-link",
 ): EditResult {
   return patchMemo(project, objectId, (memo) => {
     const order = nextBlockOrder(memo);
@@ -2053,6 +2054,8 @@ function addMemoBlock(
           ? newStatusBlock(order)
           : blockType === "table"
             ? newTableBlock(order)
+            : blockType === "flow-diagram"
+              ? newFlowDiagramBlock(order)
             : newObjectLinkBlock(order);
     return { ...memo, blocks: [...memo.blocks, block] };
   });

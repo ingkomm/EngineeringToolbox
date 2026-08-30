@@ -5,6 +5,7 @@ import type {
   MemoObject,
   ObjectKind,
   ObjectLinkBlock,
+  FlowDiagramBlock,
   ProjectDocument,
   StatusBlock,
   TableBlock,
@@ -16,7 +17,7 @@ import { newStableId } from "./ids";
 
 export const MEMO_ATTACHMENT_HANDLE = "MEMO";
 export const MEMO_DEFAULT_SIZE = { width: 220, height: 148 };
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export function isMemoObject(object: WorksheetObject): object is MemoObject {
   return object.kind === "memo";
@@ -94,6 +95,20 @@ function cloneBlock(block: MemoBlock, linkIdMap: Map<string, string>): MemoBlock
     }));
     return { ...block, id, columns, rows };
   }
+  if (block.type === "flow-diagram") {
+    const nodeMap = new Map(block.nodes.map((node) => [node.id, newStableId("n")]));
+    return {
+      ...block,
+      id,
+      nodes: block.nodes.map((node) => ({ ...node, id: nodeMap.get(node.id) ?? node.id })),
+      edges: block.edges.map((edge) => ({
+        ...edge,
+        id: newStableId("e"),
+        source: nodeMap.get(edge.source) ?? edge.source,
+        target: nodeMap.get(edge.target) ?? edge.target,
+      })),
+    };
+  }
   return {
     ...block,
     id,
@@ -101,13 +116,21 @@ function cloneBlock(block: MemoBlock, linkIdMap: Map<string, string>): MemoBlock
   };
 }
 
+export function firstMajorBlock(memo: MemoObject): MemoBlock | undefined {
+  return sortedBlocks(memo).find((block) => !block.collapsed);
+}
+
 export function firstTextPreview(memo: MemoObject): string {
-  const text = memo.blocks
-    .filter((item): item is TextBlock => item.type === "text")
-    .sort((a, b) => a.order - b.order)
-    .find((item) => item.content.trim());
-  if (!text) return "";
-  return text.content.trim().split(/\n/)[0]?.slice(0, 80) ?? "";
+  const major = firstMajorBlock(memo);
+  if (!major) return "";
+  if (major.type === "text") return major.content.trim().split(/\n/)[0]?.slice(0, 80) ?? "";
+  if (major.type === "status") {
+    const item = major.items.find((entry) => entry.value.trim() || entry.label?.trim());
+    return item ? [item.label, item.value].filter(Boolean).join(": ") : "Status";
+  }
+  if (major.type === "table") return `Table ${major.rows.length}×${major.columns.length}`;
+  if (major.type === "flow-diagram") return major.nodes.map((node) => node.text).filter(Boolean).join(" → ").slice(0, 80);
+  return major.linkIds.length ? `Links ${major.linkIds.length}` : "Object Link";
 }
 
 export function sortedBlocks(memo: MemoObject): MemoBlock[] {
@@ -191,6 +214,22 @@ export function newTableBlock(order: number): TableBlock {
       { id: colB, name: "B" },
     ],
     rows: [{ id: rowId, cells: { [colA]: { type: "text", value: "" }, [colB]: { type: "text", value: "" } } }],
+  };
+}
+
+export function newFlowDiagramBlock(order: number): FlowDiagramBlock {
+  const start = newStableId("n");
+  const process = newStableId("n");
+  return {
+    id: newStableId("b"),
+    type: "flow-diagram",
+    order,
+    collapsed: false,
+    nodes: [
+      { id: start, shape: "start-end", text: "시작", position: { x: 40, y: 40 } },
+      { id: process, shape: "process", text: "판단", position: { x: 40, y: 120 } },
+    ],
+    edges: [{ id: newStableId("e"), source: start, target: process }],
   };
 }
 

@@ -155,4 +155,23 @@ describe("memo core", () => {
     const loaded = normalizeLoadedProject(JSON.parse(JSON.stringify(blankProject)));
     expect(loaded.objects.filter(isMemoObject)).toEqual([]);
   });
+
+  it("restores a flow diagram after save/load and does not treat it as executable", () => {
+    let project = applyAll([{ type: "addMemo" }]);
+    const memoId = memoOf(project).id;
+    const calcBefore = project.objects.find(isCalculationObject)!;
+    project = applyWorkspaceEdit(project, { type: "addMemoBlock", objectId: memoId, blockType: "flow-diagram" }, FALLBACK_QUANTITIES).project;
+    const flow = memoOf(project).blocks.find((item) => item.type === "flow-diagram");
+    if (!flow || flow.type !== "flow-diagram") throw new Error("flow");
+    expect(flow.nodes).toHaveLength(2);
+    expect(flow.edges).toHaveLength(1);
+    const loaded = applyWorkspaceEdit(blankProject, { type: "loadProject", project: JSON.parse(JSON.stringify(project)) }, FALLBACK_QUANTITIES).project;
+    const restored = loaded.objects.filter(isMemoObject)[0]!.blocks.find((item) => item.type === "flow-diagram");
+    if (!restored || restored.type !== "flow-diagram") throw new Error("flow");
+    expect(restored.nodes.map((item) => item.id)).toEqual(flow.nodes.map((item) => item.id));
+    expect(restored.edges.map((item) => item.id)).toEqual(flow.edges.map((item) => item.id));
+    expect(restored.nodes.map((item) => item.position)).toEqual(flow.nodes.map((item) => item.position));
+    const calcAfter = loaded.objects.find(isCalculationObject)!;
+    expect(calcAfter.outputs.map((item) => item.value)).toEqual(calcBefore.outputs.map((item) => item.value));
+  });
 });

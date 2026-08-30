@@ -378,7 +378,44 @@ class TableBlock(BaseModel):
     rows: list[TableRow] = Field(default_factory=list)
 
 
-MemoBlock = Annotated[Union[TextBlock, StatusBlock, TableBlock, ObjectLinkBlock], Field(discriminator="type")]
+class FlowNode(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str
+    shape: Literal["process", "decision", "start-end", "note"]
+    text: str = ""
+    position: Position
+
+
+class FlowEdge(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str
+    source: str
+    target: str
+    label: str | None = None
+
+
+class FlowViewport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    x: float = 0
+    y: float = 0
+    zoom: float = 1
+
+
+class FlowDiagramBlock(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    type: Literal["flow-diagram"]
+    id: str
+    order: int = 0
+    collapsed: bool = False
+    nodes: list[FlowNode] = Field(default_factory=list)
+    edges: list[FlowEdge] = Field(default_factory=list)
+    viewport: FlowViewport | None = None
+
+
+MemoBlock = Annotated[
+    Union[TextBlock, StatusBlock, TableBlock, FlowDiagramBlock, ObjectLinkBlock],
+    Field(discriminator="type"),
+]
 
 
 class MemoObject(BaseModel):
@@ -624,6 +661,13 @@ class ProjectDocument(BaseModel):
                     for link_id in block.linkIds:
                         if link_id not in link_ids:
                             raise ValueError(f"UNKNOWN_OBJECT_LINK_REF: {link_id}")
+                if block.type == "flow-diagram":
+                    node_ids = {node.id for node in block.nodes}
+                    if len(node_ids) != len(block.nodes):
+                        raise ValueError(f"DUPLICATE_FLOW_NODE_ID: {memo.id}")
+                    for edge in block.edges:
+                        if edge.source not in node_ids or edge.target not in node_ids:
+                            raise ValueError(f"UNKNOWN_FLOW_ENDPOINT: {edge.id}")
 
 
 
