@@ -33,6 +33,15 @@ export function MemoObjectNode({ id, selected, data }: NodeProps<MemoObjectNodeT
     }
   }, [selected]);
 
+  useEffect(() => {
+    if (!editing) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setEditing(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [editing]);
+
   useLayoutEffect(() => {
     updateNodeInternals(id);
   }, [id, side, object.size.width, object.size.height, updateNodeInternals]);
@@ -42,6 +51,9 @@ export function MemoObjectNode({ id, selected, data }: NodeProps<MemoObjectNodeT
       className={`memo-node ws-node ${selected ? "is-selected" : ""} ${editing ? "is-editing" : ""}`}
       data-testid={`object-${id}`}
       style={{ width: object.size.width, height: object.size.height }}
+      onKeyDownCapture={(event) => {
+        if (editing) event.stopPropagation();
+      }}
       onDoubleClick={(event) => {
         event.stopPropagation();
         setEditing(true);
