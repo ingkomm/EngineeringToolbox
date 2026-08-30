@@ -35,6 +35,47 @@ export function IsoSymbolSidebar({
           Create
         </button>
       </header>
+      <div className="iso-sidebar__groups">
+        {library.map((item) => (
+          <div key={item.id} className={`iso-sidebar__row ${editingId === item.id ? "is-editing" : ""}`}>
+            <button
+              type="button"
+              className="iso-sidebar__tile"
+              title={item.name}
+              data-testid={item.kind === "point" ? "btn-add-point" : `btn-add-equipment-${item.id}`}
+              onClick={() =>
+                onEdit(item.kind === "point" ? { type: "addPoint" } : { type: "addEquipment", symbolId: item.id })
+              }
+            >
+              <span className="iso-sidebar__icon">{renderLibrarySymbol(item)}</span>
+              <span className="iso-sidebar__name">{item.name}</span>
+            </button>
+            <div className="iso-sidebar__actions">
+              {item.kind === "equipment" ? (
+                <button
+                  type="button"
+                  className="ghost-btn"
+                  data-testid={`btn-edit-symbol-${item.id}`}
+                  onClick={() => setEditingId(item.id === editingId ? null : item.id)}
+                >
+                  편집
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="ghost-btn ghost-btn--danger"
+                data-testid={`btn-delete-symbol-${item.id}`}
+                onClick={() => {
+                  if (editingId === item.id) setEditingId(null);
+                  onEdit({ type: "deleteLibrarySymbol", symbolId: item.id });
+                }}
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
       {editing ? (
         <SymbolEditor
           symbolId={editing.id}
@@ -44,44 +85,7 @@ export function IsoSymbolSidebar({
           onChange={(drawing) => onEdit({ type: "updateLibrarySymbol", symbolId: editing.id, patch: { drawing } })}
           onClose={() => setEditingId(null)}
         />
-      ) : (
-        <div className="iso-sidebar__groups">
-          {library.map((item) => (
-            <div key={item.id} className="iso-sidebar__row">
-              <button
-                type="button"
-                className="iso-sidebar__tile"
-                title={item.name}
-                data-testid={item.kind === "point" ? "btn-add-point" : `btn-add-equipment-${item.id}`}
-                onClick={() =>
-                  onEdit(item.kind === "point" ? { type: "addPoint" } : { type: "addEquipment", symbolId: item.id })
-                }
-              >
-                <span className="iso-sidebar__icon">{renderLibrarySymbol(item)}</span>
-                <span className="iso-sidebar__name">{item.name}</span>
-              </button>
-              <div className="iso-sidebar__actions">
-                {item.kind === "equipment" ? (
-                  <button type="button" className="ghost-btn" data-testid={`btn-edit-symbol-${item.id}`} onClick={() => setEditingId(item.id)}>
-                    편집
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  className="ghost-btn ghost-btn--danger"
-                  data-testid={`btn-delete-symbol-${item.id}`}
-                  onClick={() => {
-                    if (editingId === item.id) setEditingId(null);
-                    onEdit({ type: "deleteLibrarySymbol", symbolId: item.id });
-                  }}
-                >
-                  삭제
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      ) : null}
     </aside>
   );
 }

@@ -258,7 +258,7 @@ function nextPrefixedObjectId(project: ProjectDocument, prefix: string): string 
 function nextLayoutPosition(project: ProjectDocument): { x: number; y: number } {
   const layouts = project.objects.filter(isLayoutObject);
   const index = layouts.length;
-  return { x: 80 + (index % 4) * 200, y: 420 + Math.floor(index / 4) * 150 };
+  return { x: 520 + (index % 4) * 140, y: 88 + Math.floor(index / 4) * 140 };
 }
 
 function rewriteIdentifier(formula: string, fromId: string, toId: string): string {

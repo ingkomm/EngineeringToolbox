@@ -1779,6 +1779,8 @@ label.ghost-btn {
 .iso-sidebar__groups {
   overflow: auto;
   padding: 8px;
+  flex: 0 1 auto;
+  max-height: 42%;
 }
 
 .iso-sidebar__group {
@@ -1826,11 +1828,8 @@ label.ghost-btn {
   color: var(--text);
 }
 
-.iso-sidebar__row {
-  display: flex;
-  gap: 6px;
-  align-items: stretch;
-  margin-bottom: 6px;
+.iso-sidebar__row.is-editing .iso-sidebar__tile {
+  border-color: var(--accent);
 }
 
 .iso-sidebar__row .iso-sidebar__tile {
