@@ -33,11 +33,11 @@ export function PointObjectNode({ id, selected, data }: NodeProps<PointObjectNod
   const [inspect, setInspect] = useState(false);
   const connecting = useConnection();
   const connectingFrom = connecting.fromHandle?.id;
+  const fromThis = connecting.inProgress && connecting.fromNode?.id === id;
+  const hot = Boolean(selected || hovered || fromThis);
   const pipeConnectable =
     !connecting.inProgress ||
     (!isMemoAttachmentHandle(connectingFrom) && !isObjectLinkHandle(connectingFrom));
-  const fromThis = connecting.inProgress && connecting.fromNode?.id === id;
-  const hot = Boolean(selected || hovered || fromThis);
   const updateNodeInternals = useUpdateNodeInternals();
 
   useLayoutEffect(() => {

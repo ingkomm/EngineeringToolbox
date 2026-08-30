@@ -29,11 +29,11 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
   const [inspect, setInspect] = useState(false);
   const connection = useConnection();
   const connecting = connection.inProgress;
+  const fromThis = connecting && connection.fromNode?.id === id;
+  const showPorts = Boolean(selected || hovered || fromThis);
   const pipeConnectable =
     !connecting ||
     (!isMemoAttachmentHandle(connection.fromHandle?.id) && !isObjectLinkHandle(connection.fromHandle?.id));
-  const fromThis = connecting && connection.fromNode?.id === id;
-  const showPorts = Boolean(selected || hovered || fromThis);
   const updateNodeInternals = useUpdateNodeInternals();
   const handleSignature = `${object.inCount}:${object.outCount}:${objectLinkSideOf(object)}:${memoLinkSideOf(object)}:${bounds.rotation}:${bounds.width}x${bounds.height}:${object.drawing?.primitives.length ?? 0}:${object.drawing?.ports?.map((item) => `${item.id}:${item.x}:${item.y}`).join(",") ?? ""}`;
 

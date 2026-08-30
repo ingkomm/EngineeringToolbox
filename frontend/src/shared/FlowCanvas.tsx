@@ -290,7 +290,7 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
       defaultEdgeOptions={defaultEdgeOptions}
       connectionLineType={ConnectionLineType.SmoothStep}
       connectionMode={ConnectionMode.Loose}
-      connectionRadius={4}
+      connectionRadius={isMemoAttachmentHandle(connectingHandleId) ? 20 : 6}
       className={
         isMemoAttachmentHandle(connectingHandleId)
           ? "rf-connecting-memo"
