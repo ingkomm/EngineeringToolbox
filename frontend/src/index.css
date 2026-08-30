@@ -2382,10 +2382,11 @@ label.ghost-btn {
 }
 
 .memo-attach-cluster .memo-attach {
-  position: absolute !important;
-  inset: 0;
+  position: relative !important;
   top: auto !important;
+  right: auto !important;
   left: auto !important;
+  bottom: auto !important;
   transform: none !important;
 }
 
@@ -2398,7 +2399,28 @@ label.ghost-btn {
 }
 
 .memo-attach--target {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
   opacity: 0;
+}
+
+.react-flow__node-memoObject .react-flow__resize-control.handle.right:not(.top):not(.bottom),
+.react-flow__node-memoObject .react-flow__resize-control.line.right {
+  display: none;
+}
+
+.memo-md {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: var(--input);
+}
+
+.memo-node__table-wrap {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: auto;
 }
 
 .memo-attach-side {
