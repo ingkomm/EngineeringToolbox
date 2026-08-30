@@ -22,9 +22,11 @@ function parentFolder(path: string): string {
 export function IsoSymbolSidebar({
   project,
   onEdit,
+  onCollapse,
 }: {
   project: ProjectDocument;
   onEdit: (edit: WorkspaceEdit) => void;
+  onCollapse?: () => void;
 }) {
   const library = libraryOf(project);
   const folders = libraryFolders(library, project.symbolCategories);
@@ -39,8 +41,15 @@ export function IsoSymbolSidebar({
   return (
     <aside className="iso-sidebar" data-testid="iso-sidebar">
       <header className="iso-sidebar__head">
-        <p className="iso-sidebar__kicker">Library</p>
-        <h2>심볼</h2>
+        <div className="iso-sidebar__title">
+          <p className="iso-sidebar__kicker">Library</p>
+          <h2>심볼</h2>
+        </div>
+        {onCollapse ? (
+          <button type="button" className="ghost-btn iso-sidebar__collapse" data-testid="btn-collapse-library" title="라이브러리 접기" onClick={onCollapse}>
+            접기
+          </button>
+        ) : null}
         <button
           type="button"
           className="ghost-btn"

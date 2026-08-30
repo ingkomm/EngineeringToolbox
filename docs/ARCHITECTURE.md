@@ -286,6 +286,8 @@ Object A의 PIN/POUT만 바꾸면 Object A와 B가 갱신된다. 매핑되지 �
 | testid | 위치 | 동작 |
 |---|---|---|
 | `btn-new-worksheet` | 상단 바 | `newWorkspace` |
+| `btn-toggle-library` | 상단 바 | 왼쪽 라이브러리 패널 접기/펼치기 |
+| `btn-toggle-worksheet` | 상단 바 | 오른쪽 안내 패널 접기/펼치기 |
 | `btn-evaluate` | 상단 바 | `POST /api/v1/evaluate` |
 | `btn-add-calculation` | 왼쪽 Library SYSTEM | `addObject` (Calculation 생성) |
 | `iso-sidebar` | 왼쪽 심볼 라이브러리 | SYSTEM(Calculation, Memo) / ARRANGEMENT SYMBOLS(Point, Pump, Valve, Vessel, 사용자 심볼) |

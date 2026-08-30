@@ -12,6 +12,20 @@ import { isEquipmentObject, isPointObject } from "./shared/worksheet";
 import { isMemoObject } from "./memo/memo";
 import { mergeCalculationResults } from "./calculation/evalMerge";
 
+const LEFT_PANEL_KEY = "et.panel.left";
+const RIGHT_PANEL_KEY = "et.panel.right";
+
+function readPanelOpen(key: string): boolean {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === "0") return false;
+    if (raw === "1") return true;
+  } catch {
+    /* ignore */
+  }
+  return typeof window === "undefined" || window.innerWidth >= 1400;
+}
+
 export function App() {
   const [project, setProject] = useState<ProjectDocument>(blankProject);
   const [quantities, setQuantities] = useState<QuantitySpec[]>(FALLBACK_QUANTITIES);
@@ -19,6 +33,8 @@ export function App() {
   const [evaluated, setEvaluated] = useState<string[]>([]);
   const [backendUp, setBackendUp] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
+  const [leftOpen, setLeftOpen] = useState(() => readPanelOpen(LEFT_PANEL_KEY));
+  const [rightOpen, setRightOpen] = useState(() => readPanelOpen(RIGHT_PANEL_KEY));
   const [message, setMessage] = useState("변수와 수식을 직접 정의하세요");
   const pastRef = useRef<ProjectDocument[]>([]);
   const futureRef = useRef<ProjectDocument[]>([]);
@@ -28,6 +44,30 @@ export function App() {
   const requestSeq = useRef(0);
   const evalEpochRef = useRef(0);
   projectRef.current = project;
+
+  const toggleLeft = useCallback(() => {
+    setLeftOpen((open) => {
+      const next = !open;
+      try {
+        localStorage.setItem(LEFT_PANEL_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleRight = useCallback(() => {
+    setRightOpen((open) => {
+      const next = !open;
+      try {
+        localStorage.setItem(RIGHT_PANEL_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
 
   const invalidateEval = useCallback(() => {
     evalEpochRef.current += 1;
@@ -259,6 +299,24 @@ export function App() {
           <h1>Calculation Object Canvas</h1>
         </div>
         <div className="topbar__meta">
+          <button
+            className={`ghost-btn ${leftOpen ? "ghost-btn--on" : ""}`}
+            type="button"
+            data-testid="btn-toggle-library"
+            title={leftOpen ? "라이브러리 접기" : "라이브러리 펼치기"}
+            onClick={toggleLeft}
+          >
+            라이브러리
+          </button>
+          <button
+            className={`ghost-btn ${rightOpen ? "ghost-btn--on" : ""}`}
+            type="button"
+            data-testid="btn-toggle-worksheet"
+            title={rightOpen ? "워크시트 접기" : "워크시트 펼치기"}
+            onClick={toggleRight}
+          >
+            안내
+          </button>
           <span
             className={`pill ${backendUp ? "pill--ok" : backendUp === false ? "pill--bad" : ""}`}
             data-testid="api-status"
@@ -302,8 +360,22 @@ export function App() {
         </div>
       </header>
 
-      <main className="workspace">
-        <IsoSymbolSidebar project={project} onEdit={onEdit} />
+      <main
+        className={`workspace ${leftOpen ? "" : "is-left-collapsed"} ${rightOpen ? "" : "is-right-collapsed"}`}
+      >
+        {leftOpen ? (
+          <IsoSymbolSidebar project={project} onEdit={onEdit} onCollapse={toggleLeft} />
+        ) : (
+          <button
+            type="button"
+            className="dock-rail dock-rail--left"
+            data-testid="btn-expand-library"
+            title="라이브러리 펼치기"
+            onClick={toggleLeft}
+          >
+            <span>라이브러리</span>
+          </button>
+        )}
         <section className="canvas-pane">
           <ReactFlowProvider>
             <FlowCanvas
@@ -316,60 +388,82 @@ export function App() {
             />
           </ReactFlowProvider>
         </section>
-        <aside className="side-pane">
-          <section>
-            <h2>워크시트</h2>
-            <p className="side-pane__hint">
-              Calculation과 Memo는 SYSTEM 고정 항목입니다. Point는 Arrangement Symbols에 두고
-              Pump/Valve/Vessel·사용자 SVG와 같이 배치합니다. 라이브러리 심볼은 편집·삭제할 수 있습니다.
-              Equipment와 Point는 P&ID 도면 심볼이며 계산하지 않습니다. Calc Input은 하늘색, Calc Output은
-              초록색, Arrangement Point는 노란색입니다. Pipe/Signal은 값 연동(value flow)과 섞이지 않습니다.
-            </p>
-            <button
-              className="ghost-btn"
-              type="button"
-              data-testid="btn-load-example"
-              onClick={() => onEdit({ type: "loadExample" })}
-            >
-              참고 예제 열기
-            </button>
-          </section>
-          <section>
-            <h2>SI 표준 물성</h2>
-            <ul className="qty-list">
-              {quantities.map((item) => (
-                <li key={item.id}>
-                  <strong>{item.nameKo}</strong>
-                  <span>
-                    {item.siUnit}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-          <details className="dev-panel">
-            <summary>Developer</summary>
+        {rightOpen ? (
+          <aside className="side-pane">
+            <header className="side-pane__head">
+              <h2>워크시트</h2>
+              <button
+                type="button"
+                className="ghost-btn"
+                data-testid="btn-collapse-worksheet"
+                title="워크시트 접기"
+                onClick={toggleRight}
+              >
+                접기
+              </button>
+            </header>
             <section>
-              <h2>Mapping JSON</h2>
-              <pre data-testid="mapping-json">{mappingJson}</pre>
+              <p className="side-pane__hint">
+                Calculation과 Memo는 SYSTEM 고정 항목입니다. Point는 Arrangement Symbols에 두고
+                Pump/Valve/Vessel·사용자 SVG와 같이 배치합니다. 라이브러리 심볼은 편집·삭제할 수 있습니다.
+                Equipment와 Point는 P&ID 도면 심볼이며 계산하지 않습니다. Calc Input은 하늘색, Calc Output은
+                초록색, Arrangement Point는 노란색입니다. Pipe/Signal은 값 연동(value flow)과 섞이지 않습니다.
+                입력값은 선택한 SI 단위 기준입니다.
+              </p>
+              <button
+                className="ghost-btn"
+                type="button"
+                data-testid="btn-load-example"
+                onClick={() => onEdit({ type: "loadExample" })}
+              >
+                참고 예제 열기
+              </button>
             </section>
             <section>
-              <h2>마지막 계산</h2>
-              <p>대상: {evaluated.length ? evaluated.join(", ") : "—"}</p>
-              {errors.length === 0 ? (
-                <p className="ok-text">오류 없음</p>
-              ) : (
-                <ul className="error-list">
-                  {errors.map((error, index) => (
-                    <li key={`${error.code}-${index}`}>
-                      <strong>{error.code}</strong> {error.objectId}/{error.variableId}: {error.message}
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <h2>SI 표준 물성</h2>
+              <ul className="qty-list">
+                {quantities.map((item) => (
+                  <li key={item.id}>
+                    <strong>{item.nameKo}</strong>
+                    <span>{item.siUnit}</span>
+                  </li>
+                ))}
+              </ul>
             </section>
-          </details>
-        </aside>
+            <details className="dev-panel">
+              <summary>Developer</summary>
+              <section>
+                <h2>Mapping JSON</h2>
+                <pre data-testid="mapping-json">{mappingJson}</pre>
+              </section>
+              <section>
+                <h2>마지막 계산</h2>
+                <p>대상: {evaluated.length ? evaluated.join(", ") : "—"}</p>
+                {errors.length === 0 ? (
+                  <p className="ok-text">오류 없음</p>
+                ) : (
+                  <ul className="error-list">
+                    {errors.map((error, index) => (
+                      <li key={`${error.code}-${index}`}>
+                        <strong>{error.code}</strong> {error.objectId}/{error.variableId}: {error.message}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </details>
+          </aside>
+        ) : (
+          <button
+            type="button"
+            className="dock-rail dock-rail--right"
+            data-testid="btn-expand-worksheet"
+            title="워크시트 펼치기"
+            onClick={toggleRight}
+          >
+            <span>워크시트</span>
+          </button>
+        )}
       </main>
     </div>
   );
