@@ -812,14 +812,22 @@ label.ghost-btn {
   top: 50% !important;
 }
 
-.calc-handle--in {
-  background: #38bdf8;
+.calc-handle--in,
+.react-flow__handle[data-port-category="calc-input"] {
+  background: #38bdf8 !important;
   left: -12px !important;
 }
 
-.calc-handle--out {
-  background: var(--accent);
+.calc-handle--out,
+.react-flow__handle[data-port-category="calc-output"] {
+  background: var(--accent) !important;
   right: -12px !important;
+}
+
+.react-flow__handle.calc-handle--rail[data-port-category="calc-input"],
+.react-flow__handle.calc-handle--rail[data-port-category="calc-output"] {
+  left: auto !important;
+  right: auto !important;
 }
 
 .calc-handle--link {
