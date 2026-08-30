@@ -444,6 +444,7 @@ class LibrarySymbol(BaseModel):
 class ProjectDocument(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    schemaVersion: Literal["0.1"] | None = None
     id: str
     name: str
     objects: list[CalculationObject | EquipmentObject | PointObject | MemoObject] = Field(default_factory=list)

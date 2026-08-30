@@ -76,7 +76,7 @@ describe("simple memo", () => {
   });
 
   it("stores a visual link without creating a value-flow edge", () => {
-    let project = applyAll([{ type: "addMemo" }]);
+    let project = applyAll([{ type: "addObject" }, { type: "addMemo" }]);
     const calcId = project.objects.find(isCalculationObject)!.id;
     const memoId = memoOf(project).id;
     project = applyWorkspaceEdit(project, { type: "connectMemoLink", memoId, targetObjectId: calcId }, FALLBACK_QUANTITIES).project;

@@ -67,6 +67,16 @@ export function rekeyObject(project: ProjectDocument, fromId: string, toId: stri
           })),
         };
       }
+      if (isMemoObject(next)) {
+        next = {
+          ...next,
+          links: next.links.map((link) => ({
+            ...link,
+            memoId: link.memoId === fromId ? toId : link.memoId,
+            targetObjectId: link.targetObjectId === fromId ? toId : link.targetObjectId,
+          })),
+        };
+      }
       return next;
     }),
     edges: project.edges.map((edge) => ({

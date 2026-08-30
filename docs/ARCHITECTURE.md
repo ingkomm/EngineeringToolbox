@@ -1,8 +1,10 @@
 # Engineering Toolbox Prototype — Architecture
 
-이 문서는 첫 프로토타입의 Data Model, Variable Model, Node/Port/Edge Model, Python Calculation Interface를 정의한다.
+이 문서는 v0.1의 Data Model, Variable Model, Node/Port/Edge Model, Python Calculation Interface를 정의한다.
 
 구현은 이 계약을 따른다. Architectural boundary는 사용자 승인 없이 변경하지 않는다.
+
+워크시트 객체는 **Calculation**, **Memo**, **Arrangement**(Equipment / Point)다. Point는 SYSTEM이 아니라 Arrangement Symbols에서 추가한다. Calculation 카드는 항상 펼친 상태다.
 
 ## 1. Architectural Boundaries
 
@@ -40,9 +42,9 @@ Variable ID는 셀 주소(`A1`, `B2`)가 아니라 의미 기반 식별자다.
 - 커넥터 `enabled`(On/Off)로 연동을 끊거나 다시 이을 수 있다. Off면 대상 Input은 새로운 로컬 ID를 받는다.
 - 커넥터 `collapsed`로 긴 선을 접는다. 접힌 상태에서는 캔버스 선/칩을 그리지 않고 포트 옆 **링크** 버튼만 남긴다. 다시 누르면 전체 선을 그린다.
 - 커넥터 검색으로 다른 Object를 ID/이름으로 찾아 연결할 수 있다. 검색 결과는 기존 연결 상태(`연결됨` / `사용 중`)를 보여주고, 현재 포트의 링크는 **끊기**로 해제한다.
-- Input과 Calculation 행은 사용자가 임의로 추가/삭제/편집한다. 기본 워크시트는 비어 있다.
+- Input과 Calculation 행은 사용자가 임의로 추가/삭제/편집한다. 기본 워크시트는 비어 있다. Calculation은 Library SYSTEM에서 추가한다.
 
-각 변수는 SI 표준 물성(`quantity`)과 그에 따른 SI 단위(`unit`)를 가질 수 있다. 카탈로그는 Python이 소유한다 (`GET /api/v1/quantities`).
+각 변수는 SI 표준 물성(`quantity`)과 그에 따른 SI 단위(`unit`)를 가질 수 있다. 카탈로그는 Python이 소유한다 (`GET /api/v1/quantities`). **입력값은 선택한 SI 단위 기준**이다. v0.1에는 단위 변환 시스템이 없다.
 
 | quantity | 한글 | SI unit |
 |---|---|---|
@@ -107,6 +109,7 @@ sourceObjectId.outputs[sourceVariableId]
 
 ```json
 {
+  "schemaVersion": "0.1",
   "id": "prototype-1",
   "name": "FLOW-POWER Prototype",
   "objects": [
@@ -115,9 +118,9 @@ sourceObjectId.outputs[sourceVariableId]
       "name": "Object A",
       "position": { "x": 80, "y": 120 },
       "inputs": [
-        { "id": "FLOW", "value": 120, "unit": null },
-        { "id": "PIN", "value": 12, "unit": null },
-        { "id": "POUT", "value": 15, "unit": null }
+        { "id": "FLOW", "value": 120, "quantity": "volume_flow" },
+        { "id": "PIN", "value": 12, "quantity": "pressure" },
+        { "id": "POUT", "value": 15, "quantity": "pressure" }
       ],
       "calculations": [
         { "id": "DP", "formula": "POUT - PIN" },
@@ -140,7 +143,9 @@ sourceObjectId.outputs[sourceVariableId]
 }
 ```
 
-평가 후 각 변수에 `value`, `status`, `error`가 채워져 돌아온다. 프론트엔드는 이 값을 표시만 한다.
+평가 후 각 변수에 `value`, `status`, `error`가 채워져 돌아온다. 프론트엔드는 이 값을 표시만 한다. 비동기 evaluate 응답은 최신 워크시트에 Calculation 결과만 ID 기준으로 병합한다. Memo·Arrangement·위치 변경과 Undo/Redo·새 워크시트·Import 이후의 이전 응답은 덮어쓰지 않는다.
+
+`schemaVersion`이 없는 기존 JSON도 로드한다. Import 시 `id`/`name`/`objects`/`edges`와 객체 `id`, edge 참조 필드를 검사한다.
 
 ## 5. Formula Language (Python only)
 
@@ -283,8 +288,8 @@ Object A의 PIN/POUT만 바꾸면 Object A와 B가 갱신된다. 매핑되지 �
 | `btn-new-worksheet` | 상단 바 | `newWorkspace` |
 | `btn-evaluate` | 상단 바 | `POST /api/v1/evaluate` |
 | `btn-add-calculation` | 왼쪽 Library SYSTEM | `addObject` (Calculation 생성) |
-| `iso-sidebar` | 왼쪽 심볼 라이브러리 | SYSTEM(Point, Calculation) / ARRANGEMENT(Pump, Valve, Vessel, 사용자 심볼) |
-| `library-system` | 왼쪽 라이브러리 상단 | Point·Calculation 고정 항목. 편집·삭제 없음 |
+| `iso-sidebar` | 왼쪽 심볼 라이브러리 | SYSTEM(Calculation, Memo) / ARRANGEMENT SYMBOLS(Point, Pump, Valve, Vessel, 사용자 심볼) |
+| `library-system` | 왼쪽 라이브러리 상단 | Calculation·Memo 고정 항목. 편집·삭제 없음 |
 | `btn-create-symbol` | 왼쪽 라이브러리 | 빈 Equipment 심볼 추가 후 편집기 열기 |
 | `btn-add-equipment-{symbolId}` | 왼쪽 라이브러리 | 해당 심볼 Equipment를 캔버스에 추가 |
 | `btn-add-point` | 왼쪽 라이브러리 | Point 추가 |
@@ -296,7 +301,6 @@ Object A의 PIN/POUT만 바꾸면 Object A와 B가 갱신된다. 매핑되지 �
 | `btn-load-example` | 우측 사이드바 | `loadExample` |
 | `object-{id}-id` | Node 헤더 | Object ID, blur로 commit. 전역 유일. 기본 숨김, hover/선택 시 표시 |
 | `object-{id}-name` | Node 헤더 | Object 이름, blur로 commit. 전역 유일 |
-| `object-{id}-expand` | Calculation 헤더 | compact/expanded 토글. 클릭 선택만으로는 펼치지 않음 |
 | `object-{id}-add-input` | Node Input 헤더 | `addInput` |
 | `object-{id}-add-calc` | Node Calculation 헤더 | `addCalculation` |
 | `object-{id}-add-output` | Node Output 헤더 | `addOutput` |
@@ -321,7 +325,7 @@ Object A의 PIN/POUT만 바꾸면 Object A와 B가 갱신된다. 매핑되지 �
 
 첫 Input 추가 시 Variable ID는 `IN_1`이다. ID를 `FLOW`로 바꾼 뒤에 testid가 `object-obj_1-input-FLOW-*`로 바뀐다.
 
-캔버스 기본 표시는 이름·심볼·연결선·주요 값이다. Object ID, 포트명, 방향, 링크 On/Off, 편집/삭제 컨트롤은 hover 또는 선택 시에만 보인다. Calculation Object는 compact가 기본이며, 노드를 선택하거나 `object-{id}-expand`를 눌러야 Input / Calculation / Output / Link 섹션이 펼쳐진다. Equipment / Point / Calculation의 header·border·타이포·포트(10px)는 같은 `--ws-*` 토큰을 쓴다.
+캔버스 기본 표시는 이름·심볼·연결선·주요 값이다. Object ID, 포트명, 방향, 링크 On/Off, 편집/삭제 컨트롤은 hover 또는 선택 시에만 보인다. Calculation Object는 항상 펼친 상태이며 좌우로 폭을 조절하고 `width`로 저장한다. Equipment / Point / Calculation의 header·border·타이포·포트(10px)는 같은 `--ws-*` 토큰을 쓴다.
 
 Arrangement:
 
@@ -338,11 +342,11 @@ Arrangement:
 
 Equipment와 Point는 Calculation Object와 **같은 공용 워크시트**에 놓인다. 별도의 Arrangement 창/노드로 감싸지 않는다. 내부에서 공학 계산을 하지 않는다.
 
-Arrangement 기본 화면은 P&ID 도면이다. Equipment는 SVG 심볼과 Tag만 보이고, Point는 작은 연결점이다. ID/입력창/삭제 버튼은 더블클릭 팝오버나 선택 툴바에 둔다. Calculation Object는 기존 카드 UI를 유지하며, 펼치기 버튼으로만 Input/Calculation/Output/Link를 연다. 펼친 상태에서는 좌우로 폭을 조절할 수 있고 `width`로 저장한다.
+Arrangement 기본 화면은 P&ID 도면이다. Equipment는 SVG 심볼과 Tag만 보이고, Point는 작은 연결점이다. Point는 Arrangement Symbols에서 추가한다. ID/입력창/삭제 버튼은 더블클릭 팝오버나 선택 툴바에 둔다. Calculation Object는 기존 카드 UI를 유지하며 항상 Input / Calculation / Output / Link가 보인다. 좌우로 폭을 조절할 수 있고 `width`로 저장한다.
 
 심볼(Equipment / Point)은 Grid snap이 켜져 있으면 **노드 중심**이 그리드에 붙는다. 저장 좌표는 계속 좌상단이다.
 
-심볼은 프로젝트 `symbolLibrary`에 저장한다. 기본값은 Pump, Valve, Point 세 개다. 사용자는 Create로 빈 심볼을 만들고 왼쪽 편집기에서 직선·원·다각형을 그린 뒤 저장한다. 편집기에서 그리드 선 개수(기본 9×7), In/Out 개수, 포트 점 위치를 정한다. 라이브러리 심볼을 고치면 같은 `symbolId`를 쓰는 캔버스 Equipment도 따라간다.
+심볼은 프로젝트 `symbolLibrary`에 저장한다. 기본 Equipment는 Pump, Valve, Vessel이다. Point는 Arrangement Symbols의 고정 배치 항목이다. 사용자는 Create로 빈 심볼을 만들고 왼쪽 편집기에서 직선·원·다각형을 그린 뒤 저장한다. 편집기에서 그리드 선 개수(기본 9×7), In/Out 개수, 포트 점 위치를 정한다. 라이브러리 심볼을 고치면 같은 `symbolId`를 쓰는 캔버스 Equipment도 따라간다.
 
 선택 필드(`tag`, `rotation`, `width`, `height`, `linkKind`, `showArrow`, `waypoints`)는 없어도 예전 JSON을 로드한다. Pipe/Signal은 `Point.connections`에만 있고, Calculation 값 연결(`value_flow`)과 섞지 않는다.
 

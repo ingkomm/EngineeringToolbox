@@ -16,7 +16,7 @@ def test_user_authored_worksheet_evaluates_through_python() -> None:
                 "name": "Object 1",
                 "position": {"x": 80, "y": 88},
                 "inputs": [
-                    {"id": "FLOW", "value": 120, "quantity": "mass_flow"},
+                    {"id": "FLOW", "value": 120, "quantity": "volume_flow"},
                     {"id": "PIN", "value": 12, "quantity": "pressure"},
                     {"id": "POUT", "value": 15, "quantity": "pressure"},
                 ],
@@ -60,15 +60,15 @@ def test_user_authored_worksheet_evaluates_through_python() -> None:
     mapped = next(item for item in objects["obj_2"]["inputs"] if item["id"] == "POWER")
     result = next(item for item in objects["obj_2"]["calculations"] if item["id"] == "RESULT")
 
-    assert flow["unit"] == "kg/s"
+    assert flow["unit"] == "m3/s"
     assert dp["value"] == 3.0 and dp["quantity"] == "pressure" and dp["unit"] == "Pa"
     assert power["value"] == 360.0
-    assert power["quantity"] is None
-    assert power["unit"] == "kg2/(m·s3)"
+    assert power["quantity"] == "power"
+    assert power["unit"] == "W"
     assert mapped["status"] == "mapped" and mapped["value"] == 360.0
     assert mapped["name"] == "POWER"
-    assert mapped["quantity"] is None
-    assert mapped["unit"] == "kg2/(m·s3)"
+    assert mapped["quantity"] == "power"
+    assert mapped["unit"] == "W"
     assert result["formula"] == "POWER * 2"
     assert result["value"] == 720.0
 

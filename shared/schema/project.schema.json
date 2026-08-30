@@ -7,6 +7,7 @@
   "additionalProperties": false,
   "required": ["id", "name", "objects", "edges"],
   "properties": {
+    "schemaVersion": { "type": "string", "const": "0.1" },
     "id": { "type": "string", "minLength": 1 },
     "name": { "type": "string" },
     "symbolLibrary": {

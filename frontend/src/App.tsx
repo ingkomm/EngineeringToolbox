@@ -7,9 +7,10 @@ import { IsoSymbolSidebar } from "./arrangement/IsoSymbolSidebar";
 import { blankProject } from "./example/blankProject";
 import { FALLBACK_QUANTITIES, type QuantitySpec } from "./shared/quantities";
 import { applyWorkspaceEdit, type WorkspaceEdit } from "./shared/projectEdits";
-import type { EvalError, ProjectDocument } from "./types/contract";
+import { invalidProjectImportReason, type EvalError, type ProjectDocument } from "./types/contract";
 import { isEquipmentObject, isPointObject } from "./shared/worksheet";
 import { isMemoObject } from "./memo/memo";
+import { mergeCalculationResults } from "./calculation/evalMerge";
 
 export function App() {
   const [project, setProject] = useState<ProjectDocument>(blankProject);
@@ -25,9 +26,15 @@ export function App() {
   const busyTimerRef = useRef<number | null>(null);
   const projectRef = useRef(project);
   const requestSeq = useRef(0);
+  const evalEpochRef = useRef(0);
   projectRef.current = project;
 
+  const invalidateEval = useCallback(() => {
+    evalEpochRef.current += 1;
+  }, []);
+
   const runEvaluate = useCallback(async (next: ProjectDocument, dirtyObjectIds?: string[]) => {
+    const epoch = evalEpochRef.current;
     const seq = ++requestSeq.current;
     if (busyTimerRef.current) window.clearTimeout(busyTimerRef.current);
     busyTimerRef.current = window.setTimeout(() => {
@@ -35,8 +42,8 @@ export function App() {
     }, 280);
     try {
       const result = await evaluateProject(next, dirtyObjectIds);
-      if (seq !== requestSeq.current) return;
-      setProject(result.project);
+      if (seq !== requestSeq.current || epoch !== evalEpochRef.current) return;
+      setProject(mergeCalculationResults(projectRef.current, result.project));
       setErrors(result.errors);
       setEvaluated(result.evaluatedObjectIds);
       setBackendUp(true);
@@ -48,7 +55,7 @@ export function App() {
             : "계산할 수식이 없습니다",
       );
     } catch (error) {
-      if (seq !== requestSeq.current) return;
+      if (seq !== requestSeq.current || epoch !== evalEpochRef.current) return;
       setBackendUp(false);
       setMessage(error instanceof Error ? error.message : "Evaluate request failed");
     } finally {
@@ -103,6 +110,9 @@ export function App() {
 
   const onEdit = useCallback(
     (edit: WorkspaceEdit) => {
+      if (edit.type === "newWorkspace" || edit.type === "loadProject" || edit.type === "loadExample") {
+        invalidateEval();
+      }
       const previous = projectRef.current;
       const result = applyWorkspaceEdit(previous, edit, quantities);
       if (result.project !== previous) remember(previous);
@@ -115,7 +125,7 @@ export function App() {
         setEvaluated([]);
       }
     },
-    [quantities, remember, scheduleEvaluate],
+    [invalidateEval, quantities, remember, scheduleEvaluate],
   );
 
   const onProjectChange = useCallback(
@@ -129,16 +139,18 @@ export function App() {
   const onUndo = useCallback(() => {
     const previous = pastRef.current.pop();
     if (!previous) return;
+    invalidateEval();
     futureRef.current.push(projectRef.current);
     setProject(previous);
-  }, []);
+  }, [invalidateEval]);
 
   const onRedo = useCallback(() => {
     const next = futureRef.current.pop();
     if (!next) return;
+    invalidateEval();
     pastRef.current.push(projectRef.current);
     setProject(next);
-  }, []);
+  }, [invalidateEval]);
 
   const mappingJson = useMemo(
     () =>
@@ -224,12 +236,13 @@ export function App() {
     (file: File) => {
       void file.text().then((text) => {
         try {
-          const parsed = JSON.parse(text) as ProjectDocument;
-          if (!parsed || !Array.isArray(parsed.objects) || !Array.isArray(parsed.edges)) {
-            setMessage("가져오기 실패: 프로젝트 JSON이 아닙니다");
+          const parsed = JSON.parse(text) as unknown;
+          const reason = invalidProjectImportReason(parsed);
+          if (reason) {
+            setMessage(reason);
             return;
           }
-          onEdit({ type: "loadProject", project: parsed });
+          onEdit({ type: "loadProject", project: parsed as ProjectDocument });
         } catch {
           setMessage("가져오기 실패: JSON을 읽을 수 없습니다");
         }

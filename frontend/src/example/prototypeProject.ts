@@ -1,16 +1,18 @@
 import type { ProjectDocument } from "../types/contract";
+import { SCHEMA_VERSION } from "../types/contract";
 
 /** Optional reference worksheet. Not loaded as the default workspace. */
 export const prototypeProject: ProjectDocument = {
   id: "prototype-1",
   name: "FLOW-POWER Prototype",
+  schemaVersion: SCHEMA_VERSION,
   objects: [
     {
       id: "obj-a",
       name: "Object A",
       position: { x: 72, y: 96 },
       inputs: [
-        { id: "FLOW", name: "FLOW", value: 120, quantity: "mass_flow" },
+        { id: "FLOW", name: "FLOW", value: 120, quantity: "volume_flow" },
         { id: "PIN", name: "PIN", value: 12, quantity: "pressure" },
         { id: "POUT", name: "POUT", value: 15, quantity: "pressure" },
       ],

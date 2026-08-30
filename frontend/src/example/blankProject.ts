@@ -1,19 +1,12 @@
 import type { ProjectDocument } from "../types/contract";
+import { SCHEMA_VERSION } from "../types/contract";
 import { defaultSymbolLibrary } from "../arrangement/symbols/library";
 
 export const blankProject: ProjectDocument = {
   id: "workspace-1",
   name: "Engineering Workspace",
-  objects: [
-    {
-      id: "obj_1",
-      name: "Object 1",
-      position: { x: 80, y: 88 },
-      inputs: [],
-      calculations: [],
-      outputs: [],
-    },
-  ],
+  schemaVersion: SCHEMA_VERSION,
+  objects: [],
   edges: [],
   symbolLibrary: defaultSymbolLibrary(),
 };

@@ -129,7 +129,7 @@ def test_engine_is_pure_json_roundtrip() -> None:
     result = evaluate_project(project)
     payload = json.loads(result.model_dump_json())
     assert payload["project"]["objects"][0]["calculations"][1]["value"] == 360.0
-    assert payload["project"]["objects"][0]["inputs"][0]["unit"] == "kg/s"
+    assert payload["project"]["objects"][0]["inputs"][0]["unit"] == "m3/s"
 
 
 def test_draft_object_is_idle_not_error() -> None:

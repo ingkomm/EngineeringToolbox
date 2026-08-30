@@ -7,7 +7,7 @@
       "name": "Object A",
       "position": { "x": 72, "y": 96 },
       "inputs": [
-        { "id": "FLOW", "value": 120, "quantity": "mass_flow" },
+        { "id": "FLOW", "value": 120, "quantity": "volume_flow" },
         { "id": "PIN", "value": 12, "quantity": "pressure" },
         { "id": "POUT", "value": 15, "quantity": "pressure" }
       ],

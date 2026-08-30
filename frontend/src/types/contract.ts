@@ -37,3 +37,4 @@ export type {
   EvaluateRequest,
   EvaluateResponse,
 } from "../shared/document";
+export { SCHEMA_VERSION, invalidProjectImportReason } from "../shared/document";

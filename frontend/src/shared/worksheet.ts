@@ -8,6 +8,7 @@ import type {
   ProjectDocument,
   WorksheetObject,
 } from "../types/contract";
+import { SCHEMA_VERSION } from "../types/contract";
 import { defaultSymbolLibrary } from "../arrangement/symbols/library";
 import { isMemoObject, normalizeMemo } from "../memo/memo";
 
@@ -302,6 +303,7 @@ export function normalizeLoadedProject(project: ProjectDocument): ProjectDocumen
   });
   return {
     ...project,
+    schemaVersion: project.schemaVersion ?? SCHEMA_VERSION,
     symbolLibrary: project.symbolLibrary ?? defaultSymbolLibrary(),
     symbolCategories: project.symbolCategories ?? [],
     objects: normalized,

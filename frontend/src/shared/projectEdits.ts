@@ -27,6 +27,7 @@ export { syncObjectOutputs } from "../calculation/edits";
 export type WorkspaceEdit =
   | import("../calculation/edits").CalculationEdit
   | { type: "deleteObject"; objectId: string }
+  | { type: "deleteObjects"; objectIds: string[] }
   | { type: "deleteEdges"; edgeIds: string[] }
   | import("../memo/edits").MemoEdit
   | import("../arrangement/edits").ArrangementEdit
@@ -57,44 +58,10 @@ export function applyWorkspaceEdit(
         dirtyObjectIds: [],
         shouldEvaluate: edit.project.objects.some(isCalculationObject),
       };
-    case "deleteObject": {
-      const removed = project.objects.find((item) => item.id === edit.objectId);
-      return {
-        project: {
-          ...project,
-          objects: project.objects
-            .filter((object) => object.id !== edit.objectId)
-            .map((object) => {
-              if (!isPointObject(object)) return object;
-              return {
-                ...object,
-                connections: object.connections.map((end) =>
-                  end && end.objectId === edit.objectId ? null : end,
-                ),
-              };
-            })
-            .map((object) => {
-              if (isMemoObject(object)) {
-                return { ...object, links: object.links.filter((link) => link.targetObjectId !== edit.objectId) };
-              }
-              if (!isCalculationObject(object)) return object;
-              return {
-                ...object,
-                links: (object.links ?? []).map((link) =>
-                  link.targetObjectId === edit.objectId
-                    ? { ...link, targetObjectId: null, targetPortId: null }
-                    : link,
-                ),
-              };
-            }),
-          edges: project.edges.filter(
-            (edge) => edge.sourceObjectId !== edit.objectId && edge.targetObjectId !== edit.objectId,
-          ),
-        },
-        dirtyObjectIds: [],
-        shouldEvaluate: Boolean(removed && isCalculationObject(removed)),
-      };
-    }
+    case "deleteObject":
+      return deleteWorksheetObjects(project, [edit.objectId]);
+    case "deleteObjects":
+      return deleteWorksheetObjects(project, edit.objectIds);
     case "deleteEdges": {
       const removed = new Set(edit.edgeIds);
       let next = project;
@@ -152,6 +119,47 @@ export function applyWorkspaceEdit(
     case "setObjectLinkSide":
       return setObjectLinkSide(project, edit.objectId, edit.side);
   }
+}
+
+function deleteWorksheetObjects(project: ProjectDocument, objectIds: string[]): EditResult {
+  const removing = new Set(objectIds);
+  if (removing.size === 0) return noEval(project);
+  const removedCalc = project.objects.some((object) => removing.has(object.id) && isCalculationObject(object));
+  if (!project.objects.some((object) => removing.has(object.id))) return noEval(project);
+  return {
+    project: {
+      ...project,
+      objects: project.objects
+        .filter((object) => !removing.has(object.id))
+        .map((object) => {
+          if (isPointObject(object)) {
+            return {
+              ...object,
+              connections: object.connections.map((end) =>
+                end && removing.has(end.objectId) ? null : end,
+              ),
+            };
+          }
+          if (isMemoObject(object)) {
+            return { ...object, links: object.links.filter((link) => !removing.has(link.targetObjectId)) };
+          }
+          if (!isCalculationObject(object)) return object;
+          return {
+            ...object,
+            links: (object.links ?? []).map((link) =>
+              link.targetObjectId && removing.has(link.targetObjectId)
+                ? { ...link, targetObjectId: null, targetPortId: null }
+                : link,
+            ),
+          };
+        }),
+      edges: project.edges.filter(
+        (edge) => !removing.has(edge.sourceObjectId) && !removing.has(edge.targetObjectId),
+      ),
+    },
+    dirtyObjectIds: [],
+    shouldEvaluate: removedCalc,
+  };
 }
 
 function nextAvailableId(used: Set<string>, prefix: string): string {

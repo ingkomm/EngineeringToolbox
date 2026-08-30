@@ -141,7 +141,7 @@ describe("library placement", () => {
     expect(libraryPlaceEdit({ place: "calculation" })).toEqual({ type: "addObject" });
     const project = applyWorkspaceEdit(blankProject, libraryPlaceEdit({ place: "calculation" }), FALLBACK_QUANTITIES)
       .project;
-    expect(project.objects.filter((item) => item.kind !== "equipment" && item.kind !== "point")).toHaveLength(2);
+    expect(project.objects.filter((item) => item.kind !== "equipment" && item.kind !== "point")).toHaveLength(1);
   });
 
   it("keeps port categories after JSON load without stored category fields", () => {

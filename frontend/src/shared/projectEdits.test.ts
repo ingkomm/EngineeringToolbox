@@ -14,7 +14,7 @@ function calc(project: ProjectDocument, index = 0): CalculationObject {
 }
 
 function applyAll(edits: Parameters<typeof applyWorkspaceEdit>[1][]): ProjectDocument {
-  let project = structuredClone(blankProject);
+  let project = applyWorkspaceEdit(structuredClone(blankProject), { type: "addObject" }, FALLBACK_QUANTITIES).project;
   for (const edit of edits) {
     project = applyWorkspaceEdit(project, edit, FALLBACK_QUANTITIES).project;
   }
@@ -22,13 +22,10 @@ function applyAll(edits: Parameters<typeof applyWorkspaceEdit>[1][]): ProjectDoc
 }
 
 describe("blank workspace", () => {
-  it("starts with one empty object and no edges", () => {
-    expect(blankProject.objects).toHaveLength(1);
-    expect(calc(blankProject).id).toBe("obj_1");
-    expect(calc(blankProject).inputs).toEqual([]);
-    expect(calc(blankProject).calculations).toEqual([]);
-    expect(calc(blankProject).outputs).toEqual([]);
+  it("starts empty so Calculation is added from the library", () => {
+    expect(blankProject.objects).toEqual([]);
     expect(blankProject.edges).toEqual([]);
+    expect(blankProject.schemaVersion).toBe("0.1");
   });
 
   it("stores an expanded calculation width on the grid", () => {
@@ -863,3 +860,54 @@ describe("user symbol library", () => {
     expect(project.symbolLibrary?.find((item) => item.id === "pump")?.category).toBeUndefined();
   });
 });
+
+describe("v0.1 worksheet edits", () => {
+  it("deletes several objects in one edit", () => {
+    const project = applyAll([{ type: "addObject" }, { type: "addMemo" }, { type: "addPoint" }]);
+    const ids = project.objects.map((item) => item.id);
+    expect(ids.length).toBeGreaterThan(2);
+    const next = applyWorkspaceEdit(project, { type: "deleteObjects", objectIds: ids }, FALLBACK_QUANTITIES).project;
+    expect(next.objects).toEqual([]);
+    expect(next.edges).toEqual([]);
+  });
+
+  it("rewrites memo link targets when an object id changes", () => {
+    let project = applyAll([{ type: "addMemo" }]);
+    const memoId = project.objects.find((item) => item.kind === "memo")!.id;
+    project = applyWorkspaceEdit(
+      project,
+      { type: "connectMemoLink", memoId, targetObjectId: "obj_1" },
+      FALLBACK_QUANTITIES,
+    ).project;
+    project = applyWorkspaceEdit(
+      project,
+      { type: "updateObject", objectId: "obj_1", patch: { id: "calc_a" } },
+      FALLBACK_QUANTITIES,
+    ).project;
+    const memo = project.objects.find((item) => item.kind === "memo");
+    expect(memo && "links" in memo ? memo.links[0]?.targetObjectId : null).toBe("calc_a");
+  });
+
+  it("loads JSON that has no schemaVersion", () => {
+    const raw = {
+      id: "old",
+      name: "old",
+      objects: [
+        {
+          id: "obj_1",
+          name: "Object 1",
+          position: { x: 0, y: 0 },
+          inputs: [],
+          calculations: [],
+          outputs: [],
+        },
+      ],
+      edges: [],
+    };
+    const project = applyWorkspaceEdit(blankProject, { type: "loadProject", project: raw as never }, FALLBACK_QUANTITIES)
+      .project;
+    expect(project.schemaVersion).toBe("0.1");
+    expect(project.objects.map((item) => item.id)).toEqual(["obj_1"]);
+  });
+});
+

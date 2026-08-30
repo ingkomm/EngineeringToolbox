@@ -340,7 +340,7 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
         onEdit({ type: "deleteEdges", edgeIds: deleted.map((edge) => edge.id) });
       }}
       onNodesDelete={(deleted) => {
-        deleted.forEach((node) => onEdit({ type: "deleteObject", objectId: node.id }));
+        onEdit({ type: "deleteObjects", objectIds: deleted.map((node) => node.id) });
       }}
       multiSelectionKeyCode="Shift"
       selectionOnDrag={selectMode}
@@ -400,7 +400,7 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
           <button
             type="button"
             className="ghost-btn"
-            onClick={() => selectedIds.forEach((objectId) => onEdit({ type: "deleteObject", objectId }))}
+            onClick={() => onEdit({ type: "deleteObjects", objectIds: selectedIds })}
           >
             삭제
           </button>
@@ -422,7 +422,7 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
           <button
             type="button"
             onClick={() => {
-              menu.ids.forEach((objectId) => onEdit({ type: "deleteObject", objectId }));
+              onEdit({ type: "deleteObjects", objectIds: menu.ids });
               setMenu(null);
             }}
           >
