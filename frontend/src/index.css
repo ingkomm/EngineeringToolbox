@@ -440,13 +440,13 @@ label.ghost-btn {
 
 .calc-node,
 .ws-node--calc {
-  width: 100%;
-  min-width: 280px;
   box-sizing: border-box;
 }
 
 .react-flow__node-calculationObject {
   overflow: visible !important;
+  width: max-content !important;
+  max-width: none !important;
 }
 
 .react-flow__node-equipmentObject,

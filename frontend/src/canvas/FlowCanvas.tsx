@@ -333,7 +333,6 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
       selectionMode={SelectionMode.Partial}
       panOnDrag={selectMode ? [1] : true}
       snapToGrid={false}
-      nodeOrigin={[0.5, 0.5]}
       proOptions={{ hideAttribution: true }}
     >
       <Background variant={BackgroundVariant.Dots} gap={CANVAS_GRID} size={1.4} color="#243044" />

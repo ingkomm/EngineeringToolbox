@@ -59,19 +59,25 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
   ].join("|");
 
   useLayoutEffect(() => {
-    setNodes((nodes) => {
-      const current = nodes.find((node) => node.id === id);
-      const styleWidth =
-        typeof current?.style?.width === "number"
-          ? current.style.width
-          : Number.parseFloat(String(current?.style?.width ?? ""));
-      if (current && current.width === cardWidth && styleWidth === cardWidth) return nodes;
-      return nodes.map((node) =>
-        node.id === id ? { ...node, width: cardWidth, style: { ...node.style, width: cardWidth } } : node,
-      );
-    });
+    setNodes((nodes) =>
+      nodes.map((node) => {
+        if (node.id !== id) return node;
+        if (node.width === cardWidth && node.style?.width === cardWidth) return node;
+        return {
+          ...node,
+          width: cardWidth,
+          style: { ...node.style, width: cardWidth },
+          measured: { width: cardWidth, height: node.measured?.height ?? node.height },
+        };
+      }),
+    );
     updateNodeInternals(id);
   }, [cardWidth, handleSignature, id, setNodes, updateNodeInternals]);
+
+  useEffect(() => {
+    if (resizeWidth == null || object.width == null) return;
+    if (object.width === snapCalcWidth(resizeWidth)) setResizeWidth(null);
+  }, [object.width, resizeWidth]);
 
   const candidatesFor = (excludeId: string): FormulaCandidate[] => [
     ...[...object.inputs, ...object.calculations]
@@ -83,47 +89,56 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
     ...FORMULA_FUNCTIONS,
   ];
 
-  const onCalcResize = (width: number, positionX: number) => {
-    setResizeWidth(width);
-    setNodes((nodes) =>
-      nodes.map((node) =>
-        node.id === id
-          ? { ...node, width, style: { ...node.style, width }, position: { ...node.position, x: positionX } }
-          : node,
-      ),
-    );
-  };
-  const onCalcResizeEnd = (width: number, positionX: number) => {
-    setResizeWidth(null);
-    onEdit({
-      type: "updateObject",
-      objectId: id,
-      patch: { width: snapCalcWidth(width), position: { x: positionX, y: object.position.y } },
-    });
-  };
-
   const startWidthDrag = (side: "left" | "right") => (event: PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    resizeDrag.current = { side, startX: event.clientX, startWidth: cardWidth, startPosX: object.position.x };
-  };
-  const moveWidthDrag = (event: PointerEvent<HTMLDivElement>) => {
-    const drag = resizeDrag.current;
-    if (!drag) return;
-    const dx = (event.clientX - drag.startX) / getZoom();
-    const nextWidth = Math.max(440, drag.side === "right" ? drag.startWidth + dx : drag.startWidth - dx);
-    const positionX = drag.side === "right" ? drag.startPosX : drag.startPosX + (drag.startWidth - nextWidth);
-    onCalcResize(nextWidth, positionX);
-  };
-  const endWidthDrag = (event: PointerEvent<HTMLDivElement>) => {
-    const drag = resizeDrag.current;
-    if (!drag) return;
-    resizeDrag.current = null;
-    const dx = (event.clientX - drag.startX) / getZoom();
-    const nextWidth = Math.max(440, drag.side === "right" ? drag.startWidth + dx : drag.startWidth - dx);
-    const positionX = drag.side === "right" ? drag.startPosX : drag.startPosX + (drag.startWidth - nextWidth);
-    onCalcResizeEnd(nextWidth, positionX);
+    const zoom = getZoom() || 1;
+    const drag = { side, startX: event.clientX, startWidth: cardWidth, startPosX: object.position.x };
+    resizeDrag.current = drag;
+
+    const widthFromEvent = (clientX: number) => {
+      const dx = (clientX - drag.startX) / zoom;
+      const nextWidth = Math.max(440, drag.side === "right" ? drag.startWidth + dx : drag.startWidth - dx);
+      const positionX = drag.side === "right" ? drag.startPosX : drag.startPosX + (drag.startWidth - nextWidth);
+      return { nextWidth, positionX };
+    };
+
+    const onMove = (moveEvent: globalThis.PointerEvent) => {
+      if (!resizeDrag.current) return;
+      const { nextWidth, positionX } = widthFromEvent(moveEvent.clientX);
+      setResizeWidth(nextWidth);
+      setNodes((nodes) =>
+        nodes.map((node) =>
+          node.id === id
+            ? {
+                ...node,
+                width: nextWidth,
+                style: { ...node.style, width: nextWidth },
+                measured: { width: nextWidth, height: node.measured?.height ?? node.height },
+                position: { ...node.position, x: positionX },
+              }
+            : node,
+        ),
+      );
+    };
+    const onUp = (upEvent: globalThis.PointerEvent) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      if (!resizeDrag.current) return;
+      resizeDrag.current = null;
+      const { nextWidth, positionX } = widthFromEvent(upEvent.clientX);
+      const snapped = snapCalcWidth(nextWidth);
+      setResizeWidth(snapped);
+      onEdit({
+        type: "updateObject",
+        objectId: id,
+        patch: { width: snapped, position: { x: positionX, y: object.position.y } },
+      });
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   };
 
   return (
@@ -132,23 +147,17 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
       data-testid={`object-${id}`}
       style={{ width: cardWidth }}
     >
-      {open && selected ? (
+      {open ? (
         <>
           <div
-            className="calc-resize calc-resize--left nodrag nopan"
+            className="calc-resize calc-resize--left nodrag nopan nowheel"
             data-testid={`object-${id}-resize-left`}
             onPointerDown={startWidthDrag("left")}
-            onPointerMove={moveWidthDrag}
-            onPointerUp={endWidthDrag}
-            onPointerCancel={endWidthDrag}
           />
           <div
-            className="calc-resize calc-resize--right nodrag nopan"
+            className="calc-resize calc-resize--right nodrag nopan nowheel"
             data-testid={`object-${id}-resize-right`}
             onPointerDown={startWidthDrag("right")}
-            onPointerMove={moveWidthDrag}
-            onPointerUp={endWidthDrag}
-            onPointerCancel={endWidthDrag}
           />
         </>
       ) : null}
