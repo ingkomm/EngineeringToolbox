@@ -10,7 +10,7 @@ import type {
   ProjectDocument,
   RelationType,
 } from "../types/contract";
-import { catalogEntry, symbolPortDefaults } from "../canvas/symbols/catalog";
+import { firstEquipmentSymbol, findLibrarySymbol, libraryOf, newBlankEquipmentSymbol } from "../canvas/symbols/library";
 import { evenGridSize } from "../canvas/symbols/grid";
 import { blankProject } from "../example/blankProject";
 import { prototypeProject } from "../example/prototypeProject";
@@ -88,6 +88,18 @@ export type WorkspaceEdit =
   | { type: "deleteEdges"; edgeIds: string[] }
   | { type: "addEquipment"; symbolId?: string }
   | { type: "addPoint" }
+  | { type: "addLibrarySymbol" }
+  | { type: "deleteLibrarySymbol"; symbolId: string }
+  | {
+      type: "updateLibrarySymbol";
+      symbolId: string;
+      patch: {
+        name?: string;
+        inCount?: number;
+        outCount?: number;
+        drawing?: EquipmentObject["drawing"];
+      };
+    }
   | {
       type: "updatePoint";
       objectId: string;
@@ -165,7 +177,7 @@ function nextObjectName(project: ProjectDocument): string {
 
 function nextEquipmentName(project: ProjectDocument, symbolId?: string): string {
   const used = new Set(project.objects.map((item) => item.name.trim()));
-  const base = symbolId && symbolId !== "generic-equipment" ? catalogEntry(symbolId).label : "Equipment";
+  const base = findLibrarySymbol(project, symbolId)?.name ?? "Equipment";
   let n = 1;
   while (used.has(`${base} ${n}`)) n += 1;
   return `${base} ${n}`;
@@ -966,6 +978,12 @@ export function applyWorkspaceEdit(
       return addWorksheetEquipment(project, edit.symbolId);
     case "addPoint":
       return addWorksheetPoint(project);
+    case "addLibrarySymbol":
+      return addLibrarySymbol(project);
+    case "deleteLibrarySymbol":
+      return deleteLibrarySymbol(project, edit.symbolId);
+    case "updateLibrarySymbol":
+      return updateLibrarySymbol(project, edit.symbolId, edit.patch);
     case "updateEquipment":
       return updateWorksheetEquipment(project, edit.objectId, edit.patch);
     case "updatePointEnd":
@@ -1020,20 +1038,75 @@ function noEval(project: ProjectDocument): EditResult {
 }
 
 function addWorksheetEquipment(project: ProjectDocument, symbolId?: string): EditResult {
+  const template = symbolId ? findLibrarySymbol(project, symbolId) : firstEquipmentSymbol(project);
+  if (!template || template.kind !== "equipment") return noEval(project);
   const id = nextPrefixedObjectId(project, "EQ");
-  const nextSymbol = symbolId?.trim() || "generic-equipment";
-  const ports = symbolPortDefaults(nextSymbol);
+  const drawing = template.drawing ?? undefined;
   const object: EquipmentObject = {
     kind: "equipment",
     id,
-    name: nextEquipmentName(project, nextSymbol),
+    name: nextEquipmentName(project, template.id),
     position: nextLayoutPosition(project),
-    symbolId: nextSymbol,
-    inCount: ports.inCount,
-    outCount: ports.outCount,
+    symbolId: template.id,
+    inCount: template.inCount ?? 1,
+    outCount: template.outCount ?? 1,
     rotation: 0,
+    width: drawing?.width,
+    height: drawing?.height,
+    drawing: drawing ?? null,
   };
   return { project: { ...project, objects: [...project.objects, object] }, dirtyObjectIds: [], shouldEvaluate: false };
+}
+
+function addLibrarySymbol(project: ProjectDocument): EditResult {
+  const library = libraryOf(project);
+  const created = newBlankEquipmentSymbol(library);
+  return {
+    project: { ...project, symbolLibrary: [...library, created] },
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
+function deleteLibrarySymbol(project: ProjectDocument, symbolId: string): EditResult {
+  const library = libraryOf(project).filter((item) => item.id !== symbolId);
+  return { project: { ...project, symbolLibrary: library }, dirtyObjectIds: [], shouldEvaluate: false };
+}
+
+function updateLibrarySymbol(
+  project: ProjectDocument,
+  symbolId: string,
+  patch: { name?: string; inCount?: number; outCount?: number; drawing?: EquipmentObject["drawing"] },
+): EditResult {
+  const library = libraryOf(project);
+  const current = library.find((item) => item.id === symbolId);
+  if (!current || current.kind !== "equipment") return noEval(project);
+  const nextItem = {
+    ...current,
+    name: (patch.name ?? current.name).trim() || current.name,
+    inCount: patch.inCount ?? current.inCount,
+    outCount: patch.outCount ?? current.outCount,
+    drawing: patch.drawing !== undefined ? patch.drawing : current.drawing,
+  };
+  return {
+    project: {
+      ...project,
+      symbolLibrary: library.map((item) => (item.id === symbolId ? nextItem : item)),
+      objects: project.objects.map((object) => {
+        if (!isEquipmentObject(object) || object.symbolId !== symbolId) return object;
+        return {
+          ...object,
+          inCount: nextItem.inCount ?? object.inCount,
+          outCount: nextItem.outCount ?? object.outCount,
+          drawing: nextItem.drawing ?? object.drawing,
+          width: nextItem.drawing?.width ?? object.width,
+          height: nextItem.drawing?.height ?? object.height,
+        };
+      }),
+    },
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
 }
 
 function snapRotation(value: number): 0 | 90 | 180 | 270 {

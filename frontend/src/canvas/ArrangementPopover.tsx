@@ -1,7 +1,6 @@
 import type { KeyboardEvent } from "react";
 import type { ArrangementLinkKind, EquipmentObject, PointObject } from "../types/contract";
 import { OBJECT_ID_RE, VARIABLE_ID_RE, type WorkspaceEdit } from "../lib/projectEdits";
-import { SYMBOL_GROUPS, SYMBOL_REGISTRY } from "./symbols/registry";
 import { POINT_CONNECTION_IDS } from "../lib/worksheet";
 import { equipmentTag, linkKindOf, showArrowOf } from "../lib/arrangementView";
 
@@ -13,12 +12,10 @@ export function EquipmentPopover({
   object,
   onEdit,
   onClose,
-  onEditSymbol,
 }: {
   object: EquipmentObject;
   onEdit: (edit: WorkspaceEdit) => void;
   onClose: () => void;
-  onEditSymbol?: () => void;
 }) {
   return (
     <div className="pid-pop nodrag nopan" data-testid={`object-${object.id}-popover`} onMouseDown={(event) => event.stopPropagation()}>
@@ -75,22 +72,7 @@ export function EquipmentPopover({
       </label>
       <label>
         Symbol
-        <select
-          className="pid-pop__input"
-          value={object.symbolId}
-          data-testid={`object-${object.id}-symbol`}
-          onChange={(event) => onEdit({ type: "updateEquipment", objectId: object.id, patch: { symbolId: event.target.value } })}
-        >
-          {SYMBOL_GROUPS.map((group) => (
-            <optgroup key={group.id} label={`${group.clause} ${group.labelKo}`}>
-              {SYMBOL_REGISTRY.filter((item) => item.group === group.id).map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.label}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+        <input className="pid-pop__input" value={object.symbolId} readOnly />
       </label>
       <div className="pid-pop__row">
         <label>
@@ -124,9 +106,6 @@ export function EquipmentPopover({
           />
         </label>
       </div>
-      <button type="button" className="ghost-btn" data-testid={`object-${object.id}-edit-symbol`} onClick={onEditSymbol}>
-        심볼 편집
-      </button>
     </div>
   );
 }

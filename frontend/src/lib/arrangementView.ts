@@ -50,7 +50,7 @@ export function equipmentPortLayout(object: EquipmentObject) {
   const bounds = equipmentBounds(object);
   const drawingHeight = object.drawing?.height ?? bounds.size.height;
   const drawingWidth = object.drawing?.width ?? bounds.size.width;
-  return defaultPortAnchors(object.symbolId, object.inCount, object.outCount).map((anchor) => {
+  return defaultPortAnchors(object.inCount, object.outCount, drawingHeight).map((anchor) => {
     const side = rotateEdge(anchor.side, bounds.rotation);
     const along = side === "left" || side === "right" ? bounds.height : bounds.width;
     const source = side === "left" || side === "right" ? drawingHeight : drawingWidth;

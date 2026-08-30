@@ -122,6 +122,14 @@ export interface ProjectDocument {
   name: string;
   objects: WorksheetObject[];
   edges: MappingEdge[];
+  symbolLibrary?: Array<{
+    id: string;
+    name: string;
+    kind: "equipment" | "point";
+    inCount?: number;
+    outCount?: number;
+    drawing?: EquipmentObject["drawing"];
+  }>;
 }
 
 export interface EvalError {

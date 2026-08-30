@@ -1,1 +1,1 @@
-export { resolveSymbol as ArrangementSymbol, SYMBOL_REGISTRY } from "./symbols/registry";
+export { renderLibrarySymbol } from "./symbols/registry";

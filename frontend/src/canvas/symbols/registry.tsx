@@ -1,23 +1,21 @@
 import type { ReactElement } from "react";
-import type { EquipmentRotation } from "../../types/contract";
-import { SYMBOL_CATALOG, type SymbolCatalogEntry } from "./catalog";
+import type { EquipmentObject, EquipmentRotation } from "../../types/contract";
+import type { LibrarySymbol } from "./library";
 import { resolveDrawing } from "./drawing";
 import { DrawingSvg } from "./DrawingSvg";
 import { evenGridSize } from "./grid";
 
-export interface SymbolDef extends SymbolCatalogEntry {
-  render: (title: string) => ReactElement;
-}
-
-export const SYMBOL_REGISTRY: SymbolDef[] = SYMBOL_CATALOG.map((entry) => ({
-  ...entry,
-  render: (title) => <DrawingSvg drawing={resolveDrawing(entry.id)} title={title} />,
-}));
-
-const BY_ID = new Map(SYMBOL_REGISTRY.map((item) => [item.id, item]));
-
-export function resolveSymbol(symbolId: string | undefined): SymbolDef {
-  return BY_ID.get(symbolId ?? "") ?? BY_ID.get("generic-equipment")!;
+export function renderLibrarySymbol(item: LibrarySymbol, title?: string): ReactElement {
+  if (item.kind === "point") {
+    return (
+      <svg viewBox="0 0 44 44" className="pid-symbol-svg" aria-label={title ?? item.name}>
+        <circle cx="22" cy="22" r="4" fill="none" stroke="currentColor" strokeWidth="1.7" />
+        <circle cx="22" cy="22" r="2" fill="currentColor" stroke="none" />
+      </svg>
+    );
+  }
+  const drawing = resolveDrawing(item.id, item.drawing);
+  return <DrawingSvg drawing={drawing} title={title ?? item.name} />;
 }
 
 export function normalizeRotation(value: number | undefined): EquipmentRotation {
@@ -25,13 +23,10 @@ export function normalizeRotation(value: number | undefined): EquipmentRotation 
   return snapped as EquipmentRotation;
 }
 
-export function equipmentSize(object: { symbolId: string; width?: number; height?: number; drawing?: { width: number; height: number } | null }) {
-  const symbol = resolveSymbol(object.symbolId);
-  const fromDrawing = object.drawing;
+export function equipmentSize(object: Pick<EquipmentObject, "symbolId" | "width" | "height" | "drawing">) {
+  const drawing = resolveDrawing(object.symbolId, object.drawing);
   return {
-    width: evenGridSize(object.width ?? fromDrawing?.width ?? symbol.width),
-    height: evenGridSize(object.height ?? fromDrawing?.height ?? symbol.height),
+    width: evenGridSize(object.width ?? drawing.width),
+    height: evenGridSize(object.height ?? drawing.height),
   };
 }
-
-export { SYMBOL_GROUPS, symbolPortDefaults, catalogEntry } from "./catalog";

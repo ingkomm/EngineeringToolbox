@@ -1,26 +1,74 @@
-import { useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import type { SymbolDrawing, SymbolPrimitive } from "./drawing";
-import { defaultDrawing, nextPrimitiveId } from "./drawing";
+import { nextPrimitiveId } from "./drawing";
 import { CANVAS_GRID, snapToGrid } from "./grid";
 import { DrawingPrimitives } from "./DrawingSvg";
 
 type Tool = "select" | "line" | "circle" | "polygon";
 
 export function SymbolEditor({
-  symbolId,
+  name,
   drawing,
+  onChangeName,
   onChange,
   onClose,
 }: {
   symbolId: string;
+  name: string;
   drawing: SymbolDrawing;
+  onChangeName?: (name: string) => void;
   onChange: (drawing: SymbolDrawing) => void;
   onClose: () => void;
 }) {
-  const [tool, setTool] = useState<Tool>("select");
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [tool, setTool] = useState<Tool>("line");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<SymbolDrawing>(drawing);
   const [pending, setPending] = useState<Array<{ x: number; y: number }>>([]);
+  const [rubber, setRubber] = useState<{ x: number; y: number } | null>(null);
+  const drag = useRef<{
+    mode: "draw" | "move" | "vertex";
+    start: { x: number; y: number };
+    origin?: SymbolPrimitive;
+    vertex?: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (drag.current) return;
+    setDraft(drawing);
+  }, [drawing]);
+
+  const commit = (next: SymbolDrawing) => {
+    setDraft(next);
+    onChange(next);
+  };
+
+  const removeSelected = (id: string | null) => {
+    if (!id) return;
+    setDraft((current) => {
+      const next = { ...current, primitives: current.primitives.filter((item) => item.id !== id) };
+      onChange(next);
+      return next;
+    });
+    setSelectedId(null);
+  };
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      if (event.key === "Escape") {
+        drag.current = null;
+        setPending([]);
+        setRubber(null);
+      }
+      if ((event.key === "Delete" || event.key === "Backspace") && selectedId) {
+        event.preventDefault();
+        removeSelected(selectedId);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onChange, selectedId]);
 
   const gridLines = useMemo(() => {
     const lines: Array<{ key: string; x1: number; y1: number; x2: number; y2: number }> = [];
@@ -33,105 +81,131 @@ export function SymbolEditor({
     return lines;
   }, [draft.height, draft.width]);
 
-  const pointFromEvent = (event: MouseEvent<SVGSVGElement>) => {
-    const svg = event.currentTarget;
+  const pointFromClient = (event: { clientX: number; clientY: number }) => {
+    const svg = svgRef.current;
+    if (!svg) return { x: 0, y: 0 };
     const box = svg.getBoundingClientRect();
-    const x = snapToGrid(((event.clientX - box.left) / box.width) * draft.width);
-    const y = snapToGrid(((event.clientY - box.top) / box.height) * draft.height);
-    return { x, y };
+    return {
+      x: snapToGrid(((event.clientX - box.left) / box.width) * draft.width),
+      y: snapToGrid(((event.clientY - box.top) / box.height) * draft.height),
+    };
   };
 
-  const commit = (next: SymbolDrawing) => {
-    setDraft(next);
-    onChange(next);
+  const preview = (item: SymbolPrimitive) => {
+    setDraft({ ...draft, primitives: draft.primitives.map((entry) => (entry.id === item.id ? item : entry)) });
   };
 
-  const addPrimitive = (item: SymbolPrimitive) => {
+  const onPointerDown = (event: PointerEvent<SVGSVGElement>) => {
+    const point = pointFromClient(event);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    if (tool === "line" || tool === "circle") {
+      drag.current = { mode: "draw", start: point };
+      setPending([point]);
+      setRubber(point);
+      return;
+    }
+    if (tool === "polygon") {
+      if (pending.length >= 2 && point.x === pending[0]!.x && point.y === pending[0]!.y) {
+        finishPolygon();
+        return;
+      }
+      setPending((current) => [...current, point]);
+      return;
+    }
+    const hit = selectedId ? draft.primitives.find((item) => item.id === selectedId) : undefined;
+    if (hit) drag.current = { mode: "move", start: point, origin: hit };
+  };
+
+  const onPointerMove = (event: PointerEvent<SVGSVGElement>) => {
+    const point = pointFromClient(event);
+    const active = drag.current;
+    if (!active) {
+      if (tool === "polygon" && pending.length) setRubber(point);
+      return;
+    }
+    if (active.mode === "draw") {
+      setRubber(point);
+      return;
+    }
+    if (active.mode === "move" && active.origin && selectedId) {
+      preview(translatePrimitive(active.origin, point.x - active.start.x, point.y - active.start.y));
+    }
+    if (active.mode === "vertex" && active.origin && selectedId && active.vertex != null) {
+      preview(moveVertex(active.origin, active.vertex, point));
+    }
+  };
+
+  const onPointerUp = (event: PointerEvent<SVGSVGElement>) => {
+    const point = pointFromClient(event);
+    const active = drag.current;
+    drag.current = null;
+    if (!active) return;
+    if (active.mode === "draw" && (tool === "line" || tool === "circle")) {
+      if (tool === "line" && (point.x !== active.start.x || point.y !== active.start.y)) {
+        const item: SymbolPrimitive = {
+          id: nextPrimitiveId(draft, "line"),
+          kind: "line",
+          x1: active.start.x,
+          y1: active.start.y,
+          x2: point.x,
+          y2: point.y,
+        };
+        commit({ ...draft, primitives: [...draft.primitives, item] });
+        setSelectedId(item.id);
+      }
+      if (tool === "circle") {
+        const r = Math.max(CANVAS_GRID, snapToGrid(Math.hypot(point.x - active.start.x, point.y - active.start.y)));
+        const item: SymbolPrimitive = {
+          id: nextPrimitiveId(draft, "circle"),
+          kind: "circle",
+          cx: active.start.x,
+          cy: active.start.y,
+          r,
+        };
+        commit({ ...draft, primitives: [...draft.primitives, item] });
+        setSelectedId(item.id);
+      }
+      setPending([]);
+      setRubber(null);
+      return;
+    }
+    if ((active.mode === "move" || active.mode === "vertex") && active.origin && selectedId) {
+      const nextItem =
+        active.mode === "move"
+          ? translatePrimitive(active.origin, point.x - active.start.x, point.y - active.start.y)
+          : moveVertex(active.origin, active.vertex ?? 0, point);
+      commit({ ...draft, primitives: draft.primitives.map((entry) => (entry.id === nextItem.id ? nextItem : entry)) });
+    }
+  };
+
+  const finishPolygon = () => {
+    if (pending.length < 3) return;
+    const item: SymbolPrimitive = { id: nextPrimitiveId(draft, "poly"), kind: "polygon", points: pending };
     commit({ ...draft, primitives: [...draft.primitives, item] });
-    setPending([]);
     setSelectedId(item.id);
+    setPending([]);
+    setRubber(null);
     setTool("select");
   };
 
-  const onSvgClick = (event: MouseEvent<SVGSVGElement>) => {
-    const point = pointFromEvent(event);
-    if (tool === "select") {
-      setSelectedId(null);
-      return;
-    }
-    if (tool === "line") {
-      if (pending.length === 0) {
-        setPending([point]);
-        return;
-      }
-      addPrimitive({
-        id: nextPrimitiveId(draft, "line"),
-        kind: "line",
-        x1: pending[0]!.x,
-        y1: pending[0]!.y,
-        x2: point.x,
-        y2: point.y,
-      });
-      return;
-    }
-    if (tool === "circle") {
-      if (pending.length === 0) {
-        setPending([point]);
-        return;
-      }
-      const dx = point.x - pending[0]!.x;
-      const dy = point.y - pending[0]!.y;
-      const r = Math.max(CANVAS_GRID, snapToGrid(Math.hypot(dx, dy)));
-      addPrimitive({
-        id: nextPrimitiveId(draft, "circle"),
-        kind: "circle",
-        cx: pending[0]!.x,
-        cy: pending[0]!.y,
-        r,
-      });
-      return;
-    }
-    if (pending.length >= 2 && point.x === pending[0]!.x && point.y === pending[0]!.y) {
-      addPrimitive({
-        id: nextPrimitiveId(draft, "poly"),
-        kind: "polygon",
-        points: pending,
-      });
-      return;
-    }
-    setPending([...pending, point]);
-  };
-
-  const onPrimitiveClick = (event: MouseEvent, id: string) => {
-    event.stopPropagation();
-    if (tool !== "select") return;
-    setSelectedId(id);
-  };
-
-  const closePolygon = () => {
-    if (tool !== "polygon" || pending.length < 3) return;
-    addPrimitive({
-      id: nextPrimitiveId(draft, "poly"),
-      kind: "polygon",
-      points: pending,
-    });
-  };
-
-  const removeSelected = () => {
-    if (!selectedId) return;
-    commit({ ...draft, primitives: draft.primitives.filter((item) => item.id !== selectedId) });
-    setSelectedId(null);
-  };
+  const selected = draft.primitives.find((item) => item.id === selectedId);
 
   return (
-    <div className="symbol-editor nodrag nopan" data-testid="symbol-editor" onMouseDown={(event) => event.stopPropagation()}>
+    <div className="symbol-editor symbol-editor--dock nodrag nopan" data-testid="symbol-editor">
       <header>
         <strong>심볼 편집</strong>
-        <span>직선 · 원 · 다각형 · 그리드 {CANVAS_GRID}px</span>
-        <button type="button" className="icon-btn" onClick={onClose}>
-          ×
+        <button type="button" className="ghost-btn" data-testid="symbol-editor-done" onClick={onClose}>
+          완료
         </button>
       </header>
+      {onChangeName ? (
+        <input
+          className="iso-sidebar__search"
+          value={name}
+          data-testid="symbol-editor-name"
+          onChange={(event) => onChangeName(event.target.value)}
+        />
+      ) : null}
       <div className="symbol-editor__tools">
         {(["select", "line", "circle", "polygon"] as Tool[]).map((item) => (
           <button
@@ -142,36 +216,30 @@ export function SymbolEditor({
             onClick={() => {
               setTool(item);
               setPending([]);
+              setRubber(null);
             }}
           >
-            {item === "select" ? "선택" : item === "line" ? "직선" : item === "circle" ? "원" : "다각형"}
+            {item === "select" ? "이동" : item === "line" ? "직선" : item === "circle" ? "원" : "다각형"}
           </button>
         ))}
-        <button type="button" className="ghost-btn" disabled={tool !== "polygon" || pending.length < 3} onClick={closePolygon}>
-          다각형 닫기
+        <button type="button" className="ghost-btn" disabled={tool !== "polygon" || pending.length < 3} onClick={finishPolygon}>
+          닫기
         </button>
-        <button type="button" className="ghost-btn" disabled={!selectedId} onClick={removeSelected}>
-          삭제
-        </button>
-        <button
-          type="button"
-          className="ghost-btn"
-          onClick={() => {
-            const next = defaultDrawing(symbolId);
-            setDraft(next);
-            onChange(next);
-            setSelectedId(null);
-            setPending([]);
-          }}
-        >
-          기본값
+        <button type="button" className="ghost-btn" disabled={!selectedId} onClick={() => removeSelected(selectedId)}>
+          지우기
         </button>
       </div>
       <svg
+        ref={svgRef}
         className="symbol-editor__canvas"
         viewBox={`0 0 ${draft.width} ${draft.height}`}
         data-testid="symbol-editor-canvas"
-        onClick={onSvgClick}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onDoubleClick={() => {
+          if (tool === "polygon") finishPolygon();
+        }}
       >
         {gridLines.map((item) => (
           <line key={item.key} className="symbol-editor__grid" x1={item.x1} y1={item.y1} x2={item.x2} y2={item.y2} />
@@ -182,27 +250,120 @@ export function SymbolEditor({
           <DrawingPrimitives drawing={draft} selectedId={selectedId} />
         </g>
         {draft.primitives.map((item) => (
-          <g key={`hit-${item.id}`} onClick={(event) => onPrimitiveClick(event, item.id)} className="symbol-editor__hit">
+          <g
+            key={`hit-${item.id}`}
+            onPointerDown={(event) => {
+              if (tool !== "select") return;
+              event.stopPropagation();
+              setSelectedId(item.id);
+              const point = pointFromClient(event);
+              drag.current = { mode: "move", start: point, origin: item };
+              svgRef.current?.setPointerCapture(event.pointerId);
+            }}
+          >
             <HitShape item={item} />
           </g>
         ))}
-        {pending.map((point, index) => (
-          <circle key={`p${index}`} className="symbol-editor__pending" cx={point.x} cy={point.y} r={2} />
-        ))}
+        {selected?.kind === "line" ? (
+          <>
+            <VertexHandle
+              x={selected.x1}
+              y={selected.y1}
+              onPointerDown={(event) => startVertex(event, selected, 0)}
+            />
+            <VertexHandle
+              x={selected.x2}
+              y={selected.y2}
+              onPointerDown={(event) => startVertex(event, selected, 1)}
+            />
+          </>
+        ) : null}
+        {selected?.kind === "circle" ? (
+          <VertexHandle
+            x={selected.cx + selected.r}
+            y={selected.cy}
+            onPointerDown={(event) => startVertex(event, selected, 0)}
+          />
+        ) : null}
+        {selected?.kind === "polygon"
+          ? selected.points.map((point, index) => (
+              <VertexHandle
+                key={index}
+                x={point.x}
+                y={point.y}
+                onPointerDown={(event) => startVertex(event, selected, index)}
+              />
+            ))
+          : null}
+        {tool === "line" && pending[0] && rubber ? (
+          <line className="symbol-editor__rubber" x1={pending[0].x} y1={pending[0].y} x2={rubber.x} y2={rubber.y} />
+        ) : null}
+        {tool === "circle" && pending[0] && rubber ? (
+          <circle
+            className="symbol-editor__rubber"
+            cx={pending[0].x}
+            cy={pending[0].y}
+            r={Math.max(CANVAS_GRID, snapToGrid(Math.hypot(rubber.x - pending[0].x, rubber.y - pending[0].y)))}
+          />
+        ) : null}
+        {tool === "polygon" && pending.length ? (
+          <polyline
+            className="symbol-editor__rubber"
+            fill="none"
+            points={[...pending, rubber ?? pending[pending.length - 1]!].map((point) => `${point.x},${point.y}`).join(" ")}
+          />
+        ) : null}
       </svg>
       <p className="symbol-editor__hint">
-        직선/원: 두 점 클릭. 다각형: 꼭짓점 클릭 후 닫기. 중심선은 가로·세로 점선입니다.
+        직선/원: 드래그. 다각형: 꼭짓점 클릭 후 닫기(또는 더블클릭). 이동: 도형·꼭짓점을 잡고 옮깁니다. Delete로 지웁니다.
       </p>
     </div>
   );
+
+  function startVertex(event: PointerEvent<SVGCircleElement>, origin: SymbolPrimitive, vertex: number) {
+    event.stopPropagation();
+    drag.current = { mode: "vertex", start: pointFromClient(event), origin, vertex };
+    svgRef.current?.setPointerCapture(event.pointerId);
+  }
+}
+
+function translatePrimitive(item: SymbolPrimitive, dx: number, dy: number): SymbolPrimitive {
+  if (item.kind === "line") return { ...item, x1: item.x1 + dx, y1: item.y1 + dy, x2: item.x2 + dx, y2: item.y2 + dy };
+  if (item.kind === "circle") return { ...item, cx: item.cx + dx, cy: item.cy + dy };
+  return { ...item, points: item.points.map((point) => ({ x: point.x + dx, y: point.y + dy })) };
+}
+
+function moveVertex(item: SymbolPrimitive, index: number, point: { x: number; y: number }): SymbolPrimitive {
+  if (item.kind === "line") {
+    return index === 0 ? { ...item, x1: point.x, y1: point.y } : { ...item, x2: point.x, y2: point.y };
+  }
+  if (item.kind === "circle") {
+    return { ...item, r: Math.max(CANVAS_GRID, snapToGrid(Math.hypot(point.x - item.cx, point.y - item.cy))) };
+  }
+  if (item.kind === "polygon") {
+    return { ...item, points: item.points.map((entry, itemIndex) => (itemIndex === index ? point : entry)) };
+  }
+  return item;
 }
 
 function HitShape({ item }: { item: SymbolPrimitive }) {
   if (item.kind === "line") {
-    return <line x1={item.x1} y1={item.y1} x2={item.x2} y2={item.y2} stroke="transparent" strokeWidth="8" />;
+    return <line x1={item.x1} y1={item.y1} x2={item.x2} y2={item.y2} stroke="transparent" strokeWidth="10" />;
   }
   if (item.kind === "circle") {
-    return <circle cx={item.cx} cy={item.cy} r={item.r} fill="transparent" stroke="transparent" strokeWidth="8" />;
+    return <circle cx={item.cx} cy={item.cy} r={item.r} fill="transparent" stroke="transparent" strokeWidth="10" />;
   }
-  return <polygon points={item.points.map((point) => `${point.x},${point.y}`).join(" ")} fill="transparent" stroke="transparent" strokeWidth="8" />;
+  return <polygon points={item.points.map((point) => `${point.x},${point.y}`).join(" ")} fill="transparent" stroke="transparent" strokeWidth="10" />;
+}
+
+function VertexHandle({
+  x,
+  y,
+  onPointerDown,
+}: {
+  x: number;
+  y: number;
+  onPointerDown: (event: PointerEvent<SVGCircleElement>) => void;
+}) {
+  return <circle className="symbol-editor__handle" cx={x} cy={y} r={4} onPointerDown={onPointerDown} />;
 }

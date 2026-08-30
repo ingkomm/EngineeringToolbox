@@ -1,4 +1,5 @@
 import type { ProjectDocument } from "../types/contract";
+import { defaultSymbolLibrary } from "../canvas/symbols/library";
 
 export const blankProject: ProjectDocument = {
   id: "workspace-1",
@@ -14,4 +15,5 @@ export const blankProject: ProjectDocument = {
     },
   ],
   edges: [],
+  symbolLibrary: defaultSymbolLibrary(),
 };

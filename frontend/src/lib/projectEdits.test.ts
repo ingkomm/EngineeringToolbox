@@ -367,12 +367,12 @@ describe("worksheet equipment and points", () => {
       ["EQ_1", 1, 1],
       ["EQ_2", 1, 1],
     ]);
-    const exchanger = applyWorkspaceEdit(
+    const pump = applyWorkspaceEdit(
       project,
-      { type: "addEquipment", symbolId: "heat-exchanger" },
+      { type: "addEquipment", symbolId: "pump" },
       FALLBACK_QUANTITIES,
     ).project.objects.filter(isEquipmentObject).at(-1);
-    expect(exchanger).toMatchObject({ symbolId: "heat-exchanger", inCount: 2, outCount: 2 });
+    expect(pump).toMatchObject({ symbolId: "pump", inCount: 1, outCount: 1 });
     expect(project.objects.filter(isPointObject).map((item) => [item.id, item.connectionCount])).toEqual([["PT_1", 4]]);
     expect(applyWorkspaceEdit(project, { type: "addInput", objectId: "EQ_1" }, FALLBACK_QUANTITIES).shouldEvaluate).toBe(false);
   });
@@ -810,5 +810,30 @@ describe("worksheet equipment and points", () => {
     project = applyWorkspaceEdit(project, { type: "deleteEdges", edgeIds: [edgeId!] }, FALLBACK_QUANTITIES).project;
     expect(project.edges).toHaveLength(0);
     expect(calc(project).links?.[0]?.targetObjectId).toBeNull();
+  });
+});
+
+describe("user symbol library", () => {
+  it("creates, updates, and deletes library symbols", () => {
+    let project = applyAll([{ type: "addLibrarySymbol" }]);
+    expect(project.symbolLibrary?.at(-1)).toMatchObject({ id: "sym_1", kind: "equipment" });
+    project = applyWorkspaceEdit(
+      project,
+      { type: "addEquipment", symbolId: "pump" },
+      FALLBACK_QUANTITIES,
+    ).project;
+    project = applyWorkspaceEdit(
+      project,
+      {
+        type: "updateLibrarySymbol",
+        symbolId: "pump",
+        patch: { name: "Main Pump", drawing: { width: 88, height: 66, primitives: [] } },
+      },
+      FALLBACK_QUANTITIES,
+    ).project;
+    expect(project.symbolLibrary?.find((item) => item.id === "pump")?.name).toBe("Main Pump");
+    expect(project.objects.find(isEquipmentObject)?.drawing?.primitives).toEqual([]);
+    project = applyWorkspaceEdit(project, { type: "deleteLibrarySymbol", symbolId: "valve" }, FALLBACK_QUANTITIES).project;
+    expect(project.symbolLibrary?.map((item) => item.id)).toEqual(["pump", "point", "sym_1"]);
   });
 });

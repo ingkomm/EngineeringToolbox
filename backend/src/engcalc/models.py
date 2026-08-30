@@ -324,6 +324,17 @@ def is_value_flow_edge(edge: Edge) -> bool:
     return (edge.relationType or "value_flow") == "value_flow"
 
 
+class LibrarySymbol(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    name: str = ""
+    kind: Literal["equipment", "point"] = "equipment"
+    inCount: int | None = Field(default=None, ge=0, le=8)
+    outCount: int | None = Field(default=None, ge=0, le=8)
+    drawing: SymbolDrawing | None = None
+
+
 class ProjectDocument(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -331,6 +342,7 @@ class ProjectDocument(BaseModel):
     name: str
     objects: list[CalculationObject | EquipmentObject | PointObject] = Field(default_factory=list)
     edges: list[Edge] = Field(default_factory=list)
+    symbolLibrary: list[LibrarySymbol] = Field(default_factory=list)
 
     @model_validator(mode="before")
     @classmethod

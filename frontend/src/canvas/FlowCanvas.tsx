@@ -317,22 +317,6 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
         </button>
         <button
           type="button"
-          className="ghost-btn"
-          data-testid="btn-add-equipment"
-          onClick={() => onEdit({ type: "addEquipment" })}
-        >
-          + Equipment
-        </button>
-        <button
-          type="button"
-          className="ghost-btn"
-          data-testid="btn-add-point"
-          onClick={() => onEdit({ type: "addPoint" })}
-        >
-          + Point
-        </button>
-        <button
-          type="button"
           className={`ghost-btn ${selectMode ? "ghost-btn--on" : ""}`}
           data-testid="btn-select-mode"
           onClick={() => setSelectMode((value) => !value)}

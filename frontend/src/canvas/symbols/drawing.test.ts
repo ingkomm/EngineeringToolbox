@@ -1,14 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { defaultPortAnchors, defaultDrawing } from "./drawing";
+import { defaultPortAnchors, defaultDrawing, blankDrawing } from "./drawing";
 import { CANVAS_GRID } from "./grid";
-import { SYMBOL_CATALOG } from "./catalog";
 
 describe("symbol drawings", () => {
-  it("keeps every default vertex on the canvas grid", () => {
-    for (const item of SYMBOL_CATALOG) {
-      const drawing = defaultDrawing(item.id);
-      expect(drawing.width).toBe(item.width);
-      expect(drawing.height).toBe(item.height);
+  it("keeps pump and valve vertices on the canvas grid", () => {
+    for (const id of ["pump", "valve"]) {
+      const drawing = defaultDrawing(id);
+      expect(drawing.width % CANVAS_GRID).toBe(0);
+      expect(drawing.height % CANVAS_GRID).toBe(0);
       for (const primitive of drawing.primitives) {
         if (primitive.kind === "line") {
           for (const value of [primitive.x1, primitive.y1, primitive.x2, primitive.y2]) {
@@ -30,13 +29,23 @@ describe("symbol drawings", () => {
     }
   });
 
-  it("crosses heat-exchanger in/out ports", () => {
-    const ports = defaultPortAnchors("heat-exchanger", 2, 2);
-    expect(ports).toEqual([
-      { id: "IN_1", side: "left", offset: 22 },
-      { id: "OUT_1", side: "right", offset: 44 },
-      { id: "IN_2", side: "right", offset: 22 },
-      { id: "OUT_2", side: "left", offset: 44 },
+  it("spaces in/out ports along the flow axis", () => {
+    expect(defaultPortAnchors(1, 1, 66)).toEqual([
+      { id: "IN_1", side: "left", offset: 33 },
+      { id: "OUT_1", side: "right", offset: 33 },
     ]);
+    expect(defaultPortAnchors(2, 2, 66)).toEqual([
+      { id: "IN_1", side: "left", offset: 22 },
+      { id: "IN_2", side: "left", offset: 44 },
+      { id: "OUT_1", side: "right", offset: 22 },
+      { id: "OUT_2", side: "right", offset: 44 },
+    ]);
+  });
+
+  it("starts a blank drawing on the even grid", () => {
+    const drawing = blankDrawing();
+    expect(drawing.primitives).toEqual([]);
+    expect(drawing.width % (CANVAS_GRID * 2)).toBe(0);
+    expect(drawing.height % (CANVAS_GRID * 2)).toBe(0);
   });
 });

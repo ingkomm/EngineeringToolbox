@@ -124,7 +124,7 @@ label.ghost-btn {
 
 .workspace {
   display: grid;
-  grid-template-columns: 228px minmax(0, 1fr) 300px;
+  grid-template-columns: 280px minmax(0, 1fr) 300px;
   min-height: 0;
 }
 
@@ -1742,6 +1742,10 @@ label.ghost-btn {
   background: #0b121c;
 }
 
+.iso-sidebar__head .ghost-btn {
+  width: 100%;
+}
+
 .iso-sidebar__head {
   padding: 12px 12px 8px;
   border-bottom: 1px solid var(--line);
@@ -1822,6 +1826,37 @@ label.ghost-btn {
   color: var(--text);
 }
 
+.iso-sidebar__row {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+  margin-bottom: 6px;
+}
+
+.iso-sidebar__row .iso-sidebar__tile {
+  flex: 1;
+  min-width: 0;
+}
+
+.iso-sidebar__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: center;
+}
+
+.iso-sidebar__actions .ghost-btn {
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.iso-sidebar__actions .ghost-btn--danger:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
 .iso-sidebar__icon {
   display: flex;
   align-items: center;
@@ -1848,17 +1883,20 @@ label.ghost-btn {
 }
 
 .symbol-editor {
-  position: absolute;
-  z-index: 30;
-  left: calc(100% + 12px);
-  top: 0;
-  width: 320px;
-  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px 10px 12px;
   background: #101826;
-  border: 1px solid var(--line-strong);
-  border-radius: 10px;
-  box-shadow: var(--shadow);
   color: var(--text);
+}
+
+.symbol-editor--dock {
+  flex: 1;
+  overflow: auto;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .symbol-editor header {
@@ -1882,11 +1920,28 @@ label.ghost-btn {
 
 .symbol-editor__canvas {
   width: 100%;
-  height: 220px;
-  background: #070c14;
+  height: 300px;
+  background: #f4f6f8;
+  color: #1a2436;
   border: 1px solid var(--line);
   border-radius: 8px;
   cursor: crosshair;
+  touch-action: none;
+}
+
+.symbol-editor__rubber {
+  fill: none;
+  stroke: #3d7dd6;
+  stroke-width: 1.4;
+  stroke-dasharray: 4 3;
+  pointer-events: none;
+}
+
+.symbol-editor__handle {
+  fill: #fff;
+  stroke: #3d7dd6;
+  stroke-width: 1.2;
+  cursor: grab;
 }
 
 .symbol-editor__grid {

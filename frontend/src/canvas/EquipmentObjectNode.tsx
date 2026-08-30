@@ -7,7 +7,6 @@ import { equipmentBounds, equipmentPortLayout, equipmentTag } from "../lib/arran
 import { resolveDrawing } from "./symbols/drawing";
 import { DrawingSvg } from "./symbols/DrawingSvg";
 import { evenGridSize } from "./symbols/grid";
-import { SymbolEditor } from "./symbols/SymbolEditor";
 import { ObjectLinkHandle } from "./ObjectLinkHandle";
 import { EquipmentPopover } from "./ArrangementPopover";
 
@@ -26,7 +25,6 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
   const ports = equipmentPortLayout(object);
   const [hovered, setHovered] = useState(false);
   const [inspect, setInspect] = useState(false);
-  const [editing, setEditing] = useState(false);
   const connecting = Boolean(useConnection().inProgress);
   const showPorts = Boolean(selected || hovered || connecting);
   const updateNodeInternals = useUpdateNodeInternals();
@@ -93,31 +91,7 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
           <span className="pid-port__label">{port.id}</span>
         </Handle>
       ))}
-      {inspect ? (
-        <EquipmentPopover
-          object={object}
-          onEdit={onEdit}
-          onClose={() => setInspect(false)}
-          onEditSymbol={() => {
-            setInspect(false);
-            setEditing(true);
-          }}
-        />
-      ) : null}
-      {editing ? (
-        <SymbolEditor
-          symbolId={object.symbolId}
-          drawing={drawing}
-          onChange={(next) =>
-            onEdit({
-              type: "updateEquipment",
-              objectId: id,
-              patch: { drawing: next, width: next.width, height: next.height },
-            })
-          }
-          onClose={() => setEditing(false)}
-        />
-      ) : null}
+      {inspect ? <EquipmentPopover object={object} onEdit={onEdit} onClose={() => setInspect(false)} /> : null}
     </article>
   );
 }

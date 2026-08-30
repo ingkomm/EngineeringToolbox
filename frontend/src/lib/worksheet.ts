@@ -8,6 +8,7 @@ import type {
   ProjectDocument,
   WorksheetObject,
 } from "../types/contract";
+import { defaultSymbolLibrary } from "../canvas/symbols/library";
 
 export type { ObjectLinkSide };
 
@@ -293,6 +294,7 @@ export function normalizeLoadedProject(project: ProjectDocument): ProjectDocumen
   });
   return {
     ...project,
+    symbolLibrary: project.symbolLibrary ?? defaultSymbolLibrary(),
     objects: normalized,
     edges: project.edges.map((edge) => {
       if (!isAssociationEdge(edge)) return edge;

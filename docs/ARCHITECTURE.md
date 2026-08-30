@@ -283,10 +283,13 @@ Object A의 PIN/POUT만 바꾸면 Object A와 B가 갱신된다. 매핑되지 �
 | `btn-new-worksheet` | 상단 바 | `newWorkspace` |
 | `btn-evaluate` | 상단 바 | `POST /api/v1/evaluate` |
 | `btn-add-object` | Canvas Panel top-left | `addObject` (Cal. 추가) |
-| `btn-add-equipment` | Canvas Panel top-left | 기본 Equipment 추가 |
-| `btn-add-point` | Canvas Panel top-left | `addPoint` |
-| `iso-sidebar` | 왼쪽 ISO 팔레트 | ISO 14084-2 분류 심볼 |
-| `btn-add-equipment-{symbolId}` | ISO 사이드메뉴 | 해당 심볼 Equipment 추가 |
+| `iso-sidebar` | 왼쪽 심볼 라이브러리 | Pump / Valve / Point. Create로 커스텀 심볼 추가 |
+| `btn-create-symbol` | 왼쪽 라이브러리 | 빈 Equipment 심볼 추가 후 편집기 열기 |
+| `btn-add-equipment-{symbolId}` | 왼쪽 라이브러리 | 해당 심볼 Equipment를 캔버스에 추가 |
+| `btn-add-point` | 왼쪽 라이브러리 | Point 추가 |
+| `btn-edit-symbol-{symbolId}` | 왼쪽 라이브러리 | 심볼 편집기 |
+| `btn-delete-symbol-{symbolId}` | 왼쪽 라이브러리 | 라이브러리에서 삭제 (캔버스 인스턴스는 유지) |
+| `symbol-editor` | 왼쪽 사이드바 | 직선/원 드래그, 다각형 클릭, 이동/꼭짓점 |
 | `btn-export-project` | 상단 바 | 프로젝트 JSON 다운로드 |
 | `btn-import-project` | 상단 바 | 프로젝트 JSON 불러오기 |
 | `btn-load-example` | 우측 사이드바 | `loadExample` |
@@ -323,8 +326,7 @@ Arrangement:
 
 | testid | 위치 | 동작 |
 |---|---|---|
-| `btn-add-equipment` | 캔버스 패널 | Equipment를 공용 워크시트에 추가 |
-| `btn-add-point` | 캔버스 패널 | Point를 공용 워크시트에 추가 |
+| `btn-add-point` | 왼쪽 라이브러리 | Point를 공용 워크시트에 추가 |
 | `object-{id}` | 워크시트 노드 | Equipment / Point 선택·이동 |
 | `object-{id}-IN_n` / `OUT_n` | Equipment 포트 | Point 연결 점과 드래그 연결 |
 | `object-{id}-in-count` | Equipment | In 포트 개수 |
@@ -337,16 +339,16 @@ Equipment와 Point는 Calculation Object와 **같은 공용 워크시트**에 �
 
 Arrangement 기본 화면은 P&ID 도면이다. Equipment는 SVG 심볼과 Tag만 보이고, Point는 작은 연결점이다. ID/입력창/삭제 버튼은 더블클릭 팝오버나 선택 툴바에 둔다. Calculation Object는 기존 카드 UI를 유지하며, 펼치기 버튼으로만 Input/Calculation/Output/Link를 연다.
 
-심볼은 `frontend/src/canvas/symbols/`에 ISO 14084-2 절 구조로 등록한다. 크기는 11px 그리드의 짝수 칸이라 중심선이 그리드에 붙는다. 화면 심볼은 직선·원·다각형이며, Equipment 팝오버의 심볼 편집으로 바꿀 수 있다. 열교환기는 인/아웃이 대각으로 교차한다.
+심볼은 프로젝트 `symbolLibrary`에 저장한다. 기본값은 Pump, Valve, Point 세 개다. 사용자는 Create로 빈 심볼을 만들고 왼쪽 편집기에서 직선·원·다각형을 그린 뒤 저장한다. 크기는 11px 그리드의 짝수 칸이라 중심선이 그리드에 붙는다. 라이브러리 심볼을 고치면 같은 `symbolId`를 쓰는 캔버스 Equipment도 따라간다.
 
 선택 필드(`tag`, `rotation`, `width`, `height`, `linkKind`, `showArrow`, `waypoints`)는 없어도 예전 JSON을 로드한다. Pipe/Signal은 `Point.connections`에만 있고, Calculation 값 연결(`value_flow`)과 섞지 않는다.
 
 이 프로토타입 범위:
 
-- Equipment: 범용 심볼. In/Out 포트 개수를 지정한다. 포트 ID는 `IN_1`… / `OUT_1`…
+- Equipment: 라이브러리 심볼. In/Out 포트 개수를 지정한다. 포트 ID는 `IN_1`… / `OUT_1`…
 - Point: 원형 노드. 배관 연결 점은 서·동·남·북 4개(`C_1`/`C_2`/`C_3`/`C_4`)로 고정한다. Equipment In/Out 또는 다른 Point에 드래그로 붙인다. 연결선은 꺾은선이며 화살표 방향은 토글한다.
 - Calculation Object Link: 각 객체의 노란 `OBJ` 점에만 붙는 점선 association. 위치는 상단/하단을 고른다. Calculation 하나는 여러 Equipment/Point에 연결할 수 있고, layout 객체당 노란 링크는 하나다. 더블클릭으로 지운다. 값은 흐르지 않는다.
-- ISO 객체는 왼쪽 사이드메뉴에서 고른다. Pipe/Signal은 Point·Equipment 포트 연결이다.
+- 왼쪽 사이드바에서 심볼을 만들고 지운다. 캔버스 위쪽 `+ Equipment` / `+ Point` 버튼은 없다. Pipe/Signal은 Point·Equipment 포트 연결이다.
 
 역할 분리:
 

@@ -280,7 +280,7 @@ export function App() {
       </header>
 
       <main className="workspace">
-        <IsoSymbolSidebar onAdd={(symbolId) => onEdit({ type: "addEquipment", symbolId })} />
+        <IsoSymbolSidebar project={project} onEdit={onEdit} />
         <section className="canvas-pane">
           <ReactFlowProvider>
             <FlowCanvas
