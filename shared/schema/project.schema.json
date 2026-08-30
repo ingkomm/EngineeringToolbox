@@ -1,0 +1,337 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://engineeringtoolbox.local/schema/project.json",
+  "title": "Engineering Toolbox Project Document",
+  "description": "Canonical JSON contract between React Flow UI and Python calculation backend. Cell addresses are forbidden; variables use semantic IDs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "objects", "edges"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "schemaVersion": { "type": "integer", "minimum": 1 },
+    "name": { "type": "string" },
+    "symbolLibrary": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/librarySymbol" }
+    },
+    "symbolCategories": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "objects": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/calculationObject" },
+          { "$ref": "#/$defs/equipmentObject" },
+          { "$ref": "#/$defs/pointObject" },
+          { "$ref": "#/$defs/memoObject" }
+        ]
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/edge" }
+    }
+  },
+  "$defs": {
+    "variableId": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "variableStatus": {
+      "type": "string",
+      "enum": ["idle", "ok", "mapped", "error"]
+    },
+    "inputVariable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "$ref": "#/$defs/variableId" },
+        "name": { "type": "string" },
+        "value": { "type": ["number", "null"] },
+        "quantity": { "type": ["string", "null"] },
+        "unit": { "type": ["string", "null"] },
+        "status": { "$ref": "#/$defs/variableStatus" },
+        "error": { "type": ["string", "null"] }
+      }
+    },
+    "formulaVariable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "formula"],
+      "properties": {
+        "id": { "$ref": "#/$defs/variableId" },
+        "name": { "type": "string" },
+        "formula": { "type": "string" },
+        "value": { "type": ["number", "null"] },
+        "quantity": { "type": ["string", "null"] },
+        "unit": { "type": ["string", "null"] },
+        "status": { "$ref": "#/$defs/variableStatus" },
+        "error": { "type": ["string", "null"] }
+      }
+    },
+    "outputBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sourceVariableId"],
+      "properties": {
+        "id": { "$ref": "#/$defs/variableId" },
+        "name": { "type": "string" },
+        "sourceVariableId": { "$ref": "#/$defs/variableId" },
+        "value": { "type": ["number", "null"] },
+        "quantity": { "type": ["string", "null"] },
+        "unit": { "type": ["string", "null"] },
+        "status": { "$ref": "#/$defs/variableStatus" },
+        "error": { "type": ["string", "null"] }
+      }
+    },
+    "position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "calculationObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "position", "inputs", "calculations", "outputs"],
+      "properties": {
+        "kind": { "type": "string", "const": "calculation" },
+        "id": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$" },
+        "name": { "type": "string", "minLength": 1 },
+        "position": { "$ref": "#/$defs/position" },
+        "inputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/inputVariable" }
+        },
+        "calculations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/formulaVariable" }
+        },
+        "outputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/outputBinding" }
+        },
+        "links": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/calculationLink" }
+        },
+        "objectLinkSide": { "type": "string", "enum": ["top", "bottom"] },
+        "width": { "type": "number", "minimum": 280 }
+      }
+    },
+    "calculationLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "$ref": "#/$defs/variableId" },
+        "name": { "type": "string" },
+        "targetObjectId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+        "targetPortId": { "anyOf": [{ "$ref": "#/$defs/variableId" }, { "type": "null" }] }
+      }
+    },
+    "pointEnd": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["objectId", "portId"],
+      "properties": {
+        "objectId": { "$ref": "#/$defs/variableId" },
+        "portId": { "$ref": "#/$defs/variableId" },
+        "reversed": { "type": "boolean" },
+        "equipmentId": { "$ref": "#/$defs/variableId" },
+        "linkKind": { "type": "string", "enum": ["pipe", "signal"] },
+        "showArrow": { "type": "boolean" },
+        "waypoints": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/position" }
+        }
+      }
+    },
+    "librarySymbol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "kind"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "kind": { "type": "string", "enum": ["equipment", "point"] },
+        "inCount": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "outCount": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "category": { "type": "string" },
+        "drawing": { "$ref": "#/$defs/symbolDrawing" }
+      }
+    },
+    "symbolPort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "side": { "type": "string", "enum": ["left", "right", "top", "bottom"] },
+        "offset": { "type": "number" }
+      }
+    },
+    "symbolDrawing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height", "primitives"],
+      "properties": {
+        "width": { "type": "number", "minimum": 22 },
+        "height": { "type": "number", "minimum": 22 },
+        "ports": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/symbolPort" }
+        },
+        "primitives": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "x1", "y1", "x2", "y2"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "kind": { "type": "string", "const": "line" },
+                  "x1": { "type": "number" },
+                  "y1": { "type": "number" },
+                  "x2": { "type": "number" },
+                  "y2": { "type": "number" }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "cx", "cy", "r"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "kind": { "type": "string", "const": "circle" },
+                  "cx": { "type": "number" },
+                  "cy": { "type": "number" },
+                  "r": { "type": "number", "minimum": 0 }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "points"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "kind": { "type": "string", "const": "polygon" },
+                  "points": {
+                    "type": "array",
+                    "minItems": 3,
+                    "items": { "$ref": "#/$defs/position" }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "equipmentObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "name", "position"],
+      "properties": {
+        "kind": { "type": "string", "const": "equipment" },
+        "id": { "$ref": "#/$defs/variableId" },
+        "name": { "type": "string" },
+        "position": { "$ref": "#/$defs/position" },
+        "symbolId": { "type": "string", "minLength": 1 },
+        "inCount": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "outCount": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "objectLinkSide": { "type": "string", "enum": ["top", "bottom"] },
+        "tag": { "type": "string" },
+        "rotation": { "type": "integer", "enum": [0, 90, 180, 270] },
+        "width": { "type": "number", "minimum": 22 },
+        "height": { "type": "number", "minimum": 22 },
+        "drawing": { "$ref": "#/$defs/symbolDrawing" }
+      }
+    },
+    "pointObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "name", "position"],
+      "properties": {
+        "kind": { "type": "string", "const": "point" },
+        "id": { "$ref": "#/$defs/variableId" },
+        "name": { "type": "string" },
+        "position": { "$ref": "#/$defs/position" },
+        "connectionCount": { "type": "integer", "minimum": 2, "maximum": 4 },
+        "connections": {
+          "type": "array",
+          "items": { "anyOf": [{ "$ref": "#/$defs/pointEnd" }, { "type": "null" }] }
+        },
+        "objectLinkSide": { "type": "string", "enum": ["top", "bottom"] }
+      }
+    },
+    "memoObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "position", "tags", "blocks", "links", "size"],
+      "properties": {
+        "kind": { "type": "string", "const": "memo" },
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["label", "normalizedKey"],
+            "properties": {
+              "label": { "type": "string" },
+              "normalizedKey": { "type": "string" }
+            }
+          }
+        },
+        "parentId": { "type": ["string", "null"] },
+        "blocks": { "type": "array" },
+        "links": { "type": "array" },
+        "position": { "$ref": "#/$defs/position" },
+        "size": {
+          "type": "object",
+          "required": ["width", "height"],
+          "properties": {
+            "width": { "type": "number" },
+            "height": { "type": "number" }
+          }
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sourceObjectId",
+        "sourceVariableId",
+        "targetObjectId",
+        "targetVariableId"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "sourceObjectId": { "type": "string" },
+        "sourceVariableId": { "$ref": "#/$defs/variableId" },
+        "targetObjectId": { "type": "string" },
+        "targetVariableId": { "$ref": "#/$defs/variableId" },
+        "enabled": { "type": "boolean" },
+        "collapsed": { "type": "boolean" },
+        "relationType": {
+          "type": "string",
+          "enum": ["value_flow", "reference", "association", "pipe", "signal"]
+        }
+      }
+    }
+  }
+}
