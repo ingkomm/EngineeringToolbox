@@ -58,7 +58,8 @@ export function IsoSymbolSidebar({
                   type="button"
                   className="iso-sidebar__mini"
                   data-testid={`btn-edit-symbol-${item.id}`}
-                  onClick={() => {
+                  onClick={(event) => {
+                    event.stopPropagation();
                     setPendingDelete(null);
                     setEditingId(item.id === editingId ? null : item.id);
                   }}
@@ -70,9 +71,21 @@ export function IsoSymbolSidebar({
                 <>
                   <button
                     type="button"
+                    className="iso-sidebar__mini"
+                    data-testid={`btn-cancel-delete-symbol-${item.id}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setPendingDelete(null);
+                    }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
                     className="iso-sidebar__mini iso-sidebar__mini--danger"
                     data-testid={`btn-confirm-delete-symbol-${item.id}`}
-                    onClick={() => {
+                    onClick={(event) => {
+                      event.stopPropagation();
                       if (editingId === item.id) setEditingId(null);
                       setPendingDelete(null);
                       onEdit({ type: "deleteLibrarySymbol", symbolId: item.id });
@@ -80,16 +93,16 @@ export function IsoSymbolSidebar({
                   >
                     확인
                   </button>
-                  <button type="button" className="iso-sidebar__mini" onClick={() => setPendingDelete(null)}>
-                    취소
-                  </button>
                 </>
               ) : (
                 <button
                   type="button"
                   className="iso-sidebar__mini iso-sidebar__mini--danger"
                   data-testid={`btn-delete-symbol-${item.id}`}
-                  onClick={() => setPendingDelete(item.id)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setPendingDelete(item.id);
+                  }}
                 >
                   삭제
                 </button>
