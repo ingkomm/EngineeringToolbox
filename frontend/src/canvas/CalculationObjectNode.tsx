@@ -1,5 +1,5 @@
-import { NodeResizer, Position, type Node, type NodeProps, useUpdateNodeInternals } from "@xyflow/react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { Position, type Node, type NodeProps, useReactFlow, useUpdateNodeInternals } from "@xyflow/react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import type { CalculationObject, ProjectDocument } from "../types/contract";
 import { formatValue, inputHandleId, outputHandleId } from "../lib/display";
 import { ObjectLinkHandle } from "./ObjectLinkHandle";
@@ -13,7 +13,7 @@ import {
 } from "../lib/formulaComplete";
 import { OBJECT_ID_RE, VARIABLE_ID_RE, type WorkspaceEdit } from "../lib/projectEdits";
 import { OBJECT_LINK_HANDLE, objectLinkSideOf } from "../lib/worksheet";
-import { CALC_COMPACT_WIDTH, snapCalcWidth } from "./symbols/grid";
+import { calcCardWidth, snapCalcWidth } from "./symbols/grid";
 import { displayName } from "../lib/variables";
 import type { QuantitySpec } from "../lib/quantities";
 import { RowHandle } from "./RowHandle";
@@ -38,7 +38,16 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
   const { object, project, mappedInputIds, quantities, onEdit } = data;
   const mapped = new Set(mappedInputIds);
   const [expanded, setExpanded] = useState(false);
+  const [resizeWidth, setResizeWidth] = useState<number | null>(null);
   const open = expanded;
+  const cardWidth = resizeWidth ?? calcCardWidth(open, object.width);
+  const { setNodes, getZoom } = useReactFlow();
+  const resizeDrag = useRef<{
+    side: "left" | "right";
+    startX: number;
+    startWidth: number;
+    startPosX: number;
+  } | null>(null);
   const updateNodeInternals = useUpdateNodeInternals();
   const handleSignature = [
     ...object.inputs.map((item) => item.id),
@@ -46,12 +55,23 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
     OBJECT_LINK_HANDLE,
     objectLinkSideOf(object),
     open ? "open" : "compact",
-    object.width ?? "",
+    cardWidth,
   ].join("|");
 
   useLayoutEffect(() => {
+    setNodes((nodes) => {
+      const current = nodes.find((node) => node.id === id);
+      const styleWidth =
+        typeof current?.style?.width === "number"
+          ? current.style.width
+          : Number.parseFloat(String(current?.style?.width ?? ""));
+      if (current && current.width === cardWidth && styleWidth === cardWidth) return nodes;
+      return nodes.map((node) =>
+        node.id === id ? { ...node, width: cardWidth, style: { ...node.style, width: cardWidth } } : node,
+      );
+    });
     updateNodeInternals(id);
-  }, [handleSignature, id, updateNodeInternals]);
+  }, [cardWidth, handleSignature, id, setNodes, updateNodeInternals]);
 
   const candidatesFor = (excludeId: string): FormulaCandidate[] => [
     ...[...object.inputs, ...object.calculations]
@@ -63,21 +83,75 @@ export function CalculationObjectNode({ id, selected, data }: NodeProps<Calculat
     ...FORMULA_FUNCTIONS,
   ];
 
+  const onCalcResize = (width: number, positionX: number) => {
+    setResizeWidth(width);
+    setNodes((nodes) =>
+      nodes.map((node) =>
+        node.id === id
+          ? { ...node, width, style: { ...node.style, width }, position: { ...node.position, x: positionX } }
+          : node,
+      ),
+    );
+  };
+  const onCalcResizeEnd = (width: number, positionX: number) => {
+    setResizeWidth(null);
+    onEdit({
+      type: "updateObject",
+      objectId: id,
+      patch: { width: snapCalcWidth(width), position: { x: positionX, y: object.position.y } },
+    });
+  };
+
+  const startWidthDrag = (side: "left" | "right") => (event: PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    resizeDrag.current = { side, startX: event.clientX, startWidth: cardWidth, startPosX: object.position.x };
+  };
+  const moveWidthDrag = (event: PointerEvent<HTMLDivElement>) => {
+    const drag = resizeDrag.current;
+    if (!drag) return;
+    const dx = (event.clientX - drag.startX) / getZoom();
+    const nextWidth = Math.max(440, drag.side === "right" ? drag.startWidth + dx : drag.startWidth - dx);
+    const positionX = drag.side === "right" ? drag.startPosX : drag.startPosX + (drag.startWidth - nextWidth);
+    onCalcResize(nextWidth, positionX);
+  };
+  const endWidthDrag = (event: PointerEvent<HTMLDivElement>) => {
+    const drag = resizeDrag.current;
+    if (!drag) return;
+    resizeDrag.current = null;
+    const dx = (event.clientX - drag.startX) / getZoom();
+    const nextWidth = Math.max(440, drag.side === "right" ? drag.startWidth + dx : drag.startWidth - dx);
+    const positionX = drag.side === "right" ? drag.startPosX : drag.startPosX + (drag.startWidth - nextWidth);
+    onCalcResizeEnd(nextWidth, positionX);
+  };
+
   return (
     <article
       className={`ws-node ws-node--calc calc-node ${selected ? "is-selected" : ""} ${open ? "is-expanded" : ""}`}
       data-testid={`object-${id}`}
-      style={open ? { width: object.width ?? snapCalcWidth(760) } : { width: CALC_COMPACT_WIDTH }}
+      style={{ width: cardWidth }}
     >
-      <NodeResizer
-        isVisible={Boolean(open && selected)}
-        minWidth={440}
-        minHeight={80}
-        handleStyle={{ width: 8, height: 36 }}
-        onResizeEnd={(_event, params) =>
-          onEdit({ type: "updateObject", objectId: id, patch: { width: snapCalcWidth(params.width) } })
-        }
-      />
+      {open && selected ? (
+        <>
+          <div
+            className="calc-resize calc-resize--left nodrag nopan"
+            data-testid={`object-${id}-resize-left`}
+            onPointerDown={startWidthDrag("left")}
+            onPointerMove={moveWidthDrag}
+            onPointerUp={endWidthDrag}
+            onPointerCancel={endWidthDrag}
+          />
+          <div
+            className="calc-resize calc-resize--right nodrag nopan"
+            data-testid={`object-${id}-resize-right`}
+            onPointerDown={startWidthDrag("right")}
+            onPointerMove={moveWidthDrag}
+            onPointerUp={endWidthDrag}
+            onPointerCancel={endWidthDrag}
+          />
+        </>
+      ) : null}
       <ObjectLinkHandle
         nodeId={id}
         side={objectLinkSideOf(object)}

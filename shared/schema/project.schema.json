@@ -13,6 +13,10 @@
       "type": "array",
       "items": { "$ref": "#/$defs/librarySymbol" }
     },
+    "symbolCategories": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
     "objects": {
       "type": "array",
       "items": {
@@ -157,6 +161,7 @@
         "kind": { "type": "string", "enum": ["equipment", "point"] },
         "inCount": { "type": "integer", "minimum": 0, "maximum": 8 },
         "outCount": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "category": { "type": "string" },
         "drawing": { "$ref": "#/$defs/symbolDrawing" }
       }
     },

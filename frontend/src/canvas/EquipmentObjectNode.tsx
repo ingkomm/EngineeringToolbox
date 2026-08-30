@@ -6,7 +6,7 @@ import { objectLinkSideOf } from "../lib/worksheet";
 import { equipmentBounds, equipmentPortLayout, equipmentTag } from "../lib/arrangementView";
 import { resolveDrawing } from "./symbols/drawing";
 import { DrawingSvg } from "./symbols/DrawingSvg";
-import { evenGridSize } from "./symbols/grid";
+import { snapGridSize } from "./symbols/grid";
 import { ObjectLinkHandle } from "./ObjectLinkHandle";
 import { EquipmentPopover } from "./ArrangementPopover";
 
@@ -54,14 +54,13 @@ export function EquipmentObjectNode({ id, selected, data }: NodeProps<EquipmentO
           onEdit({
             type: "updateEquipment",
             objectId: id,
-            patch: { width: evenGridSize(params.width), height: evenGridSize(params.height) },
+            patch: { width: snapGridSize(params.width), height: snapGridSize(params.height) },
           })
         }
       />
       <ObjectLinkHandle
         nodeId={id}
         side={objectLinkSideOf(object)}
-        hidden={!showPorts}
         onToggleSide={() =>
           onEdit({
             type: "setObjectLinkSide",

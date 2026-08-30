@@ -45,6 +45,7 @@ export function toFlowNodeRecords(
     return {
       id: object.id,
       type: "calculationObject" as const,
+      origin: [0, 0] as [number, number],
       position: object.position,
       data: {
         object,
@@ -207,9 +208,9 @@ export function toFlowEdges(
 }
 
 export function mergeFlowNodes<T extends { id: string; data: unknown; position: { x: number; y: number } }>(
-  current: Array<T & { dragging?: boolean; selected?: boolean }>,
+  current: Array<T & { dragging?: boolean; selected?: boolean; width?: number; style?: { width?: number | string } }>,
   next: T[],
-): Array<T & { dragging?: boolean; selected?: boolean }> {
+): Array<T & { dragging?: boolean; selected?: boolean; width?: number; style?: { width?: number | string } }> {
   const currentById = new Map(current.map((node) => [node.id, node]));
   return next.map((record) => {
     const existing = currentById.get(record.id);

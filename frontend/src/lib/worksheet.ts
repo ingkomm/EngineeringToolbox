@@ -295,6 +295,7 @@ export function normalizeLoadedProject(project: ProjectDocument): ProjectDocumen
   return {
     ...project,
     symbolLibrary: project.symbolLibrary ?? defaultSymbolLibrary(),
+    symbolCategories: project.symbolCategories ?? [],
     objects: normalized,
     edges: project.edges.map((edge) => {
       if (!isAssociationEdge(edge)) return edge;

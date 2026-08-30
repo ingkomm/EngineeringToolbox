@@ -10,6 +10,62 @@ export interface LibrarySymbol {
   inCount?: number;
   outCount?: number;
   drawing?: SymbolDrawing | null;
+  category?: string;
+}
+
+export function normalizeCategory(path: string | undefined): string {
+  return (path ?? "")
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join("/");
+}
+
+export function uniqueCategory(existing: string[], path: string): string {
+  const base = normalizeCategory(path);
+  if (!base) return "";
+  const used = new Set(existing.map(normalizeCategory));
+  if (!used.has(base)) return base;
+  let n = 2;
+  while (used.has(`${base} ${n}`)) n += 1;
+  return `${base} ${n}`;
+}
+
+export function categoryOf(item: Pick<LibrarySymbol, "category">): string {
+  return normalizeCategory(item.category);
+}
+
+export function moveLibrarySymbol(library: LibrarySymbol[], symbolId: string, direction: -1 | 1): LibrarySymbol[] {
+  const current = library.find((item) => item.id === symbolId);
+  if (!current) return library;
+  const folder = categoryOf(current);
+  const siblingIds = library.filter((item) => categoryOf(item) === folder).map((item) => item.id);
+  const siblingIndex = siblingIds.indexOf(symbolId);
+  const swapId = siblingIds[siblingIndex + direction];
+  if (!swapId) return library;
+  const from = library.findIndex((item) => item.id === symbolId);
+  const to = library.findIndex((item) => item.id === swapId);
+  const next = [...library];
+  const fromItem = next[from]!;
+  next[from] = next[to]!;
+  next[to] = fromItem;
+  return next;
+}
+
+export function libraryFolders(library: LibrarySymbol[], extra: string[] = []): string[] {
+  const folders = new Set<string>(extra.map(normalizeCategory).filter(Boolean));
+  for (const item of library) {
+    const path = categoryOf(item);
+    if (!path) continue;
+    const parts = path.split("/");
+    for (let i = 1; i <= parts.length; i += 1) folders.add(parts.slice(0, i).join("/"));
+  }
+  return [...folders].sort((a, b) => a.localeCompare(b, "en"));
+}
+
+export function symbolsInFolder(library: LibrarySymbol[], folder: string): LibrarySymbol[] {
+  const path = normalizeCategory(folder);
+  return library.filter((item) => categoryOf(item) === path);
 }
 
 export function defaultSymbolLibrary(): LibrarySymbol[] {

@@ -137,7 +137,9 @@ export interface ProjectDocument {
     inCount?: number;
     outCount?: number;
     drawing?: EquipmentObject["drawing"];
+    category?: string;
   }>;
+  symbolCategories?: string[];
 }
 
 export interface EvalError {

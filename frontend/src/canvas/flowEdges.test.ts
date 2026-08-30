@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeFlowNodes, toFlowEdges } from "./flowModel";
+import { mergeFlowNodes, toFlowEdges, toFlowNodeRecords } from "./flowModel";
 import type { ProjectDocument } from "../types/contract";
 
 const project: ProjectDocument = {
@@ -99,6 +99,15 @@ describe("mergeFlowNodes", () => {
     );
     expect(merged[0]?.position).toEqual({ x: 8, y: 9 });
   });
+
+  it("keeps an expanded calculation wrapper width when the project record has none", () => {
+    const merged = mergeFlowNodes(
+      [{ id: "obj_1", position: { x: 0, y: 0 }, width: 759, style: { width: 759 }, data: { label: "old" } }],
+      [{ id: "obj_1", position: { x: 0, y: 0 }, data: { label: "new" } }],
+    );
+    expect(merged[0]?.width).toBe(759);
+    expect(merged[0]?.style).toEqual({ width: 759 });
+  });
 });
 
 describe("arrangement and association edges", () => {
@@ -158,6 +167,49 @@ describe("arrangement and association edges", () => {
       targetHandle: "C_2",
       type: "arrangementLink",
       data: expect.objectContaining({ reversed: false, pointId: "PT_1", end: "C_1" }),
+    });
+  });
+});
+
+describe("layout node origin", () => {
+  it("places equipment and point nodes by their visual center", () => {
+    const layout: ProjectDocument = {
+      id: "ws",
+      name: "ws",
+      objects: [
+        {
+          kind: "point",
+          id: "PT_1",
+          name: "PT_1",
+          position: { x: 110, y: 88 },
+          connectionCount: 3,
+          connections: [null, null, null],
+        },
+        {
+          kind: "equipment",
+          id: "EQ_1",
+          name: "Pump",
+          position: { x: 220, y: 88 },
+          symbolId: "pump",
+          inCount: 1,
+          outCount: 1,
+          width: 66,
+          height: 66,
+        },
+      ],
+      edges: [],
+    };
+    const nodes = toFlowNodeRecords(layout, [], () => undefined);
+    const point = nodes.find((item) => item.id === "PT_1");
+    const equipment = nodes.find((item) => item.id === "EQ_1");
+    expect(point).toMatchObject({
+      origin: [0.5, 0.5],
+      position: { x: 128, y: 106 },
+    });
+    expect(equipment?.origin).toEqual([0.5, 0.5]);
+    expect(equipment?.position).toEqual({
+      x: 220 + (equipment?.width ?? 0) / 2,
+      y: 88 + (equipment?.height ?? 0) / 2,
     });
   });
 });

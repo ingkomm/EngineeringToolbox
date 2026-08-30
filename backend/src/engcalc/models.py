@@ -344,6 +344,7 @@ class LibrarySymbol(BaseModel):
     inCount: int | None = Field(default=None, ge=0, le=8)
     outCount: int | None = Field(default=None, ge=0, le=8)
     drawing: SymbolDrawing | None = None
+    category: str | None = None
 
 
 class ProjectDocument(BaseModel):
@@ -354,6 +355,7 @@ class ProjectDocument(BaseModel):
     objects: list[CalculationObject | EquipmentObject | PointObject] = Field(default_factory=list)
     edges: list[Edge] = Field(default_factory=list)
     symbolLibrary: list[LibrarySymbol] = Field(default_factory=list)
+    symbolCategories: list[str] = Field(default_factory=list)
 
     @model_validator(mode="before")
     @classmethod

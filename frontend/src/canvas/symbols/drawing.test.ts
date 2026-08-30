@@ -42,14 +42,14 @@ describe("symbol drawings", () => {
     ]);
   });
 
-  it("starts a blank drawing on the even grid", () => {
+  it("starts a blank drawing on a 9×7 cell grid", () => {
     const drawing = blankDrawing();
     expect(drawing.primitives).toEqual([]);
     expect(sizeToGridLines(drawing.width)).toBe(9);
     expect(sizeToGridLines(drawing.height)).toBe(7);
-    expect(gridLinesToSize(9)).toBe(88);
-    expect(drawing.width % (CANVAS_GRID * 2)).toBe(0);
-    expect(drawing.height % (CANVAS_GRID * 2)).toBe(0);
+    expect(gridLinesToSize(9)).toBe(99);
+    expect(drawing.width).toBe(99);
+    expect(drawing.height).toBe(77);
   });
 
   it("keeps interior port positions when in/out counts change", () => {

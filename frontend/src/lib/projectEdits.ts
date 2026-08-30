@@ -10,8 +10,8 @@ import type {
   ProjectDocument,
   RelationType,
 } from "../types/contract";
-import { firstEquipmentSymbol, findLibrarySymbol, libraryOf, newBlankEquipmentSymbol } from "../canvas/symbols/library";
-import { evenGridSize, snapCalcWidth } from "../canvas/symbols/grid";
+import { firstEquipmentSymbol, findLibrarySymbol, libraryOf, moveLibrarySymbol, newBlankEquipmentSymbol, normalizeCategory, uniqueCategory } from "../canvas/symbols/library";
+import { POINT_NODE_SIZE, snapCalcWidth, snapCenteredTopLeft, snapGridSize } from "../canvas/symbols/grid";
 import { resolveDrawing, withPorts } from "../canvas/symbols/drawing";
 import { blankProject } from "../example/blankProject";
 import { prototypeProject } from "../example/prototypeProject";
@@ -48,7 +48,7 @@ export type WorkspaceEdit =
   | { type: "addObject" }
   | { type: "deleteObject"; objectId: string }
   | { type: "renameObject"; objectId: string; name: string }
-  | { type: "updateObject"; objectId: string; patch: { id?: string; name?: string; width?: number } }
+  | { type: "updateObject"; objectId: string; patch: { id?: string; name?: string; width?: number; position?: { x: number; y: number } } }
   | { type: "addInput"; objectId: string }
   | { type: "removeInput"; objectId: string; index: number }
   | { type: "updateInput"; objectId: string; index: number; patch: Partial<InputVariable> }
@@ -89,8 +89,10 @@ export type WorkspaceEdit =
   | { type: "deleteEdges"; edgeIds: string[] }
   | { type: "addEquipment"; symbolId?: string }
   | { type: "addPoint" }
-  | { type: "addLibrarySymbol" }
+  | { type: "addLibrarySymbol"; category?: string }
   | { type: "deleteLibrarySymbol"; symbolId: string }
+  | { type: "moveLibrarySymbol"; symbolId: string; direction: -1 | 1 }
+  | { type: "addLibraryCategory"; path: string }
   | {
       type: "updateLibrarySymbol";
       symbolId: string;
@@ -99,6 +101,7 @@ export type WorkspaceEdit =
         inCount?: number;
         outCount?: number;
         drawing?: EquipmentObject["drawing"];
+        category?: string;
       };
     }
   | {
@@ -256,10 +259,18 @@ function nextPrefixedObjectId(project: ProjectDocument, prefix: string): string 
   return `${prefix}_${n}`;
 }
 
-function nextLayoutPosition(project: ProjectDocument): { x: number; y: number } {
+function nextLayoutPosition(
+  project: ProjectDocument,
+  width = POINT_NODE_SIZE,
+  height = POINT_NODE_SIZE,
+): { x: number; y: number } {
   const layouts = project.objects.filter(isLayoutObject);
   const index = layouts.length;
-  return { x: 520 + (index % 4) * 140, y: 88 + Math.floor(index / 4) * 140 };
+  return snapCenteredTopLeft(
+    { x: 520 + (index % 4) * 143, y: 88 + Math.floor(index / 4) * 143 },
+    width,
+    height,
+  );
 }
 
 function rewriteIdentifier(formula: string, fromId: string, toId: string): string {
@@ -556,11 +567,17 @@ export function applyWorkspaceEdit(
       if (nextId !== current.id) next = rekeyObject(next, current.id, nextId);
       const nextWidth =
         edit.patch.width != null && isCalculationObject(current) ? snapCalcWidth(edit.patch.width) : undefined;
+      const nextPosition = edit.patch.position ?? current.position;
       next = {
         ...next,
         objects: next.objects.map((object) =>
           object.id === nextId
-            ? { ...object, name: nextName, ...(nextWidth != null ? { width: nextWidth } : {}) }
+            ? {
+                ...object,
+                name: nextName,
+                position: nextPosition,
+                ...(nextWidth != null ? { width: nextWidth } : {}),
+              }
             : object,
         ),
       };
@@ -986,9 +1003,13 @@ export function applyWorkspaceEdit(
     case "addPoint":
       return addWorksheetPoint(project);
     case "addLibrarySymbol":
-      return addLibrarySymbol(project);
+      return addLibrarySymbol(project, edit.category);
     case "deleteLibrarySymbol":
       return deleteLibrarySymbol(project, edit.symbolId);
+    case "moveLibrarySymbol":
+      return moveLibrarySymbolEdit(project, edit.symbolId, edit.direction);
+    case "addLibraryCategory":
+      return addLibraryCategoryEdit(project, edit.path);
     case "updateLibrarySymbol":
       return updateLibrarySymbol(project, edit.symbolId, edit.patch);
     case "updateEquipment":
@@ -1049,11 +1070,13 @@ function addWorksheetEquipment(project: ProjectDocument, symbolId?: string): Edi
   if (!template || template.kind !== "equipment") return noEval(project);
   const id = nextPrefixedObjectId(project, "EQ");
   const drawing = template.drawing ?? undefined;
+  const width = drawing?.width ?? 99;
+  const height = drawing?.height ?? 77;
   const object: EquipmentObject = {
     kind: "equipment",
     id,
     name: nextEquipmentName(project, template.id),
-    position: nextLayoutPosition(project),
+    position: nextLayoutPosition(project, width, height),
     symbolId: template.id,
     inCount: template.inCount ?? 1,
     outCount: template.outCount ?? 1,
@@ -1065,9 +1088,9 @@ function addWorksheetEquipment(project: ProjectDocument, symbolId?: string): Edi
   return { project: { ...project, objects: [...project.objects, object] }, dirtyObjectIds: [], shouldEvaluate: false };
 }
 
-function addLibrarySymbol(project: ProjectDocument): EditResult {
+function addLibrarySymbol(project: ProjectDocument, category?: string): EditResult {
   const library = libraryOf(project);
-  const created = newBlankEquipmentSymbol(library);
+  const created = { ...newBlankEquipmentSymbol(library), category: normalizeCategory(category ?? "") || undefined };
   return {
     project: { ...project, symbolLibrary: [...library, created] },
     dirtyObjectIds: [],
@@ -1080,20 +1103,48 @@ function deleteLibrarySymbol(project: ProjectDocument, symbolId: string): EditRe
   return { project: { ...project, symbolLibrary: library }, dirtyObjectIds: [], shouldEvaluate: false };
 }
 
+function moveLibrarySymbolEdit(project: ProjectDocument, symbolId: string, direction: -1 | 1): EditResult {
+  return {
+    project: { ...project, symbolLibrary: moveLibrarySymbol(libraryOf(project), symbolId, direction) },
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
+function addLibraryCategoryEdit(project: ProjectDocument, path: string): EditResult {
+  const next = uniqueCategory(project.symbolCategories ?? [], path);
+  if (!next) return noEval(project);
+  return {
+    project: { ...project, symbolCategories: [...(project.symbolCategories ?? []), next] },
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
 function updateLibrarySymbol(
   project: ProjectDocument,
   symbolId: string,
-  patch: { name?: string; inCount?: number; outCount?: number; drawing?: EquipmentObject["drawing"] },
+  patch: {
+    name?: string;
+    inCount?: number;
+    outCount?: number;
+    drawing?: EquipmentObject["drawing"];
+    category?: string;
+  },
 ): EditResult {
   const library = libraryOf(project);
   const current = library.find((item) => item.id === symbolId);
-  if (!current || current.kind !== "equipment") return noEval(project);
+  if (!current) return noEval(project);
+  if (current.kind !== "equipment" && (patch.drawing !== undefined || patch.inCount != null || patch.outCount != null)) {
+    return noEval(project);
+  }
   const nextItem = {
     ...current,
     name: (patch.name ?? current.name).trim() || current.name,
     inCount: patch.inCount ?? current.inCount,
     outCount: patch.outCount ?? current.outCount,
     drawing: patch.drawing !== undefined ? patch.drawing : current.drawing,
+    category: patch.category !== undefined ? normalizeCategory(patch.category) || undefined : current.category,
   };
   return {
     project: {
@@ -1151,8 +1202,8 @@ function updateWorksheetEquipment(
     tag: patch.tag !== undefined ? patch.tag : current.tag,
     symbolId: nextSymbol,
     rotation: patch.rotation !== undefined ? snapRotation(patch.rotation) : current.rotation,
-    width: patch.width !== undefined ? evenGridSize(patch.width) : current.width,
-    height: patch.height !== undefined ? evenGridSize(patch.height) : current.height,
+    width: patch.width !== undefined ? snapGridSize(patch.width) : current.width,
+    height: patch.height !== undefined ? snapGridSize(patch.height) : current.height,
     drawing: patch.symbolId && patch.drawing === undefined ? null : patch.drawing !== undefined ? patch.drawing : current.drawing,
   };
   return {

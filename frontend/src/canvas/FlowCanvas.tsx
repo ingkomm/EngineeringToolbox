@@ -23,9 +23,10 @@ import { EquipmentObjectNode } from "./EquipmentObjectNode";
 import { MappingEdge } from "./MappingEdge";
 import { PointObjectNode } from "./PointObjectNode";
 import { mergeFlowNodes, toFlowEdges, toFlowNodeRecords } from "./flowModel";
-import { CANVAS_GRID, toTopLeftPosition } from "./symbols/grid";
+import { CANVAS_GRID, POINT_NODE_SIZE, snapToGrid, toTopLeftPosition } from "./symbols/grid";
 import { parseHandleId } from "../lib/display";
 import { type WorkspaceEdit } from "../lib/projectEdits";
+import { equipmentBounds } from "../lib/arrangementView";
 import type { QuantitySpec } from "../lib/quantities";
 import type { ProjectDocument } from "../types/contract";
 import {
@@ -282,14 +283,16 @@ export function FlowCanvas({ project, quantities, onProjectChange, onEdit, onUnd
       onNodeDragStop={(_event, _node, dragged) => {
         const moved = new Map(
           dragged.map((node) => {
-            const origin = node.origin ?? [0, 0];
-            const width = node.measured?.width ?? node.width ?? 0;
-            const height = node.measured?.height ?? node.height ?? 0;
-            const position =
-              origin[0] || origin[1]
-                ? toTopLeftPosition(node.position, width, height)
-                : node.position;
-            return [node.id, position] as const;
+            const object = project.objects.find((item) => item.id === node.id);
+            if (object && isLayoutObject(object) && !isCalculationObject(object)) {
+              const bounds =
+                object.kind === "equipment"
+                  ? equipmentBounds(object)
+                  : { width: POINT_NODE_SIZE, height: POINT_NODE_SIZE };
+              const center = { x: snapToGrid(node.position.x), y: snapToGrid(node.position.y) };
+              return [node.id, toTopLeftPosition(center, bounds.width, bounds.height)] as const;
+            }
+            return [node.id, node.position] as const;
           }),
         );
         onProjectChange({

@@ -440,11 +440,56 @@ label.ghost-btn {
 
 .calc-node,
 .ws-node--calc {
-  width: 280px;
+  width: 100%;
+  min-width: 280px;
+  box-sizing: border-box;
+}
+
+.react-flow__node-calculationObject {
+  overflow: visible !important;
+}
+
+.react-flow__node-equipmentObject,
+.react-flow__node-pointObject {
+  overflow: visible !important;
+}
+
+.ws-node--calc.is-expanded .calc-resize {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 48px;
+  margin-top: -24px;
+  background: var(--accent);
+  border-radius: 6px;
+  cursor: ew-resize;
+  z-index: 30;
+  pointer-events: all;
+}
+
+.calc-resize--left {
+  left: -5px;
+}
+
+.calc-resize--right {
+  right: -5px;
+}
+
+.react-flow__node-calculationObject {
+  overflow: visible !important;
+}
+
+.react-flow__node-equipmentObject,
+.react-flow__node-pointObject {
+  overflow: visible !important;
 }
 
 .ws-node--calc.is-expanded .react-flow__resize-control.handle.top,
 .ws-node--calc.is-expanded .react-flow__resize-control.handle.bottom,
+.ws-node--calc.is-expanded .react-flow__resize-control.handle.top.left,
+.ws-node--calc.is-expanded .react-flow__resize-control.handle.top.right,
+.ws-node--calc.is-expanded .react-flow__resize-control.handle.bottom.left,
+.ws-node--calc.is-expanded .react-flow__resize-control.handle.bottom.right,
 .ws-node--calc.is-expanded .react-flow__resize-control.line.top,
 .ws-node--calc.is-expanded .react-flow__resize-control.line.bottom {
   display: none;
@@ -452,18 +497,22 @@ label.ghost-btn {
 
 .ws-node--calc.is-expanded .react-flow__resize-control.handle.left,
 .ws-node--calc.is-expanded .react-flow__resize-control.handle.right {
-  width: 8px;
-  height: 36px;
+  width: 10px !important;
+  height: 44px !important;
   background: var(--accent);
   border: 0;
   border-radius: 6px;
-  z-index: 12;
+  z-index: 20;
+  pointer-events: all;
 }
 
 .ws-node--calc.is-expanded .react-flow__resize-control.line.left,
 .ws-node--calc.is-expanded .react-flow__resize-control.line.right {
-  width: 12px;
-  z-index: 11;
+  width: 14px;
+  border-width: 0 !important;
+  background: transparent;
+  z-index: 19;
+  pointer-events: all;
 }
 
 .calc-node__id,
@@ -1444,7 +1493,8 @@ label.ghost-btn {
   width: 100%;
   height: 100%;
   background: transparent;
-  border: 1px solid transparent;
+  border: 0;
+  box-sizing: border-box;
   box-shadow: none;
   color: #c5d4e8;
   overflow: visible;
@@ -1452,7 +1502,8 @@ label.ghost-btn {
 
 .pid-eq.is-selected {
   border-color: transparent;
-  box-shadow: 0 0 0 1px var(--accent);
+  box-shadow: none;
+  outline: 1px solid var(--accent);
 }
 
 .pid-eq__symbol {
@@ -1600,9 +1651,14 @@ label.ghost-btn {
   display: block;
 }
 
+.pid-eq .obj-link-handle,
+.pid-pt .obj-link-handle {
+  opacity: 1;
+}
+
 .pid-eq:not(:hover):not(.is-hot):not(.is-selected) .obj-link-handle,
 .pid-pt:not(:hover):not(.is-hot):not(.is-selected) .obj-link-handle {
-  opacity: 0;
+  opacity: 1;
 }
 
 .obj-link-cluster:hover .obj-link-handle,
@@ -1853,11 +1909,57 @@ label.ghost-btn {
   color: var(--text);
 }
 
+.iso-sidebar__folder-add {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.iso-sidebar__folder-head,
+.iso-sidebar__folder-name--root {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  margin: 4px 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.iso-sidebar__folder-head.is-active .iso-sidebar__folder-name,
+.iso-sidebar__folder-name.is-active {
+  color: var(--accent);
+}
+
+.iso-sidebar__folder-toggle,
+.iso-sidebar__folder-name {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.iso-sidebar__cat {
+  max-width: 78px;
+  min-height: 22px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #0b121c;
+  color: var(--muted);
+  font-size: 10px;
+}
+
 .iso-sidebar__row {
   display: flex;
   gap: 4px;
   align-items: center;
   margin-bottom: 4px;
+  flex-wrap: wrap;
 }
 
 .iso-sidebar__row.is-editing .iso-sidebar__tile {

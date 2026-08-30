@@ -3,6 +3,7 @@ import { useLayoutEffect, useState } from "react";
 import type { PointObject } from "../types/contract";
 import type { WorkspaceEdit } from "../lib/projectEdits";
 import { POINT_CONNECTION_IDS, objectLinkSideOf, pointConnectionSide } from "../lib/worksheet";
+import { POINT_NODE_SIZE } from "./symbols/grid";
 import { ObjectLinkHandle } from "./ObjectLinkHandle";
 import { PointPopover } from "./ArrangementPopover";
 
@@ -39,6 +40,7 @@ export function PointObjectNode({ id, selected, data }: NodeProps<PointObjectNod
     <article
       className={`pid-pt ${selected ? "is-selected" : ""} ${linked ? "is-linked" : ""} ${hot ? "is-hot" : ""}`}
       data-testid={`object-${id}`}
+      style={{ width: POINT_NODE_SIZE, height: POINT_NODE_SIZE }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onDoubleClick={(event) => {
@@ -49,7 +51,6 @@ export function PointObjectNode({ id, selected, data }: NodeProps<PointObjectNod
       <ObjectLinkHandle
         nodeId={id}
         side={side}
-        hidden={!hot}
         onToggleSide={() =>
           onEdit({
             type: "setObjectLinkSide",
