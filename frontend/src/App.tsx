@@ -1,0 +1,470 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ReactFlowProvider } from "@xyflow/react";
+
+import { checkHealth, evaluateProject, fetchQuantities } from "./api/client";
+import { FlowCanvas } from "./shared/FlowCanvas";
+import { IsoSymbolSidebar } from "./arrangement/IsoSymbolSidebar";
+import { blankProject } from "./example/blankProject";
+import { FALLBACK_QUANTITIES, type QuantitySpec } from "./shared/quantities";
+import { applyWorkspaceEdit, type WorkspaceEdit } from "./shared/projectEdits";
+import { invalidProjectImportReason, type EvalError, type ProjectDocument } from "./types/contract";
+import { isEquipmentObject, isPointObject } from "./shared/worksheet";
+import { isMemoObject } from "./memo/memo";
+import { mergeCalculationResults } from "./calculation/evalMerge";
+
+const LEFT_PANEL_KEY = "et.panel.left";
+const RIGHT_PANEL_KEY = "et.panel.right";
+
+function readPanelOpen(key: string): boolean {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === "0") return false;
+    if (raw === "1") return true;
+  } catch {
+    /* ignore */
+  }
+  return typeof window === "undefined" || window.innerWidth >= 1400;
+}
+
+export function App() {
+  const [project, setProject] = useState<ProjectDocument>(blankProject);
+  const [quantities, setQuantities] = useState<QuantitySpec[]>(FALLBACK_QUANTITIES);
+  const [errors, setErrors] = useState<EvalError[]>([]);
+  const [evaluated, setEvaluated] = useState<string[]>([]);
+  const [backendUp, setBackendUp] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [leftOpen, setLeftOpen] = useState(() => readPanelOpen(LEFT_PANEL_KEY));
+  const [rightOpen, setRightOpen] = useState(() => readPanelOpen(RIGHT_PANEL_KEY));
+  const [message, setMessage] = useState("변수와 수식을 직접 정의하세요");
+  const pastRef = useRef<ProjectDocument[]>([]);
+  const futureRef = useRef<ProjectDocument[]>([]);
+  const debounceRef = useRef<number | null>(null);
+  const busyTimerRef = useRef<number | null>(null);
+  const projectRef = useRef(project);
+  const requestSeq = useRef(0);
+  const evalEpochRef = useRef(0);
+  projectRef.current = project;
+
+  const toggleLeft = useCallback(() => {
+    setLeftOpen((open) => {
+      const next = !open;
+      try {
+        localStorage.setItem(LEFT_PANEL_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleRight = useCallback(() => {
+    setRightOpen((open) => {
+      const next = !open;
+      try {
+        localStorage.setItem(RIGHT_PANEL_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
+
+  const invalidateEval = useCallback(() => {
+    evalEpochRef.current += 1;
+  }, []);
+
+  const runEvaluate = useCallback(async (next: ProjectDocument, dirtyObjectIds?: string[]) => {
+    const epoch = evalEpochRef.current;
+    const seq = ++requestSeq.current;
+    if (busyTimerRef.current) window.clearTimeout(busyTimerRef.current);
+    busyTimerRef.current = window.setTimeout(() => {
+      if (seq === requestSeq.current) setBusy(true);
+    }, 280);
+    try {
+      const result = await evaluateProject(next, dirtyObjectIds);
+      if (seq !== requestSeq.current || epoch !== evalEpochRef.current) return;
+      setProject(mergeCalculationResults(projectRef.current, result.project));
+      setErrors(result.errors);
+      setEvaluated(result.evaluatedObjectIds);
+      setBackendUp(true);
+      setMessage(
+        result.errors.length
+          ? `계산 오류 ${result.errors.length}건`
+          : result.evaluatedObjectIds.length
+            ? `계산 완료 · ${result.evaluatedObjectIds.join(", ")}`
+            : "계산할 수식이 없습니다",
+      );
+    } catch (error) {
+      if (seq !== requestSeq.current || epoch !== evalEpochRef.current) return;
+      setBackendUp(false);
+      setMessage(error instanceof Error ? error.message : "Evaluate request failed");
+    } finally {
+      if (busyTimerRef.current) {
+        window.clearTimeout(busyTimerRef.current);
+        busyTimerRef.current = null;
+      }
+      if (seq === requestSeq.current) setBusy(false);
+    }
+  }, []);
+
+  const scheduleEvaluate = useCallback(
+    (next: ProjectDocument, dirtyObjectIds?: string[]) => {
+      if (debounceRef.current) window.clearTimeout(debounceRef.current);
+      debounceRef.current = window.setTimeout(() => {
+        void runEvaluate(next, dirtyObjectIds);
+      }, 320);
+    },
+    [runEvaluate],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    let lastOk: boolean | null = null;
+    const poll = async () => {
+      const ok = await checkHealth();
+      if (cancelled) return;
+      setBackendUp(ok);
+      if (ok) {
+        if (lastOk !== true) {
+          setQuantities(await fetchQuantities());
+        }
+      } else if (lastOk !== false) {
+        setMessage("Python API가 실행 중이 아닙니다. backend를 먼저 시작하세요.");
+      }
+      lastOk = ok;
+    };
+    void poll();
+    const timer = window.setInterval(() => {
+      void poll();
+    }, 4000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const remember = useCallback((previous: ProjectDocument) => {
+    pastRef.current = [...pastRef.current.slice(-79), previous];
+    futureRef.current = [];
+  }, []);
+
+  const onEdit = useCallback(
+    (edit: WorkspaceEdit) => {
+      if (edit.type === "newWorkspace" || edit.type === "loadProject" || edit.type === "loadExample") {
+        invalidateEval();
+      }
+      const previous = projectRef.current;
+      const result = applyWorkspaceEdit(previous, edit, quantities);
+      if (result.project !== previous) remember(previous);
+      setProject(result.project);
+      if (result.shouldEvaluate) {
+        scheduleEvaluate(result.project, result.dirtyObjectIds);
+      } else {
+        setErrors([]);
+        setMessage("변수와 수식을 직접 정의하세요");
+        setEvaluated([]);
+      }
+    },
+    [invalidateEval, quantities, remember, scheduleEvaluate],
+  );
+
+  const onProjectChange = useCallback(
+    (next: ProjectDocument) => {
+      remember(projectRef.current);
+      setProject(next);
+    },
+    [remember],
+  );
+
+  const onUndo = useCallback(() => {
+    const previous = pastRef.current.pop();
+    if (!previous) return;
+    invalidateEval();
+    futureRef.current.push(projectRef.current);
+    setProject(previous);
+  }, [invalidateEval]);
+
+  const onRedo = useCallback(() => {
+    const next = futureRef.current.pop();
+    if (!next) return;
+    invalidateEval();
+    pastRef.current.push(projectRef.current);
+    setProject(next);
+  }, [invalidateEval]);
+
+  const mappingJson = useMemo(
+    () =>
+      JSON.stringify(
+        {
+          objects: project.objects.map((object) => {
+            if (isEquipmentObject(object)) {
+              return {
+                kind: "equipment",
+                id: object.id,
+                name: object.name,
+                tag: object.tag ?? "",
+                symbolId: object.symbolId,
+                rotation: object.rotation ?? 0,
+                position: object.position,
+                inCount: object.inCount,
+                outCount: object.outCount,
+              };
+            }
+            if (isPointObject(object)) {
+              return {
+                kind: "point",
+                id: object.id,
+                name: object.name,
+                position: object.position,
+                connectionCount: object.connectionCount,
+                connections: object.connections,
+              };
+            }
+            if (isMemoObject(object)) {
+              return {
+                kind: "memo",
+                id: object.id,
+                title: object.title,
+                sections: object.sections,
+                links: object.links,
+              };
+            }
+            return {
+              kind: "calculation",
+              id: object.id,
+              name: object.name,
+              inputs: object.inputs.map((item) => ({
+                id: item.id,
+                name: item.name,
+                quantity: item.quantity ?? null,
+                unit: item.unit ?? null,
+              })),
+              calculations: object.calculations.map((item) => ({
+                id: item.id,
+                name: item.name,
+                formula: item.formula,
+                quantity: item.quantity ?? null,
+              })),
+              outputs: object.outputs.map((item) => ({ id: item.id, name: item.name, sourceVariableId: item.sourceVariableId })),
+              links: (object.links ?? []).map((item) => ({
+                id: item.id,
+                name: item.name,
+                targetObjectId: item.targetObjectId ?? null,
+                targetPortId: item.targetPortId ?? null,
+              })),
+            };
+          }),
+          edges: project.edges,
+        },
+        null,
+        2,
+      ),
+    [project],
+  );
+
+  const onExport = useCallback(() => {
+    const blob = new Blob([JSON.stringify(project, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${project.id || "worksheet"}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [project]);
+
+  const onImportFile = useCallback(
+    (file: File) => {
+      void file.text().then((text) => {
+        try {
+          const parsed = JSON.parse(text) as unknown;
+          const reason = invalidProjectImportReason(parsed);
+          if (reason) {
+            setMessage(reason);
+            return;
+          }
+          onEdit({ type: "loadProject", project: parsed as ProjectDocument });
+        } catch {
+          setMessage("가져오기 실패: JSON을 읽을 수 없습니다");
+        }
+      });
+    },
+    [onEdit],
+  );
+
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <div>
+          <p className="topbar__kicker">Engineering Toolbox</p>
+          <h1>Calculation Object Canvas</h1>
+        </div>
+        <div className="topbar__meta">
+          <button
+            className={`ghost-btn ${leftOpen ? "ghost-btn--on" : ""}`}
+            type="button"
+            data-testid="btn-toggle-library"
+            title={leftOpen ? "라이브러리 접기" : "라이브러리 펼치기"}
+            onClick={toggleLeft}
+          >
+            라이브러리
+          </button>
+          <button
+            className={`ghost-btn ${rightOpen ? "ghost-btn--on" : ""}`}
+            type="button"
+            data-testid="btn-toggle-worksheet"
+            title={rightOpen ? "워크시트 접기" : "워크시트 펼치기"}
+            onClick={toggleRight}
+          >
+            안내
+          </button>
+          <span
+            className={`pill ${backendUp ? "pill--ok" : backendUp === false ? "pill--bad" : ""}`}
+            data-testid="api-status"
+          >
+            {backendUp == null ? "API…" : backendUp ? "Python API" : "API offline"}
+          </span>
+          <span className="pill" data-testid="eval-status">{busy ? "계산 중" : message}</span>
+          <button
+            className="ghost-btn"
+            type="button"
+            data-testid="btn-new-worksheet"
+            onClick={() => onEdit({ type: "newWorkspace" })}
+          >
+            새 워크시트
+          </button>
+          <button
+            className="ghost-btn"
+            type="button"
+            data-testid="btn-evaluate"
+            onClick={() => void runEvaluate(project)}
+            disabled={busy || backendUp === false}
+          >
+            계산
+          </button>
+          <button className="ghost-btn" type="button" data-testid="btn-export-project" onClick={onExport}>
+            저장
+          </button>
+          <label className="ghost-btn" data-testid="btn-import-project">
+            불러오기
+            <input
+              type="file"
+              accept="application/json"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (file) onImportFile(file);
+              }}
+            />
+          </label>
+        </div>
+      </header>
+
+      <main
+        className={`workspace ${leftOpen ? "" : "is-left-collapsed"} ${rightOpen ? "" : "is-right-collapsed"}`}
+      >
+        {leftOpen ? (
+          <IsoSymbolSidebar project={project} onEdit={onEdit} onCollapse={toggleLeft} />
+        ) : (
+          <button
+            type="button"
+            className="dock-rail dock-rail--left"
+            data-testid="btn-expand-library"
+            title="라이브러리 펼치기"
+            onClick={toggleLeft}
+          >
+            <span>라이브러리</span>
+          </button>
+        )}
+        <section className="canvas-pane">
+          <ReactFlowProvider>
+            <FlowCanvas
+              project={project}
+              quantities={quantities}
+              onProjectChange={onProjectChange}
+              onEdit={onEdit}
+              onUndo={onUndo}
+              onRedo={onRedo}
+            />
+          </ReactFlowProvider>
+        </section>
+        {rightOpen ? (
+          <aside className="side-pane">
+            <header className="side-pane__head">
+              <h2>워크시트</h2>
+              <button
+                type="button"
+                className="ghost-btn"
+                data-testid="btn-collapse-worksheet"
+                title="워크시트 접기"
+                onClick={toggleRight}
+              >
+                접기
+              </button>
+            </header>
+            <section>
+              <p className="side-pane__hint">
+                Calculation과 Memo는 SYSTEM 고정 항목입니다. Point는 Arrangement Symbols에 두고
+                Pump/Valve/Vessel·사용자 SVG와 같이 배치합니다. 라이브러리 심볼은 편집·삭제할 수 있습니다.
+                Equipment와 Point는 P&ID 도면 심볼이며 계산하지 않습니다. Calc Input은 하늘색, Calc Output은
+                초록색, Arrangement Point는 노란색입니다. Pipe/Signal은 값 연동(value flow)과 섞이지 않습니다.
+                입력값은 선택한 SI 단위 기준입니다.
+              </p>
+              <button
+                className="ghost-btn"
+                type="button"
+                data-testid="btn-load-example"
+                onClick={() => onEdit({ type: "loadExample" })}
+              >
+                참고 예제 열기
+              </button>
+            </section>
+            <section>
+              <h2>SI 표준 물성</h2>
+              <ul className="qty-list">
+                {quantities.map((item) => (
+                  <li key={item.id}>
+                    <strong>{item.nameKo}</strong>
+                    <span>{item.siUnit}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <details className="dev-panel">
+              <summary>Developer</summary>
+              <section>
+                <h2>Mapping JSON</h2>
+                <pre data-testid="mapping-json">{mappingJson}</pre>
+              </section>
+              <section>
+                <h2>마지막 계산</h2>
+                <p>대상: {evaluated.length ? evaluated.join(", ") : "—"}</p>
+                {errors.length === 0 ? (
+                  <p className="ok-text">오류 없음</p>
+                ) : (
+                  <ul className="error-list">
+                    {errors.map((error, index) => (
+                      <li key={`${error.code}-${index}`}>
+                        <strong>{error.code}</strong> {error.objectId}/{error.variableId}: {error.message}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </details>
+          </aside>
+        ) : (
+          <button
+            type="button"
+            className="dock-rail dock-rail--right"
+            data-testid="btn-expand-worksheet"
+            title="워크시트 펼치기"
+            onClick={toggleRight}
+          >
+            <span>워크시트</span>
+          </button>
+        )}
+      </main>
+    </div>
+  );
+}
