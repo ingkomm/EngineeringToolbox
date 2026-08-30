@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 VariableStatus = Literal["idle", "ok", "mapped", "error"]
 RelationType = Literal["value_flow", "reference", "association", "pipe", "signal"]
-ObjectKind = Literal["calculation", "equipment", "point"]
+ObjectKind = Literal["calculation", "equipment", "point", "memo", "arrangement-symbol"]
 
 VARIABLE_ID_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 OBJECT_ID_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
@@ -239,6 +239,84 @@ class PointObject(BaseModel):
         return self
 
 
+class Size(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    width: float = Field(ge=80)
+    height: float = Field(ge=80)
+
+
+class TagRef(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    label: str
+    normalizedKey: str = ""
+
+    @model_validator(mode="after")
+    def normalize(self) -> TagRef:
+        label = self.label.strip().lstrip("#")
+        self.label = label
+        self.normalizedKey = self.normalizedKey.strip().lower() or label.lower()
+        return self
+
+
+class MemoLink(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    sourceMemoId: str
+    targetObjectId: str
+    targetSubId: str | None = None
+    targetKind: Literal[
+        "calculation",
+        "point",
+        "memo",
+        "equipment",
+        "arrangement-symbol",
+        "calc-input",
+        "calc-formula",
+        "calc-output",
+        "arrangement-edge",
+    ]
+    relation: Literal["attachment", "reference", "association"] = "reference"
+
+
+class TextBlock(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["text"]
+    id: str
+    order: int = 0
+    collapsed: bool = False
+    content: str = ""
+    format: Literal["plain", "markdown"] = "plain"
+
+
+class ObjectLinkBlock(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["object-link"]
+    id: str
+    order: int = 0
+    collapsed: bool = False
+    linkIds: list[str] = Field(default_factory=list)
+
+
+MemoBlock = Annotated[Union[TextBlock, ObjectLinkBlock], Field(discriminator="type")]
+
+
+class MemoObject(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["memo"]
+    id: str
+    title: str = ""
+    tags: list[TagRef] = Field(default_factory=list)
+    parentId: str | None = None
+    blocks: list[MemoBlock] = Field(default_factory=list)
+    links: list[MemoLink] = Field(default_factory=list)
+    position: Position
+    size: Size = Field(default_factory=lambda: Size(width=220, height=148))
+
+
 OBJECT_LINK_HANDLE = "OBJ"
 POINT_CONNECTION_IDS = ("C_1", "C_2", "C_3", "C_4")
 
@@ -297,7 +375,10 @@ def _explode_legacy_arrangement(item: dict) -> list[dict]:
     return exploded
 
 
-WorksheetObject = Annotated[Union[CalculationObject, EquipmentObject, PointObject], Field(discriminator="kind")]
+WorksheetObject = Annotated[
+    Union[CalculationObject, EquipmentObject, PointObject, MemoObject],
+    Field(discriminator="kind"),
+]
 
 
 class Edge(BaseModel):
@@ -313,20 +394,32 @@ class Edge(BaseModel):
     relationType: RelationType = "value_flow"
 
 
-def is_calculation_object(obj: CalculationObject | EquipmentObject | PointObject) -> TypeGuard[CalculationObject]:
+def is_calculation_object(
+    obj: CalculationObject | EquipmentObject | PointObject | MemoObject,
+) -> TypeGuard[CalculationObject]:
     return getattr(obj, "kind", "calculation") == "calculation"
 
 
-def is_equipment_object(obj: CalculationObject | EquipmentObject | PointObject) -> TypeGuard[EquipmentObject]:
+def is_equipment_object(
+    obj: CalculationObject | EquipmentObject | PointObject | MemoObject,
+) -> TypeGuard[EquipmentObject]:
     return getattr(obj, "kind", None) == "equipment"
 
 
-def is_point_object(obj: CalculationObject | EquipmentObject | PointObject) -> TypeGuard[PointObject]:
+def is_point_object(
+    obj: CalculationObject | EquipmentObject | PointObject | MemoObject,
+) -> TypeGuard[PointObject]:
     return getattr(obj, "kind", None) == "point"
 
 
+def is_memo_object(
+    obj: CalculationObject | EquipmentObject | PointObject | MemoObject,
+) -> TypeGuard[MemoObject]:
+    return getattr(obj, "kind", None) == "memo"
+
+
 def is_layout_object(
-    obj: CalculationObject | EquipmentObject | PointObject,
+    obj: CalculationObject | EquipmentObject | PointObject | MemoObject,
 ) -> TypeGuard[EquipmentObject | PointObject]:
     return is_equipment_object(obj) or is_point_object(obj)
 
@@ -350,9 +443,10 @@ class LibrarySymbol(BaseModel):
 class ProjectDocument(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    schemaVersion: int | None = None
     id: str
     name: str
-    objects: list[CalculationObject | EquipmentObject | PointObject] = Field(default_factory=list)
+    objects: list[CalculationObject | EquipmentObject | PointObject | MemoObject] = Field(default_factory=list)
     edges: list[Edge] = Field(default_factory=list)
     symbolLibrary: list[LibrarySymbol] = Field(default_factory=list)
     symbolCategories: list[str] = Field(default_factory=list)
@@ -374,7 +468,7 @@ class ProjectDocument(BaseModel):
             if kind is None:
                 kind = "arrangement" if "domain" in item else "calculation"
                 item = {**item, "kind": kind}
-            if kind == "arrangement" or "domain" in item and kind not in {"calculation", "equipment", "point"}:
+            if kind == "arrangement" or "domain" in item and kind not in {"calculation", "equipment", "point", "memo"}:
                 tagged.extend(_explode_legacy_arrangement(item))
             else:
                 tagged.append(item)
@@ -412,7 +506,47 @@ class ProjectDocument(BaseModel):
                 edge.targetVariableId = OBJECT_LINK_HANDLE
             if edge.sourceObjectId in hosts and edge.sourceVariableId not in layout_port_ids(hosts[edge.sourceObjectId]):
                 edge.sourceVariableId = OBJECT_LINK_HANDLE
+        self._validate_memos(seen)
         return self
+
+    def _validate_memos(self, object_ids: set[str]) -> None:
+        memos = [item for item in self.objects if is_memo_object(item)]
+        by_id = {item.id: item for item in memos}
+        block_ids: set[str] = set()
+        for memo in memos:
+            if memo.parentId:
+                if memo.parentId == memo.id:
+                    raise ValueError(f"MEMO_SELF_PARENT: {memo.id}")
+                if memo.parentId not in by_id:
+                    raise ValueError(f"UNKNOWN_MEMO_PARENT: {memo.id} -> {memo.parentId}")
+                seen_chain: set[str] = set()
+                cursor: str | None = memo.parentId
+                while cursor:
+                    if cursor in seen_chain or cursor == memo.id:
+                        raise ValueError(f"MEMO_PARENT_CYCLE: {memo.id}")
+                    seen_chain.add(cursor)
+                    parent = by_id.get(cursor)
+                    cursor = parent.parentId if parent else None
+            local_blocks: set[str] = set()
+            for block in memo.blocks:
+                if block.id in local_blocks or block.id in block_ids:
+                    raise ValueError(f"DUPLICATE_BLOCK_ID: {block.id}")
+                local_blocks.add(block.id)
+                block_ids.add(block.id)
+            link_ids = {link.id for link in memo.links}
+            if len(link_ids) != len(memo.links):
+                raise ValueError(f"DUPLICATE_MEMO_LINK_ID: {memo.id}")
+            for link in memo.links:
+                if link.sourceMemoId != memo.id:
+                    raise ValueError(f"MEMO_LINK_SOURCE: {link.id}")
+                if link.targetObjectId not in object_ids:
+                    raise ValueError(f"UNKNOWN_MEMO_LINK_TARGET: {link.targetObjectId}")
+            for block in memo.blocks:
+                if block.type == "object-link":
+                    for link_id in block.linkIds:
+                        if link_id not in link_ids:
+                            raise ValueError(f"UNKNOWN_OBJECT_LINK_REF: {link_id}")
+
 
 
 class EvalError(BaseModel):

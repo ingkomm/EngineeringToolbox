@@ -5,7 +5,16 @@
 
 export type VariableStatus = "idle" | "ok" | "mapped" | "error";
 export type RelationType = "value_flow" | "reference" | "association" | "pipe" | "signal";
-export type PortCategory = "calc-input" | "calc-output" | "arrangement-point";
+export type PortCategory = "calc-input" | "calc-output" | "arrangement-point" | "memo-attachment";
+export type ObjectKind = "calculation" | "point" | "memo" | "equipment" | "arrangement-symbol";
+export type MemoLinkTargetKind =
+  | ObjectKind
+  | "calc-input"
+  | "calc-formula"
+  | "calc-output"
+  | "arrangement-edge";
+export type MemoLinkRelation = "attachment" | "reference" | "association";
+export type MemoBlockType = "text" | "object-link";
 export type ObjectLinkSide = "top" | "bottom";
 export type ArrangementLinkKind = "pipe" | "signal";
 export type EquipmentRotation = 0 | 90 | 180 | 270;
@@ -113,7 +122,53 @@ export interface PointObject {
   objectLinkSide?: ObjectLinkSide;
 }
 
-export type WorksheetObject = CalculationObject | EquipmentObject | PointObject;
+export interface TagRef {
+  label: string;
+  normalizedKey: string;
+}
+
+export interface MemoLink {
+  id: string;
+  sourceMemoId: string;
+  targetObjectId: string;
+  targetSubId?: string;
+  targetKind: MemoLinkTargetKind;
+  relation: MemoLinkRelation;
+}
+
+export interface MemoBlockBase {
+  id: string;
+  type: MemoBlockType;
+  order: number;
+  collapsed?: boolean;
+}
+
+export interface TextBlock extends MemoBlockBase {
+  type: "text";
+  content: string;
+  format: "plain" | "markdown";
+}
+
+export interface ObjectLinkBlock extends MemoBlockBase {
+  type: "object-link";
+  linkIds: string[];
+}
+
+export type MemoBlock = TextBlock | ObjectLinkBlock;
+
+export interface MemoObject {
+  kind: "memo";
+  id: string;
+  title?: string;
+  tags: TagRef[];
+  parentId?: string;
+  blocks: MemoBlock[];
+  links: MemoLink[];
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+}
+
+export type WorksheetObject = CalculationObject | EquipmentObject | PointObject | MemoObject;
 
 export interface MappingEdge {
   id: string;
@@ -127,6 +182,7 @@ export interface MappingEdge {
 }
 
 export interface ProjectDocument {
+  schemaVersion?: number;
   id: string;
   name: string;
   objects: WorksheetObject[];

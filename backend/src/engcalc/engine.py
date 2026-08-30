@@ -16,6 +16,7 @@ from engcalc.models import (
     VARIABLE_ID_RE,
     is_calculation_object,
     is_layout_object,
+    is_memo_object,
     is_point_object,
     is_value_flow_edge,
     layout_port_ids,
@@ -95,6 +96,8 @@ def _validate_structure(project: ProjectDocument) -> list[EvalError]:
 
     seen_object_names: dict[str, str] = {}
     for obj in project.objects:
+        if is_memo_object(obj):
+            continue
         if not OBJECT_ID_RE.match(obj.id):
             errors.append(
                 EvalError(
@@ -126,7 +129,7 @@ def _validate_structure(project: ProjectDocument) -> list[EvalError]:
     seen_names: dict[str, tuple[str, str]] = {}
 
     for obj in project.objects:
-        if is_layout_object(obj):
+        if is_layout_object(obj) or is_memo_object(obj):
             continue
         local_seen: set[str] = set()
         owned: list[tuple[str, str, str]] = []

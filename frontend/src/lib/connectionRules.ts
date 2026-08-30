@@ -10,6 +10,7 @@ import {
   isValueFlowEdge,
 } from "./worksheet";
 import type { ProjectDocument } from "../types/contract";
+import { isMemoAttachmentHandle, isMemoObject } from "./memo";
 
 export interface CanvasConnection {
   source?: string | null;
@@ -32,6 +33,10 @@ export function isValidCanvasConnection(project: ProjectDocument, connection: Ca
   const sourceCat = portCategoryOf(sourceObject, connection.sourceHandle);
   const targetCat = portCategoryOf(targetObject, connection.targetHandle);
   if (!sourceCat || !targetCat) return false;
+
+  if (isMemoAttachmentHandle(connection.sourceHandle) || isMemoAttachmentHandle(connection.targetHandle)) {
+    return isMemoObject(sourceObject) || isMemoObject(targetObject);
+  }
 
   if (isObjectLinkHandle(connection.sourceHandle) || isObjectLinkHandle(connection.targetHandle)) {
     if (

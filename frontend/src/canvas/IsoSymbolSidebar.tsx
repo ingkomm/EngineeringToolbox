@@ -97,6 +97,14 @@ export function IsoSymbolSidebar({
           >
             {renderSystemLibraryTile("calculation")}
           </SystemTile>
+          <SystemTile
+            testId="btn-add-memo"
+            name="Memo"
+            payload={{ place: "memo" }}
+            onEdit={onEdit}
+          >
+            {renderSystemLibraryTile("memo")}
+          </SystemTile>
         </section>
         <p className="iso-sidebar__section">ARRANGEMENT SYMBOLS</p>
         <FolderBlock

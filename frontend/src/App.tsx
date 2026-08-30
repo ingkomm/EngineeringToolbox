@@ -9,6 +9,7 @@ import { FALLBACK_QUANTITIES, type QuantitySpec } from "./lib/quantities";
 import { applyWorkspaceEdit, type WorkspaceEdit } from "./lib/projectEdits";
 import type { EvalError, ProjectDocument } from "./types/contract";
 import { isEquipmentObject, isPointObject } from "./lib/worksheet";
+import { isMemoObject } from "./lib/memo";
 
 export function App() {
   const [project, setProject] = useState<ProjectDocument>(blankProject);
@@ -165,6 +166,17 @@ export function App() {
                 position: object.position,
                 connectionCount: object.connectionCount,
                 connections: object.connections,
+              };
+            }
+            if (isMemoObject(object)) {
+              return {
+                kind: "memo",
+                id: object.id,
+                title: object.title ?? "",
+                tags: object.tags,
+                parentId: object.parentId ?? null,
+                blocks: object.blocks,
+                links: object.links,
               };
             }
             return {

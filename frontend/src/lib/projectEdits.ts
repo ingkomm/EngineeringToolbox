@@ -4,6 +4,8 @@ import type {
   EquipmentObject,
   FormulaVariable,
   InputVariable,
+  MemoBlock,
+  MemoObject,
   OutputBinding,
   PointEnd,
   PointObject,
@@ -24,6 +26,19 @@ import {
   nextGlobalPrefixedId,
   sourceVariable,
 } from "./variables";
+import { newStableId } from "./ids";
+import {
+  cloneMemo,
+  emptyMemo,
+  isMemoObject,
+  newObjectLinkBlock,
+  newTextBlock,
+  nextBlockOrder,
+  normalizeTagLabel,
+  parseMemoLinkEdgeId,
+  targetKindForObject,
+  wouldCreateParentCycle,
+} from "./memo";
 import {
   OBJECT_LINK_HANDLE,
   canConnectObjectLink,
@@ -156,6 +171,35 @@ export type WorkspaceEdit =
       linkKind?: "pipe" | "signal";
     }
   | { type: "togglePointLink"; pointId: string; end: string }
+  | { type: "addMemo"; position?: { x: number; y: number } }
+  | {
+      type: "updateMemo";
+      objectId: string;
+      patch: {
+        title?: string;
+        tags?: MemoObject["tags"];
+        parentId?: string | null;
+        size?: { width: number; height: number };
+        position?: { x: number; y: number };
+      };
+    }
+  | { type: "addMemoBlock"; objectId: string; blockType: "text" | "object-link" }
+  | { type: "updateMemoBlock"; objectId: string; blockId: string; patch: Partial<MemoBlock> }
+  | { type: "removeMemoBlock"; objectId: string; blockId: string }
+  | { type: "moveMemoBlock"; objectId: string; blockId: string; direction: -1 | 1 }
+  | { type: "toggleMemoBlock"; objectId: string; blockId: string }
+  | {
+      type: "connectMemoLink";
+      sourceMemoId: string;
+      targetObjectId: string;
+      targetKind?: MemoObject["links"][number]["targetKind"];
+      relation?: MemoObject["links"][number]["relation"];
+      targetSubId?: string;
+      blockId?: string;
+    }
+  | { type: "deleteMemoLink"; memoId: string; linkId: string }
+  | { type: "addMemoTag"; objectId: string; label: string }
+  | { type: "removeMemoTag"; objectId: string; key: string }
   | { type: "loadProject"; project: ProjectDocument }
   | { type: "loadExample" }
   | { type: "newWorkspace" };
@@ -174,14 +218,14 @@ function nextObjectId(project: ProjectDocument): string {
 }
 
 function nextObjectName(project: ProjectDocument): string {
-  const used = new Set(project.objects.map((item) => item.name.trim()));
+  const used = new Set(project.objects.filter((item) => !isMemoObject(item)).map((item) => item.name.trim()));
   let n = 1;
   while (used.has(`Object ${n}`)) n += 1;
   return `Object ${n}`;
 }
 
 function nextEquipmentName(project: ProjectDocument, symbolId?: string): string {
-  const used = new Set(project.objects.map((item) => item.name.trim()));
+  const used = new Set(project.objects.filter((item) => !isMemoObject(item)).map((item) => item.name.trim()));
   const base = findLibrarySymbol(project, symbolId)?.name ?? "Equipment";
   let n = 1;
   while (used.has(`${base} ${n}`)) n += 1;
@@ -196,6 +240,7 @@ function objectIdentityTaken(
   for (const object of project.objects) {
     if (object.id === exceptId) continue;
     if (candidate.id && object.id === candidate.id) return "id";
+    if (isMemoObject(object)) continue;
     const name = candidate.name?.trim();
     if (name && object.name.trim() === name) return "name";
   }
@@ -537,6 +582,24 @@ export function applyWorkspaceEdit(
                     : link,
                 ),
               };
+            })
+            .map((object) => {
+              if (!isMemoObject(object)) return object;
+              return {
+                ...object,
+                parentId: object.parentId === edit.objectId ? undefined : object.parentId,
+                links: object.links.filter((link) => link.targetObjectId !== edit.objectId),
+                blocks: object.blocks.map((block) =>
+                  block.type === "object-link"
+                    ? {
+                        ...block,
+                        linkIds: block.linkIds.filter((linkId) =>
+                          object.links.some((link) => link.id === linkId && link.targetObjectId !== edit.objectId),
+                        ),
+                      }
+                    : block,
+                ),
+              };
             }),
           edges: project.edges.filter(
             (edge) => edge.sourceObjectId !== edit.objectId && edge.targetObjectId !== edit.objectId,
@@ -554,7 +617,7 @@ export function applyWorkspaceEdit(
       );
     case "updateObject": {
       const current = project.objects.find((item) => item.id === edit.objectId);
-      if (!current) return { project, dirtyObjectIds: [], shouldEvaluate: false };
+      if (!current || isMemoObject(current)) return { project, dirtyObjectIds: [], shouldEvaluate: false };
       const nextId = edit.patch.id ?? current.id;
       const nextName = (edit.patch.name ?? current.name).trim();
       if (!nextName) return { project, dirtyObjectIds: [], shouldEvaluate: false };
@@ -966,6 +1029,25 @@ export function applyWorkspaceEdit(
         if (link) {
           next = connectPointEnd(next, link.pointId, link.end, null, null).project;
         }
+        const memoLinkId = parseMemoLinkEdgeId(edgeId);
+        if (memoLinkId) {
+          next = {
+            ...next,
+            objects: next.objects.map((object) =>
+              isMemoObject(object)
+                ? {
+                    ...object,
+                    links: object.links.filter((item) => item.id !== memoLinkId),
+                    blocks: object.blocks.map((block) =>
+                      block.type === "object-link"
+                        ? { ...block, linkIds: block.linkIds.filter((item) => item !== memoLinkId) }
+                        : block,
+                    ),
+                  }
+                : object,
+            ),
+          };
+        }
       }
       const dropping = next.edges.filter((edge) => removed.has(edge.id));
       for (const edge of dropping) {
@@ -999,6 +1081,28 @@ export function applyWorkspaceEdit(
         shouldEvaluate: dropping.some(isValueFlowEdge),
       };
     }
+    case "addMemo":
+      return addWorksheetMemo(project, edit.position);
+    case "updateMemo":
+      return updateWorksheetMemo(project, edit.objectId, edit.patch);
+    case "addMemoBlock":
+      return addMemoBlock(project, edit.objectId, edit.blockType);
+    case "updateMemoBlock":
+      return updateMemoBlock(project, edit.objectId, edit.blockId, edit.patch);
+    case "removeMemoBlock":
+      return removeMemoBlock(project, edit.objectId, edit.blockId);
+    case "moveMemoBlock":
+      return moveMemoBlock(project, edit.objectId, edit.blockId, edit.direction);
+    case "toggleMemoBlock":
+      return toggleMemoBlock(project, edit.objectId, edit.blockId);
+    case "connectMemoLink":
+      return connectMemoLink(project, edit);
+    case "deleteMemoLink":
+      return deleteMemoLink(project, edit.memoId, edit.linkId);
+    case "addMemoTag":
+      return addMemoTag(project, edit.objectId, edit.label);
+    case "removeMemoTag":
+      return removeMemoTag(project, edit.objectId, edit.key);
     case "addEquipment":
       return addWorksheetEquipment(project, edit.symbolId, edit.position);
     case "addPoint":
@@ -1054,6 +1158,9 @@ function _endpointExists(
 ): boolean {
   if (isLayoutObject(object)) {
     return layoutPortExists(object, portId);
+  }
+  if (isMemoObject(object) || !isCalculationObject(object)) {
+    return false;
   }
   if (role === "source") {
     return (
@@ -1298,7 +1405,9 @@ function duplicateWorksheetObjects(project: ProjectDocument, objectIds: string[]
   const selected = project.objects.filter((item) => objectIds.includes(item.id));
   if (selected.length === 0) return noEval(project);
   const usedObjectIds = new Set(project.objects.map((item) => item.id));
-  const usedObjectNames = new Set(project.objects.map((item) => item.name));
+  const usedObjectNames = new Set(
+    project.objects.map((item) => (isMemoObject(item) ? item.title?.trim() || item.id : item.name)),
+  );
   const usedVars = new Set(allVariableIds(project));
   const usedVarNames = new Set(
     project.objects.flatMap((item) => {
@@ -1308,6 +1417,12 @@ function duplicateWorksheetObjects(project: ProjectDocument, objectIds: string[]
   );
   const idMap = new Map<string, string>();
   for (const item of selected) {
+    if (isMemoObject(item)) {
+      const id = newStableId("m");
+      usedObjectIds.add(id);
+      idMap.set(item.id, id);
+      continue;
+    }
     const prefix = isEquipmentObject(item) ? "EQ" : isPointObject(item) ? "PT" : "obj";
     idMap.set(item.id, nextAvailableId(usedObjectIds, prefix));
   }
@@ -1353,6 +1468,19 @@ function duplicateWorksheetObjects(project: ProjectDocument, objectIds: string[]
   const clones = selected.map((item) => {
     const id = idMap.get(item.id) ?? item.id;
     const position = { x: item.position.x + 36, y: item.position.y + 36 };
+    if (isMemoObject(item)) {
+      const cloned = cloneMemo(item, position);
+      return {
+        ...cloned,
+        id,
+        parentId: item.parentId && idMap.has(item.parentId) ? idMap.get(item.parentId) : item.parentId,
+        links: cloned.links.map((link) => ({
+          ...link,
+          sourceMemoId: id,
+          targetObjectId: idMap.get(link.targetObjectId) ?? link.targetObjectId,
+        })),
+      };
+    }
     if (isEquipmentObject(item)) {
       return { ...item, id, name: nextCopyName(usedObjectNames, `${item.name} copy`), position };
     }
@@ -1860,4 +1988,165 @@ function withSiUnit<T extends { quantity?: string | null; unit?: string | null }
 ): T {
   if (!("quantity" in patch)) return patch;
   return { ...patch, unit: siUnitFor(patch.quantity, catalog) };
+}
+
+function patchMemo(
+  project: ProjectDocument,
+  objectId: string,
+  mutate: (memo: MemoObject) => MemoObject,
+): EditResult {
+  const current = project.objects.find((item) => item.id === objectId);
+  if (!current || !isMemoObject(current)) return noEval(project);
+  return {
+    project: {
+      ...project,
+      objects: project.objects.map((item) => (item.id === objectId && isMemoObject(item) ? mutate(item) : item)),
+    },
+    dirtyObjectIds: [],
+    shouldEvaluate: false,
+  };
+}
+
+function addWorksheetMemo(project: ProjectDocument, position?: { x: number; y: number }): EditResult {
+  const memo = emptyMemo(position ?? { x: 80 + project.objects.filter(isMemoObject).length * 36, y: 240 });
+  return { project: { ...project, objects: [...project.objects, memo] }, dirtyObjectIds: [], shouldEvaluate: false };
+}
+
+function updateWorksheetMemo(
+  project: ProjectDocument,
+  objectId: string,
+  patch: {
+    title?: string;
+    tags?: MemoObject["tags"];
+    parentId?: string | null;
+    size?: { width: number; height: number };
+    position?: { x: number; y: number };
+  },
+): EditResult {
+  return patchMemo(project, objectId, (memo) => {
+    const parentId = patch.parentId === null ? undefined : (patch.parentId ?? memo.parentId);
+    if (parentId && wouldCreateParentCycle(project, memo.id, parentId)) return memo;
+    return {
+      ...memo,
+      title: patch.title !== undefined ? patch.title : memo.title,
+      tags: patch.tags ?? memo.tags,
+      parentId,
+      size: patch.size ?? memo.size,
+      position: patch.position ?? memo.position,
+    };
+  });
+}
+
+function addMemoBlock(project: ProjectDocument, objectId: string, blockType: "text" | "object-link"): EditResult {
+  return patchMemo(project, objectId, (memo) => {
+    const order = nextBlockOrder(memo);
+    const block = blockType === "text" ? newTextBlock(order) : newObjectLinkBlock(order);
+    return { ...memo, blocks: [...memo.blocks, block] };
+  });
+}
+
+function updateMemoBlock(
+  project: ProjectDocument,
+  objectId: string,
+  blockId: string,
+  patch: Partial<MemoBlock>,
+): EditResult {
+  return patchMemo(project, objectId, (memo) => ({
+    ...memo,
+    blocks: memo.blocks.map((block) => (block.id === blockId ? ({ ...block, ...patch, id: block.id, type: block.type } as MemoBlock) : block)),
+  }));
+}
+
+function removeMemoBlock(project: ProjectDocument, objectId: string, blockId: string): EditResult {
+  return patchMemo(project, objectId, (memo) => ({
+    ...memo,
+    blocks: memo.blocks.filter((block) => block.id !== blockId),
+  }));
+}
+
+function moveMemoBlock(project: ProjectDocument, objectId: string, blockId: string, direction: -1 | 1): EditResult {
+  return patchMemo(project, objectId, (memo) => {
+    const ordered = [...memo.blocks].sort((a, b) => a.order - b.order);
+    const index = ordered.findIndex((item) => item.id === blockId);
+    const swap = ordered[index + direction];
+    if (index < 0 || !swap) return memo;
+    const current = ordered[index]!;
+    const next = ordered.map((item) => {
+      if (item.id === current.id) return { ...item, order: swap.order };
+      if (item.id === swap.id) return { ...item, order: current.order };
+      return item;
+    });
+    return { ...memo, blocks: next };
+  });
+}
+
+function toggleMemoBlock(project: ProjectDocument, objectId: string, blockId: string): EditResult {
+  return patchMemo(project, objectId, (memo) => ({
+    ...memo,
+    blocks: memo.blocks.map((block) => (block.id === blockId ? { ...block, collapsed: !block.collapsed } : block)),
+  }));
+}
+
+function connectMemoLink(
+  project: ProjectDocument,
+  edit: {
+    sourceMemoId: string;
+    targetObjectId: string;
+    targetKind?: MemoObject["links"][number]["targetKind"];
+    relation?: MemoObject["links"][number]["relation"];
+    targetSubId?: string;
+    blockId?: string;
+  },
+): EditResult {
+  const memo = project.objects.find((item) => item.id === edit.sourceMemoId);
+  const target = project.objects.find((item) => item.id === edit.targetObjectId);
+  if (!memo || !isMemoObject(memo) || !target || edit.sourceMemoId === edit.targetObjectId) return noEval(project);
+  if (memo.links.some((link) => link.targetObjectId === edit.targetObjectId && (link.targetSubId ?? "") === (edit.targetSubId ?? ""))) {
+    return noEval(project);
+  }
+  const link = {
+    id: newStableId("l"),
+    sourceMemoId: memo.id,
+    targetObjectId: target.id,
+    targetSubId: edit.targetSubId,
+    targetKind: edit.targetKind ?? targetKindForObject(target),
+    relation: edit.relation ?? "attachment",
+  };
+  return patchMemo(project, memo.id, (current) => ({
+    ...current,
+    links: [...current.links, link],
+    blocks: edit.blockId
+      ? current.blocks.map((block) =>
+          block.id === edit.blockId && block.type === "object-link"
+            ? { ...block, linkIds: [...block.linkIds, link.id] }
+            : block,
+        )
+      : current.blocks,
+  }));
+}
+
+function deleteMemoLink(project: ProjectDocument, memoId: string, linkId: string): EditResult {
+  return patchMemo(project, memoId, (memo) => ({
+    ...memo,
+    links: memo.links.filter((link) => link.id !== linkId),
+    blocks: memo.blocks.map((block) =>
+      block.type === "object-link" ? { ...block, linkIds: block.linkIds.filter((item) => item !== linkId) } : block,
+    ),
+  }));
+}
+
+function addMemoTag(project: ProjectDocument, objectId: string, label: string): EditResult {
+  const tag = normalizeTagLabel(label);
+  if (!tag) return noEval(project);
+  return patchMemo(project, objectId, (memo) => ({
+    ...memo,
+    tags: memo.tags.some((item) => item.normalizedKey === tag.normalizedKey) ? memo.tags : [...memo.tags, tag],
+  }));
+}
+
+function removeMemoTag(project: ProjectDocument, objectId: string, key: string): EditResult {
+  return patchMemo(project, objectId, (memo) => ({
+    ...memo,
+    tags: memo.tags.filter((item) => item.normalizedKey !== key),
+  }));
 }

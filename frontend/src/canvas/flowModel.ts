@@ -15,6 +15,7 @@ import {
   isPointObject,
   pointConnectionIds,
 } from "../lib/worksheet";
+import { isMemoObject, MEMO_ATTACHMENT_HANDLE, memoLinkEdgeId, memosOf } from "../lib/memo";
 import { mappedInputsForObject } from "./mappedInputs";
 import { equipmentBounds } from "../lib/arrangementView";
 import { LAYOUT_NODE_ORIGIN, POINT_NODE_SIZE, toCenterPosition } from "./symbols/grid";
@@ -25,8 +26,22 @@ export function toFlowNodeRecords(
   project: ProjectDocument,
   quantities: QuantitySpec[],
   onEdit: (edit: WorkspaceEdit) => void,
+  onOpenMemo?: (objectId: string) => void,
 ) {
   return project.objects.map((object) => {
+    if (isMemoObject(object)) {
+      return {
+        id: object.id,
+        type: "memoObject" as const,
+        origin: [0, 0] as [number, number],
+        position: object.position,
+        data: { object, project, onEdit, onOpen: onOpenMemo ?? (() => undefined) },
+        draggable: true,
+        style: { width: object.size.width, height: object.size.height },
+        width: object.size.width,
+        height: object.size.height,
+      };
+    }
     if (isLayoutObject(object) && !isCalculationObject(object)) {
       const bounds = object.kind === "equipment" ? equipmentBounds(object) : { width: POINT_NODE_SIZE, height: POINT_NODE_SIZE };
       const height = bounds.height;
@@ -142,9 +157,9 @@ export function toFlowEdges(
         enabled: edge.enabled !== false,
         collapsed,
         sourceObjectId: source?.id ?? edge.sourceObjectId,
-        sourceObjectName: source?.name ?? edge.sourceObjectId,
+        sourceObjectName: objectLabel(source, edge.sourceObjectId),
         targetObjectId: target?.id ?? edge.targetObjectId,
-        targetObjectName: target?.name ?? edge.targetObjectId,
+        targetObjectName: objectLabel(target, edge.targetObjectId),
         onToggle,
         onToggleCollapsed,
       },
@@ -204,7 +219,32 @@ export function toFlowEdges(
     });
   });
 
-  return [...mapping, ...links];
+  const memoLinks = memosOf(project).flatMap((memo) =>
+    memo.links
+      .filter((link) => objects.has(link.targetObjectId))
+      .map((link) => {
+        const target = objects.get(link.targetObjectId);
+        return {
+          id: memoLinkEdgeId(link.id),
+          source: memo.id,
+          target: link.targetObjectId,
+          sourceHandle: MEMO_ATTACHMENT_HANDLE,
+          targetHandle: target && isMemoObject(target) ? MEMO_ATTACHMENT_HANDLE : OBJECT_LINK_HANDLE,
+          type: "memoLink" as const,
+          className: "memo-link-edge",
+          interactionWidth: 16,
+          data: {},
+        };
+      }),
+  );
+
+  return [...mapping, ...links, ...memoLinks];
+}
+
+function objectLabel(object: ProjectDocument["objects"][number] | undefined, fallback: string): string {
+  if (!object) return fallback;
+  if (object.kind === "memo") return object.title?.trim() || object.id;
+  return object.name;
 }
 
 export function mergeFlowNodes<T extends { id: string; data: unknown; position: { x: number; y: number } }>(

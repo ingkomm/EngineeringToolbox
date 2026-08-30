@@ -4,12 +4,22 @@ import type { LibrarySymbol } from "./library";
 import { resolveDrawing } from "./drawing";
 import { DrawingSvg } from "./DrawingSvg";
 
-export function renderSystemLibraryTile(kind: "point" | "calculation", title?: string): ReactElement {
+export function renderSystemLibraryTile(kind: "point" | "calculation" | "memo", title?: string): ReactElement {
   if (kind === "point") {
     return (
       <svg viewBox="0 0 44 44" className="pid-symbol-svg" aria-label={title ?? "Point"}>
         <circle cx="22" cy="22" r="4" fill="none" stroke="currentColor" strokeWidth="1.7" />
         <circle cx="22" cy="22" r="2" fill="currentColor" stroke="none" />
+      </svg>
+    );
+  }
+  if (kind === "memo") {
+    return (
+      <svg viewBox="0 0 44 44" className="pid-symbol-svg" aria-label={title ?? "Memo"}>
+        <rect x="8" y="8" width="28" height="28" rx="3" fill="none" stroke="currentColor" strokeWidth="1.7" />
+        <line x1="14" y1="16" x2="30" y2="16" stroke="currentColor" strokeWidth="1.5" />
+        <line x1="14" y1="22" x2="30" y2="22" stroke="currentColor" strokeWidth="1.5" />
+        <line x1="14" y1="28" x2="24" y2="28" stroke="currentColor" strokeWidth="1.5" />
       </svg>
     );
   }

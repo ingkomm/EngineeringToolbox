@@ -232,7 +232,7 @@ describe("auto-linked ports", () => {
 describe("unique objects and search connectors", () => {
   it("keeps object ids and names unique and rekeys edges", () => {
     let project = applyAll([{ type: "addObject" }]);
-    expect(project.objects.map((item) => [item.id, item.name])).toEqual([
+    expect(project.objects.map((item) => [item.id, "name" in item ? item.name : ""])).toEqual([
       ["obj_1", "Object 1"],
       ["obj_2", "Object 2"],
     ]);
